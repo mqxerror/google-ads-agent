@@ -1,0 +1,28 @@
+[project]
+name = "google-ads-webapp-backend"
+version = "0.1.0"
+description = "Backend for Google Ads Campaign Manager web application"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "aiosqlite>=0.20.0",
+    "sqlmodel>=0.0.22",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.13.1",
+    "google-ads==29.2.0",
+    "fastmcp>=3.1.1",
+    "claude-code-sdk>=0.0.25",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"

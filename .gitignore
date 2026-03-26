@@ -1,0 +1,35 @@
+# Dependencies
+frontend/node_modules/
+backend/.venv/
+
+# Build outputs
+frontend/dist/
+
+# Data
+data/app.db
+data/*.db-journal
+data/*.db-wal
+
+# Environment
+backend/.env
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# UV lock (regenerated on install)
+backend/uv.lock
+
+# Temp files
+*.tmp
+*.log
