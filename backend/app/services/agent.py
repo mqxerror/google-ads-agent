@@ -22,7 +22,45 @@ from app.services.google_ads import GoogleAdsService
 logger = logging.getLogger(__name__)
 
 _NODE_PATH = shutil.which("node") or "node"
-_CLI_JS = Path.home() / "AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js"
+
+# Find Claude CLI JS entry point — cross-platform
+def _find_cli_js() -> Path:
+    """Find the Claude Code CLI JS file across OS platforms."""
+    candidates = [
+        # Windows (npm global)
+        Path.home() / "AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js",
+        # macOS/Linux (npm global)
+        Path("/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
+        Path("/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
+        Path.home() / ".npm-global/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+        # nvm on macOS/Linux
+        Path.home() / ".nvm/versions/node" / "*/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+    ]
+    for p in candidates:
+        if "*" in str(p):
+            # Glob for nvm versioned paths
+            import glob
+            matches = glob.glob(str(p))
+            if matches:
+                return Path(matches[0])
+        elif p.exists():
+            return p
+    # Fallback: try to find via npm root
+    try:
+        import subprocess as _sp
+        result = _sp.run([shutil.which("npm") or "npm", "root", "-g"],
+                         capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            npm_root = Path(result.stdout.strip())
+            cli = npm_root / "@anthropic-ai/claude-code/cli.js"
+            if cli.exists():
+                return cli
+    except Exception:
+        pass
+    # Last resort
+    return Path.home() / "AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js"
+
+_CLI_JS = _find_cli_js()
 _GUIDELINES_DIR = settings.GUIDELINES_DIR
 
 _ads_svc = GoogleAdsService()
