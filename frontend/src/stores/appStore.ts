@@ -24,12 +24,17 @@ interface AppState {
   setShowDashboard: (show: boolean) => void;
 }
 
+const savedDarkMode = localStorage.getItem('darkMode');
+const initialDarkMode = savedDarkMode !== null ? savedDarkMode === 'true' : true;
+// Apply on load before React renders
+if (!initialDarkMode) document.documentElement.classList.add('light');
+
 export const useAppStore = create<AppState>((set) => ({
   selectedAccountId: null,
   selectedCampaignId: null,
   sidebarCollapsed: false,
   chatPanelWidth: 400,
-  darkMode: true,
+  darkMode: initialDarkMode,
   connectedAccounts: [],
   showDashboard: false,
 
@@ -40,6 +45,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleDarkMode: () =>
     set((s) => {
       const newDarkMode = !s.darkMode;
+      localStorage.setItem('darkMode', String(newDarkMode));
       document.documentElement.classList.toggle('light', !newDarkMode);
       return { darkMode: newDarkMode };
     }),

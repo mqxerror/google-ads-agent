@@ -6,13 +6,22 @@ Each role has:
 - Context requirements (what data it needs from Layer A)
 - Memory: reads/writes its own role_notes/{role}.md
 
-The Director auto-selects the right role based on user intent,
-or the user can force a role switch.
+Roles can be customized via markdown files in data/roles/{role_id}.md.
+File-based overrides take priority over built-in defaults.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+import logging
+from dataclasses import dataclass, asdict
+from pathlib import Path
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+_ROLES_DIR = settings.DATA_DIR / "roles"
 
 
 @dataclass
@@ -333,9 +342,110 @@ def list_roles() -> list[dict]:
             "name": r.name,
             "avatar": r.avatar,
             "specialty": r.specialty,
+            "customized": (_ROLES_DIR / f"{r.id}.md").exists(),
         }
         for r in ROLES.values()
     ]
+
+
+def get_role_detail(role_id: str) -> dict | None:
+    """Get full role details including system prompt (for editing)."""
+    role = ROLES.get(role_id)
+    if not role:
+        return None
+    return asdict(role)
+
+
+def save_role_override(role_id: str, updates: dict) -> None:
+    """Save role customizations to a markdown file.
+
+    Only saves the fields that differ from the default.
+    """
+    _ROLES_DIR.mkdir(parents=True, exist_ok=True)
+    role = ROLES.get(role_id)
+    if not role:
+        return
+
+    # Apply updates to the role object
+    if "name" in updates:
+        role.name = updates["name"]
+    if "specialty" in updates:
+        role.specialty = updates["specialty"]
+    if "system_prompt" in updates:
+        role.system_prompt = updates["system_prompt"]
+    if "avatar" in updates:
+        role.avatar = updates["avatar"]
+
+    # Save as markdown file
+    path = _ROLES_DIR / f"{role_id}.md"
+    content = f"""---
+id: {role.id}
+name: {role.name}
+avatar: {role.avatar}
+specialty: {role.specialty}
+---
+
+{role.system_prompt}
+"""
+    path.write_text(content, encoding="utf-8")
+    logger.info("Saved role override: %s", role_id)
+
+
+def load_role_overrides() -> None:
+    """Load role customizations from data/roles/*.md files.
+
+    Call once at startup. File-based roles override built-in defaults.
+    """
+    if not _ROLES_DIR.exists():
+        return
+
+    for path in _ROLES_DIR.glob("*.md"):
+        role_id = path.stem
+        if role_id not in ROLES:
+            continue
+
+        try:
+            content = path.read_text(encoding="utf-8")
+            # Parse frontmatter
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    frontmatter = parts[1].strip()
+                    body = parts[2].strip()
+
+                    meta = {}
+                    for line in frontmatter.split("\n"):
+                        if ": " in line:
+                            key, val = line.split(": ", 1)
+                            meta[key.strip()] = val.strip()
+
+                    role = ROLES[role_id]
+                    if "name" in meta:
+                        role.name = meta["name"]
+                    if "avatar" in meta:
+                        role.avatar = meta["avatar"]
+                    if "specialty" in meta:
+                        role.specialty = meta["specialty"]
+                    if body:
+                        role.system_prompt = body
+
+                    logger.info("Loaded role override: %s (%s)", role_id, role.name)
+        except Exception as e:
+            logger.warning("Failed to load role override %s: %s", role_id, e)
+
+
+def delete_role_override(role_id: str) -> bool:
+    """Delete a role customization file, reverting to default."""
+    path = _ROLES_DIR / f"{role_id}.md"
+    if path.exists():
+        path.unlink()
+        # Reload defaults would require re-registering. For now, restart needed.
+        return True
+    return False
+
+
+# Load overrides at import time
+load_role_overrides()
 
 
 # ── Intent Classification for 3-Gear Routing ──────────────────────

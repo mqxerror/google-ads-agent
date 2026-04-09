@@ -18,7 +18,7 @@ from app.models.schemas import (
 )
 from app.services.agent import stream_agent_response, stop_agent
 from app.services.guidelines import GuidelinesService
-from app.services.roles import list_roles, classify_intent
+from app.services.roles import list_roles, classify_intent, get_role_detail, save_role_override, delete_role_override
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -320,6 +320,44 @@ async def search_conversations(
 @router.get("/roles")
 async def get_available_roles():
     return {"roles": list_roles()}
+
+
+@router.get("/roles/{role_id}")
+async def get_role_details(role_id: str):
+    detail = get_role_detail(role_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return detail
+
+
+@router.put("/roles/{role_id}")
+async def update_role(role_id: str):
+    """Update a role's system prompt, name, or specialty."""
+    import json
+    from starlette.requests import Request
+    # Read raw body since we don't have a schema for this
+    # The frontend sends { name?, specialty?, system_prompt?, avatar? }
+    detail = get_role_detail(role_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return {"status": "use_put_with_body"}
+
+
+@router.post("/roles/{role_id}/customize")
+async def customize_role(role_id: str, body: dict):
+    """Customize a role's prompt, name, or specialty. Saves to data/roles/{role_id}.md."""
+    detail = get_role_detail(role_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Role not found")
+    save_role_override(role_id, body)
+    return {"status": "saved", "role_id": role_id}
+
+
+@router.delete("/roles/{role_id}/customize")
+async def reset_role(role_id: str):
+    """Reset a role to its default prompt."""
+    deleted = delete_role_override(role_id)
+    return {"status": "reset" if deleted else "no_override", "role_id": role_id}
 
 
 @router.post("/roles/classify")
