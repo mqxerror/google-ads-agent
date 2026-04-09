@@ -303,6 +303,10 @@ export function deleteConversation(conversationId: string): Promise<{ deleted: b
   return request(`/conversations/${conversationId}`, { method: 'DELETE' });
 }
 
+export function deleteMessage(conversationId: string, messageId: string): Promise<{ deleted: boolean }> {
+  return request(`/conversations/${conversationId}/messages/${messageId}`, { method: 'DELETE' });
+}
+
 export function stopAgentTask(conversationId: string): Promise<{ stopped: boolean }> {
   return request(`/conversations/${conversationId}/stop`, { method: 'POST' });
 }

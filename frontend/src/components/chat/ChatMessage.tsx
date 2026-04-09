@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
 import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onDelete?: (messageId: string) => void;
 }
 
 /** Internal tools the user doesn't care about (chain-of-thought noise) */
@@ -142,15 +143,33 @@ const ROLE_COLORS: Record<string, string> = {
   growth_hacker: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-400/30',
 };
 
-export default function ChatMessage({ message }: ChatMessageProps) {
+export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const roleName = message.agentRoleName;
   const roleId = message.agentRole;
   const roleAvatar = message.agentRoleAvatar;
+  const [showActions, setShowActions] = useState(false);
 
   return (
-    <div className={cn('px-3 py-2', isUser ? 'flex justify-end' : '')}>
+    <div
+      className={cn('px-3 py-2 group relative', isUser ? 'flex justify-end' : '')}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* Delete button — appears on hover */}
+      {showActions && onDelete && (
+        <button
+          onClick={() => onDelete(message.id)}
+          className={cn(
+            'absolute top-2 z-10 p-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors',
+            isUser ? 'left-2' : 'right-2'
+          )}
+          title="Delete message"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
       <div
         className={cn(
           'rounded-lg px-4 py-3 text-sm leading-relaxed',

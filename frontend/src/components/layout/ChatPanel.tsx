@@ -379,7 +379,18 @@ export default function ChatPanel() {
               </div>
             )}
             {messages.map((msg) => (
-              <ChatMessageComponent key={msg.id} message={msg} />
+              <ChatMessageComponent
+                key={msg.id}
+                message={msg}
+                onDelete={async (msgId) => {
+                  if (!conversationId) return;
+                  try {
+                    const { deleteMessage } = await import('@/lib/api');
+                    await deleteMessage(conversationId, msgId);
+                    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+                  } catch {}
+                }}
+              />
             ))}
             {isResponding && messages[messages.length - 1]?.role === 'user' && (
               <div className="px-4 py-2 text-xs text-muted-foreground animate-pulse">

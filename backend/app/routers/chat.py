@@ -271,6 +271,24 @@ async def delete_conversation(conversation_id: str) -> dict:
         await db.close()
 
 
+@router.delete("/conversations/{conversation_id}/messages/{message_id}")
+async def delete_message(conversation_id: str, message_id: str):
+    """Delete a single message from a conversation."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT id FROM messages WHERE id = ? AND conversation_id = ?",
+            (message_id, conversation_id),
+        )
+        if not await cur.fetchone():
+            raise HTTPException(status_code=404, detail="Message not found")
+        await db.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        await db.commit()
+        return {"deleted": True, "message_id": message_id}
+    finally:
+        await db.close()
+
+
 @router.get("/conversations/search")
 async def search_conversations(
     q: str = Query(..., min_length=1),
