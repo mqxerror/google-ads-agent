@@ -837,7 +837,30 @@ async def stream_agent_response(
                 role_label = msg.get("agent_role_name", "Assistant")
                 prompt_parts.append(f"[{role_label}]: {msg['content'][:400]}")
 
-    prompt_parts.append(f"\n=== CURRENT QUESTION ===\n{user_message}")
+    # Resolve @[title](conv:ID) references — load referenced conversation content
+    import re
+    ref_pattern = re.compile(r'@\[([^\]]+)\]\(conv:([a-f0-9-]+)\)')
+    ref_matches = ref_pattern.findall(user_message)
+    if ref_matches:
+        for ref_title, ref_conv_id in ref_matches:
+            try:
+                ref_msgs = await _get_recent_messages(ref_conv_id, limit=15)
+                if ref_msgs:
+                    prompt_parts.append(f"\n=== REFERENCED CONVERSATION: {ref_title} ===")
+                    for msg in ref_msgs:
+                        if msg["role"] == "user":
+                            prompt_parts.append(f"User: {msg['content'][:300]}")
+                        else:
+                            rl = msg.get("agent_role_name", "Assistant")
+                            prompt_parts.append(f"[{rl}]: {msg['content'][:400]}")
+            except Exception:
+                pass
+        # Clean the references from the displayed message
+        clean_message = ref_pattern.sub(lambda m: f"(ref: {m.group(1)})", user_message)
+    else:
+        clean_message = user_message
+
+    prompt_parts.append(f"\n=== CURRENT QUESTION ===\n{clean_message}")
 
     full_prompt = "\n".join(prompt_parts)
 

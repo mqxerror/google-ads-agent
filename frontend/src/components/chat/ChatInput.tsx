@@ -26,14 +26,22 @@ const ROLE_ICONS: Record<string, string> = {
   chart: '📊', eye: '👁️', code: '💻', rocket: '🚀',
 };
 
+interface ConversationRef {
+  id: string;
+  title: string;
+  campaignName: string | null;
+  messageCount: number;
+}
+
 interface ChatInputProps {
   onSend: (text: string, model: ModelId, roleId?: string) => void;
   disabled: boolean;
   campaignName?: string | null;
   onStop?: () => void;
+  conversations?: ConversationRef[];
 }
 
-export default function ChatInput({ onSend, disabled, campaignName, onStop }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [] }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [model, setModel] = useState<ModelId>('sonnet');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -41,6 +49,10 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop }: Ch
   const [templateCategory, setTemplateCategory] = useState<string>('analyze');
   const [roles, setRoles] = useState<AgencyRole[]>([]);
   const [activeRole, setActiveRole] = useState<string | null>(null);
+  const [showMentions, setShowMentions] = useState(false);
+  const [showSlashRoles, setShowSlashRoles] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [slashFilter, setSlashFilter] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch available roles
@@ -54,25 +66,96 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop }: Ch
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
-    onSend(trimmed, model, activeRole || undefined);
+
+    // Check for /role_name at start of message → override role for this message
+    const slashMatch = trimmed.match(/^\/(\w+)\s+(.*)/s);
+    let messageText = trimmed;
+    let messageRole = activeRole || undefined;
+    if (slashMatch) {
+      const matchedRole = roles.find(r => r.id === slashMatch[1] || r.name.toLowerCase().replace(/\s+/g, '_') === slashMatch[1]);
+      if (matchedRole) {
+        messageRole = matchedRole.id;
+        messageText = slashMatch[2];
+      }
+    }
+
+    onSend(messageText, model, messageRole);
     setValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, disabled, onSend, model, activeRole]);
+  }, [value, disabled, onSend, model, activeRole, roles]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      // Don't send if mention/slash dropdown is open
+      if (showMentions || showSlashRoles) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       handleSend();
     }
+    if (e.key === 'Escape') {
+      setShowMentions(false);
+      setShowSlashRoles(false);
+    }
   };
+
+  // Detect @ and / triggers while typing
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+
+    // @ mention detection — look for @ followed by text
+    const atMatch = newValue.match(/@(\w*)$/);
+    if (atMatch) {
+      setShowMentions(true);
+      setMentionFilter(atMatch[1].toLowerCase());
+      setShowSlashRoles(false);
+    } else {
+      setShowMentions(false);
+    }
+
+    // / role detection — only at start of input
+    const slashMatch = newValue.match(/^\/(\w*)$/);
+    if (slashMatch) {
+      setShowSlashRoles(true);
+      setSlashFilter(slashMatch[1].toLowerCase());
+      setShowMentions(false);
+    } else if (!newValue.startsWith('/')) {
+      setShowSlashRoles(false);
+    }
+  };
+
+  const insertMention = (conv: ConversationRef) => {
+    // Replace the @filter with a reference tag
+    const label = conv.title || conv.campaignName || 'chat';
+    const newValue = value.replace(/@\w*$/, `@[${label}](conv:${conv.id}) `);
+    setValue(newValue);
+    setShowMentions(false);
+    textareaRef.current?.focus();
+  };
+
+  const insertSlashRole = (role: AgencyRole) => {
+    setValue(`/${role.id} `);
+    setShowSlashRoles(false);
+    textareaRef.current?.focus();
+  };
+
+  const filteredConversations = conversations.filter(c =>
+    !mentionFilter || (c.title || c.campaignName || '').toLowerCase().includes(mentionFilter)
+  ).slice(0, 8);
+
+  const filteredSlashRoles = roles.filter(r =>
+    !slashFilter || r.id.includes(slashFilter) || r.name.toLowerCase().includes(slashFilter)
+  );
 
   const handleInput = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    handleChange(el.value);
   };
 
   const handleSelectTemplate = (template: ChatTemplate) => {
@@ -151,6 +234,54 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop }: Ch
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 ml-6">{t.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* @ Mention dropdown — reference previous conversations */}
+      {showMentions && filteredConversations.length > 0 && (
+        <div className="bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div className="px-3 py-1.5 border-b border-border bg-secondary/30">
+            <span className="text-[10px] font-medium text-muted-foreground">Reference a conversation — type @ to search</span>
+          </div>
+          <div className="p-1">
+            {filteredConversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => insertMention(conv)}
+                className="w-full text-left px-3 py-1.5 rounded-md hover:bg-secondary/60 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium truncate">{conv.title || 'Untitled'}</span>
+                  <span className="text-[9px] text-muted-foreground ml-2">{conv.messageCount} msgs</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground truncate">{conv.campaignName || 'General'}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* / Role command dropdown — invoke a role inline */}
+      {showSlashRoles && filteredSlashRoles.length > 0 && (
+        <div className="bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div className="px-3 py-1.5 border-b border-border bg-secondary/30">
+            <span className="text-[10px] font-medium text-muted-foreground">Invoke a specialist — type / then role name</span>
+          </div>
+          <div className="p-1">
+            {filteredSlashRoles.map((role) => (
+              <button
+                key={role.id}
+                onClick={() => insertSlashRole(role)}
+                className="w-full text-left px-3 py-1.5 rounded-md hover:bg-secondary/60 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{ROLE_ICONS[role.avatar] || '👤'}</span>
+                  <span className="text-xs font-medium">/{role.id}</span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{role.name}</span>
+                </div>
               </button>
             ))}
           </div>

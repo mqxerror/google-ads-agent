@@ -401,6 +401,12 @@ export default function ChatPanel() {
           onSend={handleSend}
           disabled={isResponding}
           campaignName={campaign?.name}
+          conversations={conversations.map(c => ({
+            id: c.id,
+            title: c.title || 'Untitled',
+            campaignName: c.campaignName || null,
+            messageCount: c.messageCount || 0,
+          }))}
           onStop={async () => {
             if (conversationId) {
               try { await stopAgentTask(conversationId); } catch {}

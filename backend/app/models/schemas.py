@@ -83,6 +83,7 @@ class ChatMessageRequest(BaseModel):
     account_id: str | None = None
     campaign_id: str | None = None
     model: str = "sonnet"  # sonnet, opus, haiku
+    active_role: str | None = None  # force a specific specialist role
 
 
 class ChatMessageResponse(BaseModel):
