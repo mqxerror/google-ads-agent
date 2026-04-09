@@ -623,9 +623,13 @@ async def stream_agent_response(
         "IMPORTANT: Use the MCP tools directly — they are faster and more reliable than curl commands.",
         "The MCP tools handle authentication, error handling, and retries automatically.",
         "",
-        "IMPORTANT: Campaign data (daily metrics, ad groups, keywords, search terms, targeting) is ALREADY",
-        "included in the LIVE CAMPAIGN DATA section below. DO NOT re-fetch this data.",
-        "Only use MCP tools for: (1) actions/mutations, (2) data NOT in the context, (3) data the user explicitly asks to refresh.",
+        "CRITICAL PERFORMANCE RULE — READ THIS:",
+        "Campaign data (daily metrics, ad groups, keywords, search terms, targeting) is ALREADY in your context below.",
+        "DO NOT call any API, MCP search tool, or curl command to re-fetch data that is already provided.",
+        "This wastes time and makes responses slow. Use the data in your context FIRST.",
+        "Only use MCP tools for: (1) WRITE actions (pause, budget, keywords), (2) data explicitly NOT in context, (3) user says 'refresh'.",
+        "For READ operations: answer from the data below. Do NOT run search__search_campaigns or google_ads__search_google_ads for data already shown.",
+        "Be FAST — answer the question directly from the context data. No unnecessary tool calls.",
         "",
         "For HIGH-IMPACT actions (pause campaign, change bid strategy, change budget >20%), ALWAYS confirm with the user BEFORE executing.",
         "For MEDIUM-IMPACT actions (add keywords, create ads, change targeting), confirm by default.",
@@ -777,6 +781,34 @@ async def stream_agent_response(
         system_parts.append(f"\n=== PAST SESSION HISTORY ===")
         for s in summaries:
             system_parts.append(s)
+
+    # Campaign memory: pinned facts + decisions + role notes
+    if account_id and campaign_id:
+        try:
+            from app.services.campaign_memory import load_pinned_facts, load_decisions, load_role_notes
+
+            pinned = load_pinned_facts(account_id, campaign_id)
+            if pinned and pinned.strip().count("\n") > 4:
+                system_parts.append(f"\n=== PINNED FACTS (always active, never forget these) ===\n{pinned}")
+
+            decisions = load_decisions(account_id, campaign_id, limit=10)
+            if decisions and decisions.strip().count("|") > 10:
+                system_parts.append(f"\n=== RECENT DECISIONS (actions taken on this campaign) ===\n{decisions}")
+
+            # Load previous role findings so this role knows what others found
+            if role_obj and role_obj.id != "director":
+                # Load all role notes, not just current role
+                for rid in ["ppc_strategist", "search_term_hunter", "creative_director", "analytics_analyst"]:
+                    if rid != role_obj.id:
+                        notes = load_role_notes(account_id, campaign_id, rid)
+                        if notes:
+                            system_parts.append(f"\n=== FINDINGS FROM {rid.replace('_', ' ').upper()} ===\n{notes[:800]}")
+                # Load own notes (pick up where you left off)
+                own_notes = load_role_notes(account_id, campaign_id, role_obj.id)
+                if own_notes:
+                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) ===\n{own_notes[:1000]}")
+        except Exception:
+            pass
 
     # Inject active role prompt
     if role_obj.id != "director":
@@ -1016,5 +1048,53 @@ async def stream_agent_response(
         summary = " | ".join(summary_parts)
         try:
             await _save_session_summary(conversation_id, campaign_id, campaign_name, summary[:500])
+        except Exception:
+            pass
+
+    # ── Fix 2: Auto-save to campaign memory (persistent across sessions) ──
+    if len(response_text) > 300 and account_id and campaign_id:
+        try:
+            from app.services.campaign_memory import append_decision, save_role_notes
+
+            # Auto-extract decisions to campaign memory files
+            action_patterns = [
+                ("paused", "pause"), ("enabled", "enable"),
+                ("added negative", "add negative keyword"),
+                ("changed budget", "budget change"),
+                ("adjusted bid", "bid adjustment"),
+                ("added keyword", "add keyword"),
+                ("removed", "remove"),
+            ]
+            for line in response_text.split("\n"):
+                line_lower = line.lower().strip()
+                for pattern, action_type in action_patterns:
+                    if pattern in line_lower and len(line.strip()) > 15:
+                        append_decision(
+                            account_id, campaign_id,
+                            action=line.strip()[:200],
+                            reason=f"User asked: {user_message[:100]}",
+                            outcome="pending",
+                            role=role_obj.id if role_obj else "agent",
+                        )
+                        break
+
+            # Fix 3: Save role findings so next role picks up context
+            if role_obj and role_obj.id != "director":
+                finding_keywords = [
+                    "found", "identified", "recommend", "suggest", "should",
+                    "notice", "pattern", "insight", "result", "analysis",
+                    "total", "top", "worst", "best", "issue", "opportunity",
+                ]
+                findings = [f"**Task:** {user_message[:150]}"]
+                for line in response_text.split("\n"):
+                    ls = line.strip()
+                    if not ls or len(ls) < 15:
+                        continue
+                    if any(kw in ls.lower() for kw in finding_keywords):
+                        findings.append(f"- {ls[:200]}")
+                        if len(findings) >= 12:
+                            break
+                if len(findings) > 1:
+                    save_role_notes(account_id, campaign_id, role_obj.id, "\n".join(findings))
         except Exception:
             pass
