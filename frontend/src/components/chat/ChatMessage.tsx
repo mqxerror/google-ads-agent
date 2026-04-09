@@ -132,14 +132,14 @@ const ROLE_ICONS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  director: 'bg-gray-500/20 text-gray-300',
-  ppc_strategist: 'bg-orange-500/20 text-orange-300',
-  search_term_hunter: 'bg-blue-500/20 text-blue-300',
-  creative_director: 'bg-purple-500/20 text-purple-300',
-  analytics_analyst: 'bg-green-500/20 text-green-300',
-  competitor_intel: 'bg-red-500/20 text-red-300',
-  gtm_specialist: 'bg-cyan-500/20 text-cyan-300',
-  growth_hacker: 'bg-yellow-500/20 text-yellow-300',
+  director: 'bg-gray-500/20 text-gray-700 dark:text-gray-200 border border-gray-400/30',
+  ppc_strategist: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-400/30',
+  search_term_hunter: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-400/30',
+  creative_director: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-400/30',
+  analytics_analyst: 'bg-green-500/20 text-green-700 dark:text-green-300 border border-green-400/30',
+  competitor_intel: 'bg-red-500/20 text-red-700 dark:text-red-300 border border-red-400/30',
+  gtm_specialist: 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-400/30',
+  growth_hacker: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-400/30',
 };
 
 export default function ChatMessage({ message }: ChatMessageProps) {
@@ -161,12 +161,12 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       >
         {/* Role badge for assistant messages */}
         {!isUser && roleName && (
-          <div className="flex items-center gap-1.5 mb-2 -mt-1">
+          <div className="flex items-center gap-1.5 mb-2.5 -mt-0.5">
             <span className={cn(
-              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium',
-              ROLE_COLORS[roleId || ''] || 'bg-primary/20 text-primary'
+              'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold shadow-sm',
+              ROLE_COLORS[roleId || ''] || 'bg-primary/20 text-foreground border border-primary/30'
             )}>
-              <span>{ROLE_ICONS[roleAvatar || ''] || '🤖'}</span>
+              <span className="text-sm">{ROLE_ICONS[roleAvatar || ''] || '🤖'}</span>
               {roleName}
             </span>
           </div>
