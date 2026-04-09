@@ -479,6 +479,42 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
     return "\n".join(parts)
 
 
+def _condense_for_memory(response_text: str, user_message: str, max_chars: int = 3000) -> str:
+    """Condense an agent response into a memory-friendly format.
+
+    Instead of extracting keyword fragments, keep the full analysis but
+    remove noise (tool outputs, raw data tables, formatting).
+    The goal: the next role should read this and know exactly what was found.
+    """
+    lines = response_text.split("\n")
+    parts = [f"**Task:** {user_message[:200]}"]
+
+    # Keep headings, key findings, recommendations — skip raw data/tables
+    skip_section = False
+    kept_chars = 0
+    for line in lines:
+        ls = line.strip()
+        if not ls:
+            continue
+        # Skip raw data tables and code blocks
+        if ls.startswith("```") or ls.startswith("---"):
+            skip_section = not skip_section if ls.startswith("```") else False
+            continue
+        if skip_section:
+            continue
+        # Skip very long data rows (metrics tables)
+        if ls.count("|") > 3 and any(c.isdigit() for c in ls):
+            continue
+        # Keep everything else (headings, analysis, recommendations)
+        parts.append(ls[:400])
+        kept_chars += len(ls)
+        if kept_chars >= max_chars:
+            parts.append("... (truncated)")
+            break
+
+    return "\n".join(parts)
+
+
 # ── Main: Assemble All Layers ────────────────────────────────────
 
 async def stream_agent_response(
@@ -630,6 +666,14 @@ async def stream_agent_response(
         "Only use MCP tools for: (1) WRITE actions (pause, budget, keywords), (2) data explicitly NOT in context, (3) user says 'refresh'.",
         "For READ operations: answer from the data below. Do NOT run search__search_campaigns or google_ads__search_google_ads for data already shown.",
         "Be FAST — answer the question directly from the context data. No unnecessary tool calls.",
+        "",
+        "",
+        "MEMORY AWARENESS: You have access to PINNED FACTS, PAST DECISIONS, and ROLE NOTES from previous sessions below.",
+        "ALWAYS check these before starting work. If a previous role already analyzed something, acknowledge it:",
+        "- 'The GTM Specialist previously found that...'",
+        "- 'Building on yesterday's search term audit...'",
+        "- 'Per the pinned fact about CPA targets...'",
+        "Do NOT repeat work that's already been done unless the user explicitly asks to redo it.",
         "",
         "For HIGH-IMPACT actions (pause campaign, change bid strategy, change budget >20%), ALWAYS confirm with the user BEFORE executing.",
         "For MEDIUM-IMPACT actions (add keywords, create ads, change targeting), confirm by default.",
@@ -1057,24 +1101,37 @@ async def stream_agent_response(
     # ── Auto-summarize for Layer 4 (if response was substantial) ──
     response_text = "".join(full_response_text)
     if len(response_text) > 500 and conversation_id and campaign_id:
-        # Generate a 1-line summary of what was discussed/decided
+        role_label = role_obj.name if role_obj else "Agent"
         summary_parts = []
         if campaign_name:
-            summary_parts.append(f"Campaign: {campaign_name}.")
-        summary_parts.append(f"User asked: {user_message[:100]}")
-        # Extract key decisions/actions from response (first 200 chars of each section)
+            summary_parts.append(f"[{role_label}] Campaign: {campaign_name}.")
+        summary_parts.append(f"Q: {user_message[:120]}")
+
+        # Extract key conclusions — look for headings, bold text, recommendations
+        conclusion_markers = [
+            "recommend", "action", "pause", "increase", "decrease", "switch",
+            "add", "remove", "conclusion", "summary", "finding", "result",
+            "root cause", "fix", "issue", "verified", "confirmed", "critical",
+            "should", "must", "priority", "##", "**",
+        ]
         for line in response_text.split("\n"):
-            if any(kw in line.lower() for kw in ["recommend", "action", "pause", "increase", "decrease", "switch", "add", "remove"]):
-                summary_parts.append(line.strip()[:150])
-                if len(summary_parts) > 4:
+            ls = line.strip()
+            if not ls or len(ls) < 20:
+                continue
+            if any(kw in ls.lower() for kw in conclusion_markers):
+                # Clean markdown formatting for compact storage
+                clean = ls.replace("**", "").replace("##", "").strip()
+                summary_parts.append(clean[:200])
+                if len(summary_parts) > 6:
                     break
+
         summary = " | ".join(summary_parts)
         try:
-            await _save_session_summary(conversation_id, campaign_id, campaign_name, summary[:500])
+            await _save_session_summary(conversation_id, campaign_id, campaign_name, summary[:800])
         except Exception:
             pass
 
-    # ── Fix 2: Auto-save to campaign memory (persistent across sessions) ──
+    # ── Auto-save to campaign memory (persistent across sessions) ──
     if len(response_text) > 300 and account_id and campaign_id:
         try:
             from app.services.campaign_memory import append_decision, save_role_notes
@@ -1082,42 +1139,35 @@ async def stream_agent_response(
             # Auto-extract decisions to campaign memory files
             action_patterns = [
                 ("paused", "pause"), ("enabled", "enable"),
-                ("added negative", "add negative keyword"),
-                ("changed budget", "budget change"),
-                ("adjusted bid", "bid adjustment"),
-                ("added keyword", "add keyword"),
-                ("removed", "remove"),
+                ("added negative", "add negative"), ("changed budget", "budget change"),
+                ("adjusted bid", "bid adjustment"), ("added keyword", "add keyword"),
+                ("removed", "remove"), ("created", "create"), ("updated", "update"),
+                ("fixed", "fix"), ("verified", "verify"), ("confirmed", "confirm"),
+                ("flagged", "flag"), ("identified", "identify"),
             ]
+            decisions_logged = 0
             for line in response_text.split("\n"):
                 line_lower = line.lower().strip()
+                if decisions_logged >= 5:
+                    break
                 for pattern, action_type in action_patterns:
-                    if pattern in line_lower and len(line.strip()) > 15:
+                    if pattern in line_lower and len(line.strip()) > 20:
                         append_decision(
                             account_id, campaign_id,
-                            action=line.strip()[:200],
-                            reason=f"User asked: {user_message[:100]}",
+                            action=line.strip()[:300],
+                            reason=f"User asked: {user_message[:150]}",
                             outcome="pending",
                             role=role_obj.id if role_obj else "agent",
                         )
+                        decisions_logged += 1
                         break
 
-            # Fix 3: Save role findings so next role picks up context
-            if role_obj and role_obj.id != "director":
-                finding_keywords = [
-                    "found", "identified", "recommend", "suggest", "should",
-                    "notice", "pattern", "insight", "result", "analysis",
-                    "total", "top", "worst", "best", "issue", "opportunity",
-                ]
-                findings = [f"**Task:** {user_message[:150]}"]
-                for line in response_text.split("\n"):
-                    ls = line.strip()
-                    if not ls or len(ls) < 15:
-                        continue
-                    if any(kw in ls.lower() for kw in finding_keywords):
-                        findings.append(f"- {ls[:200]}")
-                        if len(findings) >= 12:
-                            break
-                if len(findings) > 1:
-                    save_role_notes(account_id, campaign_id, role_obj.id, "\n".join(findings))
+            # Save comprehensive role findings — capture the FULL analysis, not just fragments
+            role_id = role_obj.id if role_obj else "director"
+            if role_id != "director":
+                # Take the full response (up to 3000 chars) instead of extracting fragments
+                # This ensures the next role gets the complete picture
+                condensed = _condense_for_memory(response_text, user_message, max_chars=3000)
+                save_role_notes(account_id, campaign_id, role_id, condensed)
         except Exception:
             pass
