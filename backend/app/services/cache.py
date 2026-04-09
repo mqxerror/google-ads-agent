@@ -40,7 +40,14 @@ class CacheService:
 
             # Cache miss or stale -- fetch fresh data
             data = await fetch_fn()
-            serialized = json.dumps(data, default=str)
+            # Handle Pydantic models
+            if isinstance(data, list) and data and hasattr(data[0], 'model_dump'):
+                serializable = [item.model_dump() for item in data]
+            elif hasattr(data, 'model_dump'):
+                serializable = data.model_dump()
+            else:
+                serializable = data
+            serialized = json.dumps(serializable, default=str)
 
             await db.execute(
                 "INSERT OR REPLACE INTO cache (key, data, fetched_at) VALUES (?, ?, ?)",

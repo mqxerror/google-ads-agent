@@ -16,7 +16,7 @@ from app.models.schemas import (
     ConversationResponse,
     ToolConfirmRequest,
 )
-from app.services.agent import stream_agent_response
+from app.services.agent import stream_agent_response, stop_agent
 from app.services.guidelines import GuidelinesService
 from app.config import settings
 
@@ -29,11 +29,25 @@ _guidelines_svc = GuidelinesService(settings.GUIDELINES_DIR)
 
 
 @router.get("/conversations", response_model=list[ConversationResponse])
-async def list_conversations() -> list[ConversationResponse]:
+async def list_conversations(
+    account_id: str | None = Query(None),
+    campaign_id: str | None = Query(None),
+) -> list[ConversationResponse]:
     db = await get_db()
     try:
+        conditions = []
+        params: list = []
+        if account_id:
+            conditions.append("account_id = ?")
+            params.append(account_id)
+        if campaign_id:
+            conditions.append("campaign_id = ?")
+            params.append(campaign_id)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         cur = await db.execute(
-            "SELECT * FROM conversations ORDER BY updated_at DESC"
+            f"SELECT c.*, (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as message_count "
+            f"FROM conversations c {where} ORDER BY c.updated_at DESC LIMIT 50",
+            params,
         )
         rows = await cur.fetchall()
         return [
@@ -45,6 +59,7 @@ async def list_conversations() -> list[ConversationResponse]:
                 title=r["title"],
                 created_at=r["created_at"] or "",
                 updated_at=r["updated_at"] or "",
+                message_count=r["message_count"],
             )
             for r in rows
         ]
@@ -221,6 +236,81 @@ async def send_message(
 
 
 # ── Tool confirmation ───────────────────────────────────────────────
+
+
+@router.post("/conversations/{conversation_id}/stop")
+async def stop_agent_task(conversation_id: str) -> dict:
+    """Abort a running agent subprocess for this conversation."""
+    stopped = stop_agent(conversation_id)
+    return {"stopped": stopped}
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str) -> dict:
+    """Delete a conversation and its messages."""
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
+        await db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+        await db.commit()
+        return {"deleted": True}
+    finally:
+        await db.close()
+
+
+@router.get("/conversations/search")
+async def search_conversations(
+    q: str = Query(..., min_length=1),
+    account_id: str | None = Query(None),
+):
+    """Full-text search across conversation messages using FTS5."""
+    db = await get_db()
+    try:
+        # Build query with optional account filter
+        if account_id:
+            cur = await db.execute(
+                """SELECT m.id as message_id, m.conversation_id, m.content, m.created_at,
+                          c.title, c.campaign_name, c.account_id
+                   FROM messages_fts fts
+                   JOIN messages m ON m.rowid = fts.rowid
+                   JOIN conversations c ON c.id = m.conversation_id
+                   WHERE messages_fts MATCH ? AND c.account_id = ?
+                   ORDER BY rank
+                   LIMIT 20""",
+                (q, account_id),
+            )
+        else:
+            cur = await db.execute(
+                """SELECT m.id as message_id, m.conversation_id, m.content, m.created_at,
+                          c.title, c.campaign_name, c.account_id
+                   FROM messages_fts fts
+                   JOIN messages m ON m.rowid = fts.rowid
+                   JOIN conversations c ON c.id = m.conversation_id
+                   WHERE messages_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT 20""",
+                (q,),
+            )
+        rows = await cur.fetchall()
+        results = []
+        for r in rows:
+            content = r["content"]
+            # Create snippet around the match
+            snippet = content[:200] + ("..." if len(content) > 200 else "")
+            results.append({
+                "message_id": r["message_id"],
+                "conversation_id": r["conversation_id"],
+                "content_snippet": snippet,
+                "campaign_name": r["campaign_name"],
+                "title": r["title"],
+                "created_at": r["created_at"] or "",
+            })
+        return results
+    except Exception as e:
+        # FTS5 might not have data yet
+        return []
+    finally:
+        await db.close()
 
 
 @router.post("/conversations/{conversation_id}/confirm/{tool_call_id}")

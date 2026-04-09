@@ -4,6 +4,7 @@ import {
   BarChart3, MousePointerClick, Percent, DollarSign, TrendingUp, Target,
   ChevronRight, ChevronDown, Pause, Play, Pencil,
 } from 'lucide-react';
+import PerformanceChart from '@/components/charts/PerformanceChart';
 import { subDays, format } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
@@ -190,6 +191,9 @@ export default function CampaignOverview({ campaign, accountId }: CampaignOvervi
         <MetricCard label="Conversions" value={formatNumber(m.conversions)} icon={<TrendingUp className="h-3.5 w-3.5" />} />
         <MetricCard label="CPA" value={m.cpa > 0 ? `$${m.cpa.toFixed(2)}` : '—'} icon={<Target className="h-3.5 w-3.5" />} />
       </div>
+
+      {/* Performance Chart */}
+      <PerformanceChart campaignId={campaign.id} />
 
       <Separator />
 

@@ -181,6 +181,102 @@ class GoogleAdsService:
             )
         return result
 
+    # ── daily metrics (for charts) ──────────────────────────────
+
+    async def get_daily_metrics(
+        self,
+        customer_id: str,
+        campaign_id: str,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict]:
+        """Get day-by-day metrics for a single campaign. Returns list of dicts."""
+        d_from, d_to = _default_dates(date_from, date_to)
+        query = f"""
+            SELECT
+              segments.date,
+              metrics.impressions,
+              metrics.clicks,
+              metrics.cost_micros,
+              metrics.conversions,
+              metrics.ctr
+            FROM campaign
+            WHERE campaign.id = {campaign_id}
+              AND segments.date BETWEEN '{d_from}' AND '{d_to}'
+            ORDER BY segments.date
+        """
+        rows = await asyncio.to_thread(
+            _run_query, _clean_id(customer_id), query
+        )
+        result = []
+        for r in rows:
+            cost = r.metrics.cost_micros / 1_000_000
+            clicks = r.metrics.clicks
+            conversions = r.metrics.conversions
+            result.append({
+                "date": str(r.segments.date),
+                "impressions": r.metrics.impressions,
+                "clicks": clicks,
+                "cost": round(cost, 2),
+                "conversions": round(conversions, 1),
+                "ctr": round(r.metrics.ctr * 100, 2) if r.metrics.ctr else 0,
+                "cpc": round(cost / clicks, 2) if clicks > 0 else 0,
+                "cpa": round(cost / conversions, 2) if conversions > 0 else 0,
+            })
+        return result
+
+    async def get_account_daily_metrics(
+        self,
+        customer_id: str,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict]:
+        """Get day-by-day metrics aggregated across all campaigns in account."""
+        d_from, d_to = _default_dates(date_from, date_to)
+        query = f"""
+            SELECT
+              segments.date,
+              metrics.impressions,
+              metrics.clicks,
+              metrics.cost_micros,
+              metrics.conversions
+            FROM campaign
+            WHERE campaign.status != 'REMOVED'
+              AND segments.date BETWEEN '{d_from}' AND '{d_to}'
+            ORDER BY segments.date
+        """
+        rows = await asyncio.to_thread(
+            _run_query, _clean_id(customer_id), query
+        )
+        # Aggregate by date
+        agg: dict[str, dict] = {}
+        for r in rows:
+            d = str(r.segments.date)
+            if d not in agg:
+                agg[d] = {"date": d, "impressions": 0, "clicks": 0, "cost_micros": 0, "conversions": 0.0}
+            agg[d]["impressions"] += r.metrics.impressions
+            agg[d]["clicks"] += r.metrics.clicks
+            agg[d]["cost_micros"] += r.metrics.cost_micros
+            agg[d]["conversions"] += r.metrics.conversions
+
+        result = []
+        for d in sorted(agg.keys()):
+            a = agg[d]
+            cost = a["cost_micros"] / 1_000_000
+            clicks = a["clicks"]
+            conversions = a["conversions"]
+            result.append({
+                "date": d,
+                "impressions": a["impressions"],
+                "clicks": clicks,
+                "cost": round(cost, 2),
+                "conversions": round(conversions, 1),
+                "ctr": round(clicks / a["impressions"] * 100, 2) if a["impressions"] > 0 else 0,
+                "cpc": round(cost / clicks, 2) if clicks > 0 else 0,
+                "cpa": round(cost / conversions, 2) if conversions > 0 else 0,
+            })
+        return result
+
     # ── ad groups ────────────────────────────────────────────────
 
     async def get_adgroups(

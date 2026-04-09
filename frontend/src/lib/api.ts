@@ -5,6 +5,12 @@ import type {
   Ad,
   GuidelineFile,
   Conversation,
+  AccountV2,
+  AccountHealth,
+  DashboardData,
+  Alert,
+  OnboardingResult,
+  CampaignGoal,
 } from '@/types';
 
 const BASE = '/api';
@@ -261,12 +267,62 @@ export function saveGuidelineContent(filename: string, content: string): Promise
 }
 
 // Conversations
-export function fetchConversations(): Promise<Conversation[]> {
-  return request<Conversation[]>('/conversations');
+export function fetchConversations(accountId?: string, campaignId?: string): Promise<Conversation[]> {
+  const params = new URLSearchParams();
+  if (accountId) params.set('account_id', accountId);
+  if (campaignId) params.set('campaign_id', campaignId);
+  const qs = params.toString();
+  return request<Conversation[]>(`/conversations${qs ? `?${qs}` : ''}`).then((convs) =>
+    convs.map((c: any) => ({
+      id: c.id,
+      accountId: c.account_id || '',
+      campaignId: c.campaign_id,
+      campaignName: c.campaign_name,
+      title: c.title,
+      createdAt: c.created_at || '',
+      updatedAt: c.updated_at || '',
+      messageCount: c.message_count || 0,
+    }))
+  );
 }
 
-export function createConversation(data: { account_id?: string; campaign_id?: string; title?: string }): Promise<Conversation> {
-  return request<Conversation>('/conversations', { method: 'POST', body: JSON.stringify(data) });
+export function createConversation(data: { account_id?: string; campaign_id?: string; campaign_name?: string; title?: string }): Promise<Conversation> {
+  return request<any>('/conversations', { method: 'POST', body: JSON.stringify(data) }).then((c) => ({
+    id: c.id,
+    accountId: c.account_id || '',
+    campaignId: c.campaign_id,
+    campaignName: c.campaign_name,
+    title: c.title,
+    createdAt: c.created_at || '',
+    updatedAt: c.updated_at || '',
+    messageCount: 0,
+  }));
+}
+
+export function deleteConversation(conversationId: string): Promise<{ deleted: boolean }> {
+  return request(`/conversations/${conversationId}`, { method: 'DELETE' });
+}
+
+export function stopAgentTask(conversationId: string): Promise<{ stopped: boolean }> {
+  return request(`/conversations/${conversationId}/stop`, { method: 'POST' });
+}
+
+export function searchConversations(query: string, accountId?: string): Promise<import('@/types').ConversationSearchResult[]> {
+  const params = new URLSearchParams({ q: query });
+  if (accountId) params.set('account_id', accountId);
+  return request(`/conversations/search?${params.toString()}`);
+}
+
+export function fetchMessages(conversationId: string): Promise<import('@/types').ChatMessage[]> {
+  return request<any[]>(`/conversations/${conversationId}/messages`).then((msgs) =>
+    msgs.map((m) => ({
+      id: m.id,
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+      toolCalls: m.tool_input ? JSON.parse(m.tool_input) : undefined,
+      createdAt: m.created_at || '',
+    }))
+  );
 }
 
 export async function sendMessage(conversationId: string, content: string): Promise<ReadableStream<Uint8Array> | null> {
@@ -282,4 +338,143 @@ export async function sendMessage(conversationId: string, content: string): Prom
 // Setup
 export function fetchSetupStatus(): Promise<{ configured: boolean }> {
   return request('/setup/status');
+}
+
+// ── V2: Multi-Account API ──────────────────────────────────────────
+
+export function fetchAccountsV2(): Promise<AccountV2[]> {
+  return request<AccountV2[]>('/v2/accounts');
+}
+
+export function fetchDashboard(): Promise<DashboardData> {
+  return request<DashboardData>('/v2/dashboard');
+}
+
+export function addAccount(data: {
+  developer_token: string;
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+  login_customer_id: string;
+}): Promise<AccountV2> {
+  return request<AccountV2>('/v2/accounts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function removeAccount(accountId: string): Promise<{ deleted: boolean }> {
+  return request(`/v2/accounts/${accountId}`, { method: 'DELETE' });
+}
+
+export function onboardAccount(accountId: string): Promise<OnboardingResult> {
+  return request<OnboardingResult>(`/v2/accounts/${accountId}/onboard`, {
+    method: 'POST',
+  });
+}
+
+export function fetchAlerts(accountId: string): Promise<Alert[]> {
+  return request<Alert[]>(`/v2/accounts/${accountId}/alerts`);
+}
+
+export function dismissAlert(accountId: string, alertId: number): Promise<{ dismissed: boolean }> {
+  return request(`/v2/accounts/${accountId}/alerts/${alertId}/dismiss`, { method: 'POST' });
+}
+
+export function fetchCampaignGoals(accountId: string, campaignId: string): Promise<CampaignGoal> {
+  return request<CampaignGoal>(`/v2/accounts/${accountId}/campaigns/${campaignId}/goals`);
+}
+
+// ── V2: Chart Data ─────────────────────────────────────────────
+
+export interface DailyMetric {
+  date: string;
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  ctr: number;
+  cpc: number;
+  cpa: number;
+}
+
+export function fetchCampaignChart(
+  accountId: string,
+  campaignId: string,
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<DailyMetric[]> {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  const qs = params.toString();
+  return request<DailyMetric[]>(`/accounts/${accountId}/campaigns/${campaignId}/chart${qs ? `?${qs}` : ''}`);
+}
+
+export function fetchAccountChart(
+  accountId: string,
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<DailyMetric[]> {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  const qs = params.toString();
+  return request<DailyMetric[]>(`/accounts/${accountId}/chart${qs ? `?${qs}` : ''}`);
+}
+
+// ── Settings ──────────────────────────────────────────────
+
+export interface AppSettings {
+  chrome_mcp_enabled: boolean;
+  chrome_reuse_existing: boolean;
+  chrome_use_default_profile: boolean;
+  chrome_debug_port: number;
+  gtm_mcp_enabled: boolean;
+  gtm_mcp_command: string;
+  google_ads_configured: boolean;
+  google_ads_login_customer_id: string;
+  mcp_status: Record<string, {
+    enabled: boolean;
+    available?: boolean;
+    tools?: string;
+    info?: string;
+    path?: string;
+    reason?: string;
+  }>;
+}
+
+export async function fetchSettings(): Promise<AppSettings> {
+  return request<AppSettings>('/settings');
+}
+
+export async function updateSettings(data: {
+  chrome_mcp_enabled?: boolean;
+  chrome_reuse_existing?: boolean;
+  chrome_use_default_profile?: boolean;
+  gtm_mcp_enabled?: boolean;
+  gtm_mcp_command?: string;
+}): Promise<{ status: string; mcp_status: Record<string, unknown> }> {
+  const res = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Settings update failed: ${res.status}`);
+  return res.json();
+}
+
+export async function launchChrome(): Promise<{ status: string; message?: string; profile_dir?: string }> {
+  const res = await fetch('/api/settings/chrome/launch', { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Launch failed' }));
+    throw new Error(err.detail || 'Launch failed');
+  }
+  return res.json();
+}
+
+export async function stopChrome(): Promise<{ status: string }> {
+  const res = await fetch('/api/settings/chrome/stop', { method: 'POST' });
+  if (!res.ok) throw new Error('Stop failed');
+  return res.json();
 }

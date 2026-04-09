@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ interface KeywordTableProps {
 export default function KeywordTable({ accountId, campaignId }: KeywordTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('impressions');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const { data: keywords = [], isLoading } = useQuery({
     queryKey: ['keywords', accountId, campaignId],
@@ -43,6 +45,13 @@ export default function KeywordTable({ accountId, campaignId }: KeywordTableProp
     });
   }, [keywords, sortKey, sortDir]);
 
+  const rowVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 36,
+    overscan: 20,
+  });
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
@@ -65,7 +74,8 @@ export default function KeywordTable({ accountId, campaignId }: KeywordTableProp
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      <table className="w-full text-xs">
+      {/* Header */}
+      <table className="w-full text-xs table-fixed">
         <thead>
           <tr className="bg-secondary/30 border-b border-border">
             {columns.map(col => (
@@ -82,28 +92,47 @@ export default function KeywordTable({ accountId, campaignId }: KeywordTableProp
             ))}
           </tr>
         </thead>
-        <tbody>
-          {sorted.map((kw: Keyword, idx: number) => (
-            <tr key={`${kw.id}-${kw.matchType}-${idx}`} className="border-b border-border last:border-0 hover:bg-secondary/20">
-              <td className="px-3 py-2 font-medium">{kw.text}</td>
-              <td className="px-3 py-2">
-                <Badge variant="secondary" className="text-[10px]">{kw.matchType}</Badge>
-              </td>
-              <td className="px-3 py-2 text-muted-foreground truncate max-w-[150px]">{kw.adGroupName}</td>
-              <td className="px-3 py-2">
-                <span className={cn('text-[10px]', kw.status === 'ENABLED' ? 'text-status-enabled' : 'text-status-paused')}>
-                  {kw.status}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-center">{kw.qualityScore ?? '—'}</td>
-              <td className="px-3 py-2 text-right">{formatNumber(kw.metrics.impressions)}</td>
-              <td className="px-3 py-2 text-right">{formatNumber(kw.metrics.clicks)}</td>
-              <td className="px-3 py-2 text-right">{kw.metrics.conversions}</td>
-              <td className="px-3 py-2 text-right">{kw.metrics.cpa > 0 ? formatMicros(kw.metrics.cpa * 1_000_000) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
       </table>
+
+      {/* Virtualized body */}
+      <div ref={parentRef} className="max-h-[500px] overflow-auto">
+        <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const kw = sorted[virtualRow.index];
+            return (
+              <div
+                key={virtualRow.key}
+                className="absolute w-full flex items-center text-xs border-b border-border last:border-0 hover:bg-secondary/20"
+                style={{
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <span className="px-3 py-2 flex-[2] font-medium truncate">{kw.text}</span>
+                <span className="px-3 py-2 flex-1">
+                  <Badge variant="secondary" className="text-[10px]">{kw.matchType}</Badge>
+                </span>
+                <span className="px-3 py-2 flex-[1.5] text-muted-foreground truncate">{kw.adGroupName}</span>
+                <span className="px-3 py-2 flex-1">
+                  <span className={cn('text-[10px]', kw.status === 'ENABLED' ? 'text-status-enabled' : 'text-status-paused')}>
+                    {kw.status}
+                  </span>
+                </span>
+                <span className="px-3 py-2 flex-[0.5] text-center">{kw.qualityScore ?? '—'}</span>
+                <span className="px-3 py-2 flex-1 text-right">{formatNumber(kw.metrics.impressions)}</span>
+                <span className="px-3 py-2 flex-1 text-right">{formatNumber(kw.metrics.clicks)}</span>
+                <span className="px-3 py-2 flex-1 text-right">{kw.metrics.conversions}</span>
+                <span className="px-3 py-2 flex-1 text-right">{kw.metrics.cpa > 0 ? formatMicros(kw.metrics.cpa * 1_000_000) : '—'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Row count */}
+      <div className="px-3 py-1.5 text-[10px] text-muted-foreground bg-secondary/20 border-t border-border">
+        {sorted.length} keyword{sorted.length !== 1 ? 's' : ''}
+      </div>
     </div>
   );
 }

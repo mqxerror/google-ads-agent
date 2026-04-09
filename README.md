@@ -6,10 +6,13 @@ A local web application for managing Google Ads campaigns with an AI-powered cha
 
 ### Prerequisites
 
-- **Node.js** 20+ and npm
-- **Python** 3.12+ and [uv](https://docs.astral.sh/uv/)
+- **Python** 3.12+
 - **Claude Code** CLI (`npm install -g @anthropic-ai/claude-code`) — for AI chat agent
 - **Google Ads API credentials** (developer token, OAuth client ID/secret, refresh token)
+
+> **Note:** The installer automatically handles missing or outdated dependencies:
+> - **Node.js** — Installed/upgraded via [nvm](https://github.com/nvm-sh/nvm) (Mac/Linux) or [winget](https://learn.microsoft.com/en-us/windows/package-manager/) (Windows) if missing or below the required version (20.19+)
+> - **uv** — [uv](https://docs.astral.sh/uv/) (Python package manager) is installed automatically if not already present
 
 ### Install & Run (one command)
 

@@ -9,6 +9,8 @@ frontend/dist/
 data/app.db
 data/*.db-journal
 data/*.db-wal
+data/chrome-profile/
+data/chrome-agent-profile/
 
 # Environment
 backend/.env

@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CampaignOverview from './CampaignOverview';
 import KeywordTable from './KeywordTable';
 import AdList from './AdList';
+import SearchTermManager from './SearchTermManager';
 import GuidelinesViewer from '@/components/guidelines/GuidelinesViewer';
 import { formatBiddingStrategy } from '@/lib/formatters';
 import type { Campaign } from '@/types';
@@ -25,6 +26,7 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
         <TabsList className="bg-secondary/50">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="keywords">Keywords</TabsTrigger>
+          <TabsTrigger value="search-terms">Search Terms</TabsTrigger>
           <TabsTrigger value="ads">Ads</TabsTrigger>
           <TabsTrigger value="guidelines">Guidelines</TabsTrigger>
         </TabsList>
@@ -35,6 +37,10 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
 
         <TabsContent value="keywords" className="mt-4">
           <KeywordTable accountId={accountId} campaignId={campaign.id} />
+        </TabsContent>
+
+        <TabsContent value="search-terms" className="mt-4">
+          <SearchTermManager campaignId={campaign.id} />
         </TabsContent>
 
         <TabsContent value="ads" className="mt-4">

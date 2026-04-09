@@ -1,31 +1,83 @@
 import { useState } from 'react';
-import { Settings, Command, Sun, Moon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
+import { fetchAccountsV2, removeAccount } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
   onOpenCommandPalette: () => void;
+  onOpenSettings?: () => void;
 }
 
-export default function Header({ onOpenCommandPalette }: HeaderProps) {
-  const { selectedAccountId, setSelectedAccount, setSelectedCampaign, darkMode, toggleDarkMode } = useAppStore();
+export default function Header({ onOpenCommandPalette, onOpenSettings }: HeaderProps) {
+  const {
+    selectedAccountId,
+    connectedAccounts,
+    setConnectedAccounts,
+    switchAccount,
+    setShowDashboard,
+    darkMode,
+    toggleDarkMode,
+  } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const currentAccountName = selectedAccountId ? 'Mercan Group' : 'Select account';
+  // Fetch V2 accounts and sync to store
+  const { refetch } = useQuery({
+    queryKey: ['accounts-v2'],
+    queryFn: async () => {
+      const accounts = await fetchAccountsV2();
+      setConnectedAccounts(accounts);
+      return accounts;
+    },
+    staleTime: 60_000,
+  });
+
+  const currentAccount = connectedAccounts.find((a) => a.id === selectedAccountId);
+  // Show the account name, falling back to the first connected account's name
+  const currentAccountName = currentAccount?.name
+    || connectedAccounts[0]?.name
+    || (selectedAccountId ? `Account ${selectedAccountId}` : 'Select account');
+
+  const handleRemoveAccount = async (accountId: string) => {
+    if (!confirm(`Remove account ${accountId} and all its data?`)) return;
+    await removeAccount(accountId);
+    refetch();
+    if (selectedAccountId === accountId) {
+      setShowDashboard(true);
+    }
+  };
 
   return (
     <header className="h-12 flex items-center justify-between px-4 bg-card border-b border-border shrink-0">
       {/* Left */}
       <div className="flex items-center gap-3">
-        <h1 className="text-sm font-semibold text-foreground tracking-tight">
-          Google Ads Manager
-        </h1>
+        <button
+          onClick={() => setShowDashboard(true)}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <h1 className="text-sm font-semibold text-foreground tracking-tight">
+            Google Ads Agent
+          </h1>
+        </button>
+        {connectedAccounts.length > 1 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground gap-1"
+            onClick={() => setShowDashboard(true)}
+          >
+            <LayoutDashboard className="h-3 w-3" />
+            Dashboard
+          </Button>
+        )}
       </div>
 
       {/* Center - Account selector */}
@@ -37,12 +89,26 @@ export default function Header({ onOpenCommandPalette }: HeaderProps) {
               <span>{currentAccountName}</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="center">
+          <DropdownMenuContent align="center" className="w-64">
+            {connectedAccounts.map((acct) => (
+              <DropdownMenuItem
+                key={acct.id}
+                onClick={() => switchAccount(acct.id)}
+                className="text-xs flex justify-between items-center"
+              >
+                <span className={acct.id === selectedAccountId ? 'font-medium' : ''}>
+                  {acct.name}
+                </span>
+                <span className="text-muted-foreground text-[10px]">{acct.id}</span>
+              </DropdownMenuItem>
+            ))}
+            {connectedAccounts.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem
-              onClick={() => { setSelectedAccount('7178239091'); setSelectedCampaign(null); }}
-              className="text-xs"
+              onClick={() => window.location.assign('/setup')}
+              className="text-xs gap-2"
             >
-              Mercan Group Main Account
+              <Plus className="h-3 w-3" />
+              Add Account
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -69,9 +135,26 @@ export default function Header({ onOpenCommandPalette }: HeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {onOpenSettings && (
+              <DropdownMenuItem onClick={() => { setSettingsOpen(false); onOpenSettings(); }}>
+                <Settings className="h-3 w-3 mr-2" />
+                Settings
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => window.location.assign('/setup')}>
-              Setup Wizard
+              <Plus className="h-3 w-3 mr-2" />
+              Add Account
             </DropdownMenuItem>
+            {selectedAccountId && (
+              <DropdownMenuItem
+                onClick={() => handleRemoveAccount(selectedAccountId)}
+                className="text-destructive"
+              >
+                <Trash2 className="h-3 w-3 mr-2" />
+                Remove Current Account
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

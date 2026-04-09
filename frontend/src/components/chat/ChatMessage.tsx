@@ -1,15 +1,134 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
-import type { ChatMessage as ChatMessageType } from '@/types';
+import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
 
 interface ChatMessageProps {
   message: ChatMessageType;
 }
 
+/** Internal tools the user doesn't care about (chain-of-thought noise) */
+const INTERNAL_TOOLS = new Set(['ToolSearch', 'Read', 'Glob', 'Grep', 'Write', 'Edit', 'Bash', 'Agent', 'Task', 'TodoWrite']);
+
+function isActionTool(tc: ToolCall) {
+  return !INTERNAL_TOOLS.has(tc.name);
+}
+
+function ToolCallsSummary({ toolCalls }: { toolCalls: ToolCall[] }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const actions = toolCalls.filter(isActionTool);
+  const internal = toolCalls.filter((tc) => !isActionTool(tc));
+
+  const allDone = toolCalls.every((tc) => tc.status !== 'pending');
+  const hasError = toolCalls.some((tc) => tc.status === 'error');
+  const pendingCount = toolCalls.filter((tc) => tc.status === 'pending').length;
+
+  // Status indicator
+  const statusEl = !allDone ? (
+    <span className="flex items-center gap-1 text-muted-foreground">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      <span>{pendingCount} running</span>
+    </span>
+  ) : hasError ? (
+    <span className="flex items-center gap-1 text-destructive">
+      <X className="h-3 w-3" />
+      <span>error</span>
+    </span>
+  ) : (
+    <span className="flex items-center gap-1 text-status-enabled">
+      <Check className="h-3 w-3" />
+      <span>done</span>
+    </span>
+  );
+
+  // Summary label
+  const actionNames = actions.map((a) => a.name);
+  const uniqueActions = [...new Set(actionNames)];
+  const summaryText =
+    actions.length === 0
+      ? `${internal.length} internal operation${internal.length !== 1 ? 's' : ''}`
+      : uniqueActions.length <= 3
+        ? uniqueActions.join(', ')
+        : `${uniqueActions.slice(0, 2).join(', ')} +${uniqueActions.length - 2} more`;
+
+  return (
+    <div className="mt-2 border border-border/60 rounded-md text-xs overflow-hidden">
+      {/* Compact summary bar */}
+      <button
+        onClick={() => setShowAll(!showAll)}
+        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary/40 transition-colors"
+      >
+        {showAll ? (
+          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+        )}
+        <Wrench className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground truncate">
+          {actions.length > 0 && (
+            <span className="font-medium text-foreground">{actions.length} tool{actions.length !== 1 ? 's' : ''}</span>
+          )}
+          {actions.length > 0 && internal.length > 0 && ' · '}
+          {internal.length > 0 && (
+            <span>{internal.length} internal</span>
+          )}
+          <span className="ml-1.5 text-muted-foreground/70">— {summaryText}</span>
+        </span>
+        <span className="ml-auto shrink-0">{statusEl}</span>
+      </button>
+
+      {/* Expanded: show action tools inline, internal tools nested */}
+      {showAll && (
+        <div className="border-t border-border/40">
+          {/* Action tools (MCP calls, API calls) — always shown when expanded */}
+          {actions.length > 0 && (
+            <div className="px-1 py-1 space-y-0.5">
+              {actions.map((tc) => (
+                <ToolCallBlock key={tc.id} toolCall={tc} />
+              ))}
+            </div>
+          )}
+
+          {/* Internal tools (ToolSearch, Read, etc.) — extra nested */}
+          {internal.length > 0 && (
+            <InternalToolsGroup tools={internal} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border-t border-border/30">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-3 py-1 text-[10px] text-muted-foreground hover:bg-secondary/30 transition-colors"
+      >
+        {expanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+        <span>{tools.length} internal operation{tools.length !== 1 ? 's' : ''} (ToolSearch, etc.)</span>
+      </button>
+      {expanded && (
+        <div className="px-1 pb-1 space-y-0.5">
+          {tools.map((tc) => (
+            <ToolCallBlock key={tc.id} toolCall={tc} compact />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
 
   return (
     <div className={cn('px-3 py-2', isUser ? 'flex justify-end' : '')}>
@@ -48,13 +167,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
 
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {message.toolCalls.map((tc) => (
-              <ToolCallBlock key={tc.id} toolCall={tc} />
-            ))}
-          </div>
-        )}
+        {hasToolCalls && <ToolCallsSummary toolCalls={message.toolCalls!} />}
       </div>
     </div>
   );

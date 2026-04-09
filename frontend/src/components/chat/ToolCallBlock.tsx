@@ -5,13 +5,20 @@ import type { ToolCall } from '@/types';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
+  compact?: boolean;
 }
 
-export default function ToolCallBlock({ toolCall }: ToolCallBlockProps) {
+const SOURCE_CONFIG = {
+  'google-ads-mcp': { icon: '🔌', label: 'MCP', color: 'text-green-400' },
+  'google-ads': { icon: '🔧', label: 'API', color: 'text-tool-api' },
+  chrome: { icon: '🌐', label: 'Browser', color: 'text-tool-browser' },
+  gtm: { icon: '🏷️', label: 'GTM', color: 'text-orange-400' },
+} as const;
+
+export default function ToolCallBlock({ toolCall, compact }: ToolCallBlockProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const sourceIcon = toolCall.source === 'google-ads' ? '🔧' : '🌐';
-  const sourceColor = toolCall.source === 'google-ads' ? 'text-tool-api' : 'text-tool-browser';
+  const config = SOURCE_CONFIG[toolCall.source] || SOURCE_CONFIG['google-ads'];
 
   const statusIcon =
     toolCall.status === 'pending' ? (
@@ -22,24 +29,34 @@ export default function ToolCallBlock({ toolCall }: ToolCallBlockProps) {
       <X className="h-3 w-3 text-destructive" />
     );
 
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 px-2 py-0.5 text-[10px] text-muted-foreground">
+        <span className="opacity-60">{config.icon}</span>
+        <span className="font-mono truncate">{toolCall.name}</span>
+        <span className="ml-auto shrink-0">{statusIcon}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="border border-border rounded-md my-2 text-xs">
+    <div className="rounded text-xs">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary/40 transition-colors"
+        className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/40 rounded transition-colors"
       >
         {expanded ? (
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
         )}
-        <span>{sourceIcon}</span>
-        <span className={cn('font-mono', sourceColor)}>{toolCall.name}</span>
-        <span className="ml-auto">{statusIcon}</span>
+        <span>{config.icon}</span>
+        <span className={cn('font-mono truncate', config.color)}>{toolCall.name}</span>
+        <span className="ml-auto shrink-0">{statusIcon}</span>
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-2">
+        <div className="px-2 pb-2 space-y-2 ml-5">
           <div>
             <div className="text-muted-foreground mb-1">Input</div>
             <pre className="bg-secondary/50 rounded-sm p-2 overflow-x-auto font-mono text-[11px]">
@@ -49,7 +66,7 @@ export default function ToolCallBlock({ toolCall }: ToolCallBlockProps) {
           {toolCall.output && (
             <div>
               <div className="text-muted-foreground mb-1">Output</div>
-              <pre className="bg-secondary/50 rounded-sm p-2 overflow-x-auto font-mono text-[11px]">
+              <pre className="bg-secondary/50 rounded-sm p-2 overflow-x-auto font-mono text-[11px] max-h-40 overflow-y-auto">
                 {JSON.stringify(toolCall.output, null, 2)}
               </pre>
             </div>

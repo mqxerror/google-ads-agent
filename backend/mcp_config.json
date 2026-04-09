@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "google-ads": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "python", "google_ads/mcp_main.py", "--groups", "core,targeting,bidding,planning,reporting"],
+      "cwd": null
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "google-ads": {
+      "type": "stdio",
+      "command": "/Users/mqxerrormac16/.local/bin/uv",
+      "args": [
+        "run",
+        "--directory",
+        "/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend",
+        "python",
+        "/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend/google_ads/mcp_main.py",
+        "--groups",
+        "core,targeting,bidding,planning,reporting"
+      ],
+      "cwd": "/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend",
+      "env": {
+        "PYTHONPATH": "/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend"
+      }
+    },
+    "chrome": {
+      "type": "stdio",
+      "command": "/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin/npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--browser-url",
+        "http://127.0.0.1:9222"
+      ],
+      "env": {
+        "PATH": "/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin:/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend/.venv/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/Users/mqxerrormac16/.antigravity/extensions/ms-python.debugpy-2025.18.0-darwin-arm64/bundled/scripts/noConfigScripts:/Users/mqxerrormac16/.claude/plugins/cache/claude-plugins-official/context7/unknown/bin"
+      }
+    }
+  }
+}

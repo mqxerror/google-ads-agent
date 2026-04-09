@@ -6,6 +6,13 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Load nvm if available (needed for nvm-managed Node installs)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Ensure uv is on PATH
+export PATH="$HOME/.local/bin:$PATH"
+
 echo "=========================================="
 echo "  Google Ads Campaign Manager"
 echo "=========================================="

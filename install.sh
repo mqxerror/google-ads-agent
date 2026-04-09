@@ -12,11 +12,47 @@ echo ""
 # Check prerequisites
 echo "[1/5] Checking prerequisites..."
 
+# Minimum Node.js version required (major.minor)
+REQUIRED_NODE_MAJOR=20
+REQUIRED_NODE_MINOR=19
+
+# Load nvm if available (needed for nvm-managed Node installs)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+install_or_upgrade_node() {
+  echo "  Installing nvm and Node.js >= $REQUIRED_NODE_MAJOR.$REQUIRED_NODE_MINOR..."
+  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  fi
+  nvm install "$REQUIRED_NODE_MAJOR"
+  nvm use --delete-prefix "$REQUIRED_NODE_MAJOR" 2>/dev/null || nvm use "$REQUIRED_NODE_MAJOR"
+}
+
 if ! command -v node &>/dev/null; then
-  echo "ERROR: Node.js not found. Install from https://nodejs.org/"
-  exit 1
+  echo "  Node.js not found — installing automatically..."
+  install_or_upgrade_node
+  if ! command -v node &>/dev/null; then
+    echo "ERROR: Failed to install Node.js. Install manually from https://nodejs.org/"
+    exit 1
+  fi
+  echo "  Node.js: $(node --version) (just installed)"
+else
+  # Check if Node.js version meets minimum requirement
+  NODE_VERSION=$(node --version | sed 's/^v//')
+  NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
+  NODE_MINOR=$(echo "$NODE_VERSION" | cut -d. -f2)
+  if [ "$NODE_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ] || \
+     { [ "$NODE_MAJOR" -eq "$REQUIRED_NODE_MAJOR" ] && [ "$NODE_MINOR" -lt "$REQUIRED_NODE_MINOR" ]; }; then
+    echo "  Node.js $(node --version) is too old (need >= $REQUIRED_NODE_MAJOR.$REQUIRED_NODE_MINOR) — upgrading..."
+    install_or_upgrade_node
+    echo "  Node.js: $(node --version) (upgraded)"
+  else
+    echo "  Node.js: $(node --version)"
+  fi
 fi
-echo "  Node.js: $(node --version)"
 
 if ! command -v npm &>/dev/null; then
   echo "ERROR: npm not found."
@@ -25,10 +61,18 @@ fi
 echo "  npm: $(npm --version)"
 
 if ! command -v uv &>/dev/null; then
-  echo "ERROR: uv not found. Install from https://docs.astral.sh/uv/"
-  exit 1
+  echo "  uv not found — installing automatically..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Source the updated PATH so uv is available in this session
+  export PATH="$HOME/.local/bin:$PATH"
+  if ! command -v uv &>/dev/null; then
+    echo "ERROR: Failed to install uv. Install manually from https://docs.astral.sh/uv/"
+    exit 1
+  fi
+  echo "  uv: $(uv --version) (just installed)"
+else
+  echo "  uv: $(uv --version)"
 fi
-echo "  uv: $(uv --version)"
 
 if ! command -v claude &>/dev/null; then
   echo "WARNING: Claude Code CLI not found. AI chat will not work."

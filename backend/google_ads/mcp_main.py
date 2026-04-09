@@ -421,8 +421,8 @@ else:
     logger.info(f"Mounting server groups: {args.groups}")
 
 # Mount the selected servers
-for prefix, server in servers_to_mount:
-    mcp.mount(server, prefix=prefix)
+for namespace, server in servers_to_mount:
+    mcp.mount(server, namespace=namespace)
 
 
 @mcp.tool
@@ -458,7 +458,7 @@ def signal_handler(signum: int, frame: Optional[FrameType]) -> None:
 
 async def run_with_shutdown():
     """Run the MCP server with graceful shutdown support."""
-    tools = await mcp.get_tools()
+    tools = await mcp.list_tools()
     logger.info(
         f"Registered tools: {len(tools)} tools from {len(servers_to_mount)} servers"
     )

@@ -70,7 +70,7 @@ export interface ChatMessage {
 
 export interface ToolCall {
   id: string;
-  source: 'google-ads' | 'chrome';
+  source: 'google-ads' | 'google-ads-mcp' | 'chrome' | 'gtm';
   name: string;
   input: Record<string, unknown>;
   output?: Record<string, unknown>;
@@ -92,4 +92,73 @@ export interface Conversation {
   campaignName: string | null;
   title: string | null;
   createdAt: string;
+  updatedAt?: string;
+  messageCount?: number;
+}
+
+export interface ConversationSearchResult {
+  message_id: string;
+  conversation_id: string;
+  content_snippet: string;
+  campaign_name: string | null;
+  title: string | null;
+  created_at: string;
+}
+
+// V2: Multi-Account
+export interface AccountV2 {
+  id: string;
+  name: string;
+  mcc_id: string | null;
+  level: string;
+  is_active: boolean;
+  onboarded_at: string | null;
+  last_synced: string | null;
+}
+
+export interface AccountHealth {
+  id: string;
+  name: string;
+  health: 'healthy' | 'warning' | 'critical' | 'unknown';
+  active_campaigns: number;
+  total_spend_30d: number;
+  total_conversions_30d: number;
+  avg_cpa: number;
+  alert_count: number;
+  last_synced: string | null;
+}
+
+export interface DashboardData {
+  accounts: AccountHealth[];
+  total_alerts: number;
+  total_spend_30d: number;
+}
+
+export interface CampaignGoal {
+  campaign_id: string;
+  campaign_name: string | null;
+  objective: string;
+  phase: string;
+  target_cpa: number | null;
+  target_roas: number | null;
+}
+
+export interface Alert {
+  id: number;
+  account_id: string;
+  campaign_id: string | null;
+  type: string;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  message: string;
+  recommendation: string | null;
+  created_at: string;
+}
+
+export interface OnboardingResult {
+  account_id: string;
+  account_name: string;
+  campaigns_found: number;
+  campaigns: CampaignGoal[];
+  guidelines_generated: string[];
 }
