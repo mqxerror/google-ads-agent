@@ -8,6 +8,7 @@ import { fetchConversations, createConversation, deleteConversation, fetchMessag
 import ContextBadge from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
 import ChatInput, { type ModelId } from '@/components/chat/ChatInput';
+import MemoryPanel from '@/components/chat/MemoryPanel';
 import { Input } from '@/components/ui/input';
 import type { ChatMessage, ToolCall, Campaign, Conversation, ConversationSearchResult } from '@/types';
 
@@ -139,7 +140,7 @@ export default function ChatPanel() {
 
   // Send message
   const handleSend = useCallback(
-    async (text: string, model: ModelId = 'sonnet') => {
+    async (text: string, model: ModelId = 'sonnet', roleId?: string) => {
       const userMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         role: 'user',
@@ -159,6 +160,7 @@ export default function ChatPanel() {
             account_id: ACCOUNT_ID,
             campaign_id: selectedCampaignId,
             model,
+            active_role: roleId || null,
           }),
         });
 
@@ -383,6 +385,12 @@ export default function ChatPanel() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {/* Memory Panel */}
+        <MemoryPanel
+          campaignId={selectedCampaignId}
+          campaignName={campaign?.name}
+        />
 
         {/* Input */}
         <ChatInput
