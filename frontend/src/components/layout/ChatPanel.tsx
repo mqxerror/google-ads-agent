@@ -172,6 +172,7 @@ export default function ChatPanel() {
         let assistantText = '';
         const toolCalls: ToolCall[] = [];
         const assistantMsgId = `msg-${Date.now()}-resp`;
+        let resolvedRole = { id: '', name: '', avatar: '' };
 
         setMessages((prev) => [
           ...prev,
@@ -192,7 +193,10 @@ export default function ChatPanel() {
             if (!dataStr || dataStr === '[DONE]') continue;
             try {
               const event = JSON.parse(dataStr);
-              if (event.type === 'text') {
+              if (event.type === 'routing') {
+                resolvedRole = { id: event.role_id || '', name: event.role_name || '', avatar: event.role_avatar || '' };
+                setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: resolvedRole.id, agentRoleName: resolvedRole.name, agentRoleAvatar: resolvedRole.avatar } : m));
+              } else if (event.type === 'text') {
                 assistantText += event.content || '';
                 setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText, toolCalls: [...toolCalls] } : m));
               } else if (event.type === 'tool_call') {

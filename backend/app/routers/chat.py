@@ -113,6 +113,8 @@ async def list_messages(conversation_id: str) -> list[ChatMessageResponse]:
             (conversation_id,),
         )
         rows = await cur.fetchall()
+        column_names = [desc[0] for desc in cur.description] if cur.description else []
+        has_agent_role = "agent_role" in column_names
         return [
             ChatMessageResponse(
                 id=r["id"],
@@ -120,6 +122,8 @@ async def list_messages(conversation_id: str) -> list[ChatMessageResponse]:
                 role=r["role"],
                 content=r["content"],
                 created_at=r["created_at"] or "",
+                agent_role=r["agent_role"] if has_agent_role else None,
+                agent_role_name=r["agent_role_name"] if has_agent_role else None,
             )
             for r in rows
         ]
@@ -186,6 +190,8 @@ async def send_message(
         assistant_msg_id = str(uuid.uuid4())
         full_text_parts: list[str] = []
         tool_calls_json: list[dict] = []
+        agent_role_id: str | None = None
+        agent_role_name: str | None = None
 
         async for event in stream_agent_response(
             user_message=body.content,
@@ -204,21 +210,26 @@ async def send_message(
                 full_text_parts.append(event.get("content", ""))
             elif event.get("type") == "tool_call":
                 tool_calls_json.append(event)
+            elif event.get("type") == "routing":
+                agent_role_id = event.get("role_id")
+                agent_role_name = event.get("role_name")
 
-        # Persist the full assistant response
+        # Persist the full assistant response with role attribution
         full_text = "".join(full_text_parts)
         if full_text:
             db2 = await get_db()
             try:
                 await db2.execute(
-                    "INSERT INTO messages (id, conversation_id, role, content, tool_input) "
-                    "VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
                         assistant_msg_id,
                         conversation_id,
                         "assistant",
                         full_text,
                         json.dumps(tool_calls_json) if tool_calls_json else None,
+                        agent_role_id,
+                        agent_role_name,
                     ),
                 )
                 await db2.commit()

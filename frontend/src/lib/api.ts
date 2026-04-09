@@ -321,6 +321,8 @@ export function fetchMessages(conversationId: string): Promise<import('@/types')
       content: m.content,
       toolCalls: m.tool_input ? JSON.parse(m.tool_input) : undefined,
       createdAt: m.created_at || '',
+      agentRole: m.agent_role || undefined,
+      agentRoleName: m.agent_role_name || undefined,
     }))
   );
 }

@@ -196,6 +196,9 @@ CREATE TABLE IF NOT EXISTS playbooks (
 );
 
 -- Sync status tracking
+-- Add agent_role to messages for role attribution
+-- (ALTER TABLE is idempotent via the migration below)
+
 CREATE TABLE IF NOT EXISTS sync_status (
     account_id TEXT PRIMARY KEY,
     last_sync_at TEXT,
@@ -304,6 +307,14 @@ async def _migrate_v1_to_v2(db: aiosqlite.Connection) -> None:
     columns = [row[1] for row in await cursor.fetchall()]
     if "account_id" not in columns:
         await db.execute("ALTER TABLE session_summaries ADD COLUMN account_id TEXT")
+
+    # 3b. Add agent_role column to messages for role attribution
+    cursor = await db.execute("PRAGMA table_info(messages)")
+    msg_columns = [row[1] for row in await cursor.fetchall()]
+    if "agent_role" not in msg_columns:
+        await db.execute("ALTER TABLE messages ADD COLUMN agent_role TEXT")
+    if "agent_role_name" not in msg_columns:
+        await db.execute("ALTER TABLE messages ADD COLUMN agent_role_name TEXT")
 
     # 4. Populate default account from .env if credentials exist
     default_account_id = settings.GOOGLE_ADS_LOGIN_CUSTOMER_ID

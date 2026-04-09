@@ -126,9 +126,28 @@ function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
   );
 }
 
+const ROLE_ICONS: Record<string, string> = {
+  briefcase: '💼', target: '🎯', search: '🔍', palette: '🎨',
+  chart: '📊', eye: '👁️', code: '💻', rocket: '🚀',
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  director: 'bg-gray-500/20 text-gray-300',
+  ppc_strategist: 'bg-orange-500/20 text-orange-300',
+  search_term_hunter: 'bg-blue-500/20 text-blue-300',
+  creative_director: 'bg-purple-500/20 text-purple-300',
+  analytics_analyst: 'bg-green-500/20 text-green-300',
+  competitor_intel: 'bg-red-500/20 text-red-300',
+  gtm_specialist: 'bg-cyan-500/20 text-cyan-300',
+  growth_hacker: 'bg-yellow-500/20 text-yellow-300',
+};
+
 export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const roleName = message.agentRoleName;
+  const roleId = message.agentRole;
+  const roleAvatar = message.agentRoleAvatar;
 
   return (
     <div className={cn('px-3 py-2', isUser ? 'flex justify-end' : '')}>
@@ -140,6 +159,19 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             : 'w-full bg-secondary/40 text-foreground'
         )}
       >
+        {/* Role badge for assistant messages */}
+        {!isUser && roleName && (
+          <div className="flex items-center gap-1.5 mb-2 -mt-1">
+            <span className={cn(
+              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium',
+              ROLE_COLORS[roleId || ''] || 'bg-primary/20 text-primary'
+            )}>
+              <span>{ROLE_ICONS[roleAvatar || ''] || '🤖'}</span>
+              {roleName}
+            </span>
+          </div>
+        )}
+
         {isUser ? (
           <div className="whitespace-pre-wrap">{message.content}</div>
         ) : (

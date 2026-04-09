@@ -316,17 +316,28 @@ def _load_campaign_guidelines(campaign_name: str | None, account_id: str | None 
 # ── Layer 3: Recent Conversation (sliding window) ────────────────
 
 async def _get_recent_messages(conversation_id: str, limit: int = 10) -> list[dict]:
-    """Get the last N messages from the conversation (Layer 3)."""
+    """Get the last N messages with role attribution (Layer 3).
+
+    Each assistant message includes which specialist role said it,
+    so the next role knows who said what and can build on prior analysis.
+    """
     db = await get_db()
     try:
         cur = await db.execute(
-            "SELECT role, content FROM messages WHERE conversation_id = ? "
+            "SELECT role, content, agent_role, agent_role_name FROM messages WHERE conversation_id = ? "
             "ORDER BY created_at DESC LIMIT ?",
             (conversation_id, limit),
         )
         rows = await cur.fetchall()
-        # Reverse to chronological order
-        return [{"role": r["role"], "content": r["content"][:500]} for r in reversed(rows)]
+        result = []
+        for r in reversed(rows):
+            entry = {"role": r["role"], "content": r["content"][:500]}
+            # Add role attribution for assistant messages
+            if r["role"] == "assistant" and r["agent_role_name"]:
+                entry["agent_role"] = r["agent_role"]
+                entry["agent_role_name"] = r["agent_role_name"]
+            result.append(entry)
+        return result
     finally:
         await db.close()
 
@@ -761,10 +772,13 @@ async def stream_agent_response(
     ]
 
     if recent_msgs:
-        prompt_parts.append("\n=== RECENT CONVERSATION ===")
-        for msg in recent_msgs[-6:]:  # Last 6 messages only
-            role = "User" if msg["role"] == "user" else "Assistant"
-            prompt_parts.append(f"{role}: {msg['content'][:300]}")
+        prompt_parts.append("\n=== RECENT CONVERSATION (team discussion) ===")
+        for msg in recent_msgs[-8:]:  # Last 8 messages
+            if msg["role"] == "user":
+                prompt_parts.append(f"User: {msg['content'][:300]}")
+            else:
+                role_label = msg.get("agent_role_name", "Assistant")
+                prompt_parts.append(f"[{role_label}]: {msg['content'][:400]}")
 
     prompt_parts.append(f"\n=== CURRENT QUESTION ===\n{user_message}")
 

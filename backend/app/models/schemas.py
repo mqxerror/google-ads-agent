@@ -92,6 +92,8 @@ class ChatMessageResponse(BaseModel):
     content: str
     tool_calls: list[ToolCall] = Field(default_factory=list)
     created_at: str = ""
+    agent_role: str | None = None
+    agent_role_name: str | None = None
 
 
 class ToolConfirmRequest(BaseModel):

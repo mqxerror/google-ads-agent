@@ -66,6 +66,9 @@ export interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   createdAt: string;
+  agentRole?: string;      // role ID (e.g. "search_term_hunter")
+  agentRoleName?: string;  // display name (e.g. "Search Term Hunter")
+  agentRoleAvatar?: string; // avatar key (e.g. "search")
 }
 
 export interface ToolCall {
