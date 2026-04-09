@@ -18,6 +18,7 @@ from app.models.schemas import (
 )
 from app.services.agent import stream_agent_response, stop_agent
 from app.services.guidelines import GuidelinesService
+from app.services.roles import list_roles, classify_intent
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -311,6 +312,22 @@ async def search_conversations(
         return []
     finally:
         await db.close()
+
+
+# ── Roles ──────────────────────────────────────────────────────────
+
+
+@router.get("/roles")
+async def get_available_roles():
+    return {"roles": list_roles()}
+
+
+@router.post("/roles/classify")
+async def classify_message_intent(body: ChatMessageRequest):
+    return classify_intent(body.content)
+
+
+# ── Tool confirmation ──────────────────────────────────────────────
 
 
 @router.post("/conversations/{conversation_id}/confirm/{tool_call_id}")

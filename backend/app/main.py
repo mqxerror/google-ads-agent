@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.routers import accounts, campaigns, chat, guidelines, operations, search_terms, settings as settings_router, setup
+from app.services.sync_engine import start_background_sync, stop_background_sync
 
 
 @asynccontextmanager
@@ -15,7 +16,9 @@ async def lifespan(app: FastAPI):
     # Apply DB overrides to runtime settings so MCP toggles persist across restarts
     from app.routers.settings import load_settings_overrides
     await load_settings_overrides()
+    start_background_sync()
     yield
+    stop_background_sync()
 
 
 app = FastAPI(

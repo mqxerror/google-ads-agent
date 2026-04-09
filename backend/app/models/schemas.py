@@ -270,3 +270,24 @@ class ConversationSearchResult(BaseModel):
     content_snippet: str
     campaign_name: str | None = None
     created_at: str = ""
+
+
+# ── Phase 1: Decision Log & Pinned Facts ──────────────────────────
+
+class DecisionLogEntry(BaseModel):
+    action: str
+    reason: str
+    outcome: str = "pending"
+    role: str = "agent"
+
+
+class PinnedFactEntry(BaseModel):
+    fact: str
+    source: str = "user"
+
+
+class CampaignProfileUpdate(BaseModel):
+    campaign_name: str
+    goals: str | None = None
+    constraints: str | None = None
+    phase: str | None = None

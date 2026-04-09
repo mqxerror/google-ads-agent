@@ -48,6 +48,19 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]
     CACHE_TTL_SECONDS: int = 300
 
+    # Background sync
+    SYNC_INTERVAL_HOURS: int = 6
+    SYNC_LOOKBACK_DAYS: int = 30
+    SYNC_ENABLED: bool = True
+
+    # Memory
+    MEMORY_DIR: Path = _PROJECT_ROOT.parent / "data" / "memory"
+
+    # Context limits
+    RECENT_MESSAGES_LIMIT: int = 10
+    SESSION_SUMMARIES_LIMIT: int = 5
+    MAX_SNAPSHOT_DAYS: int = 30
+
     model_config = {
         "env_prefix": "",
         "env_file": str(_PROJECT_ROOT / ".env"),

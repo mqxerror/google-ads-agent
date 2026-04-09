@@ -194,6 +194,46 @@ CREATE TABLE IF NOT EXISTS playbooks (
     version TEXT,
     installed_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Sync status tracking
+CREATE TABLE IF NOT EXISTS sync_status (
+    account_id TEXT PRIMARY KEY,
+    last_sync_at TEXT,
+    last_sync_status TEXT DEFAULT 'pending',
+    last_sync_error TEXT,
+    campaigns_synced INTEGER DEFAULT 0,
+    days_synced INTEGER DEFAULT 0
+);
+
+-- Decision log
+CREATE TABLE IF NOT EXISTS decision_log (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    campaign_id TEXT NOT NULL,
+    campaign_name TEXT,
+    conversation_id TEXT,
+    action TEXT NOT NULL,
+    reason TEXT,
+    outcome TEXT,
+    role TEXT DEFAULT 'agent',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Pinned facts
+CREATE TABLE IF NOT EXISTS pinned_facts (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    campaign_id TEXT,
+    fact TEXT NOT NULL,
+    source TEXT,
+    pinned_by TEXT DEFAULT 'user',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_decision_log_campaign
+    ON decision_log(account_id, campaign_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_pinned_facts_campaign
+    ON pinned_facts(account_id, campaign_id);
 """
 
 # FTS5 must be created separately (not inside executescript easily)

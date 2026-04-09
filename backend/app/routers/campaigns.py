@@ -13,11 +13,15 @@ from app.models.schemas import (
     AdGroupResponse,
     AdResponse,
     CampaignResponse,
+    DecisionLogEntry,
     KeywordResponse,
+    PinnedFactEntry,
+    CampaignProfileUpdate,
 )
 from app.services.google_ads import GoogleAdsService
 from app.services.cache import CacheService
 from app.services.metrics_store import MetricsStore
+from app.services import campaign_memory
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -209,3 +213,41 @@ async def sync_metrics(account_id: str, days: int = Query(default=30, ge=1, le=9
         return {"synced_rows": total_synced, "campaigns": len(campaigns), "days": days}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Sync failed: {e}")
+
+
+# ── Campaign Memory endpoints ──────────────────────────────────
+
+
+@router.post("/accounts/{account_id}/campaigns/{campaign_id}/memory/init")
+async def init_memory(account_id: str, campaign_id: str, campaign_name: str = "Campaign"):
+    path = campaign_memory.init_campaign_memory(account_id, campaign_id, campaign_name)
+    return {"status": "initialized", "path": str(path)}
+
+
+@router.get("/accounts/{account_id}/campaigns/{campaign_id}/memory")
+async def get_campaign_memory_context(account_id: str, campaign_id: str, role: str | None = None):
+    context = campaign_memory.build_campaign_context(account_id, campaign_id, active_role=role)
+    return {"context": context}
+
+
+@router.post("/accounts/{account_id}/campaigns/{campaign_id}/memory/decisions")
+async def add_decision(account_id: str, campaign_id: str, body: DecisionLogEntry):
+    campaign_memory.append_decision(account_id, campaign_id, action=body.action, reason=body.reason, outcome=body.outcome, role=body.role)
+    return {"status": "logged"}
+
+
+@router.get("/accounts/{account_id}/campaigns/{campaign_id}/memory/pinned")
+async def get_pinned_facts(account_id: str, campaign_id: str):
+    return {"pinned_facts": campaign_memory.load_pinned_facts(account_id, campaign_id)}
+
+
+@router.post("/accounts/{account_id}/campaigns/{campaign_id}/memory/pinned")
+async def add_pinned_fact(account_id: str, campaign_id: str, body: PinnedFactEntry):
+    campaign_memory.add_pinned_fact(account_id, campaign_id, fact=body.fact, source=body.source)
+    return {"status": "pinned"}
+
+
+@router.put("/accounts/{account_id}/campaigns/{campaign_id}/memory/profile")
+async def update_campaign_profile(account_id: str, campaign_id: str, body: CampaignProfileUpdate):
+    campaign_memory.update_profile(account_id, campaign_id, campaign_name=body.campaign_name, goals=body.goals, constraints=body.constraints, phase=body.phase)
+    return {"status": "updated"}
