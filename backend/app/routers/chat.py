@@ -201,6 +201,7 @@ async def send_message(
             base_guidelines=base_guidelines,
             campaign_guidelines=campaign_guidelines_text,
             model=body.model or "sonnet",
+            active_role=getattr(body, 'active_role', None),
         ):
             # Forward each event as SSE
             yield f"data: {json.dumps(event)}\n\n"

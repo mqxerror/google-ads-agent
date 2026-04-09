@@ -489,11 +489,29 @@ async def stream_agent_response(
     base_guidelines: str | None = None,
     campaign_guidelines: str | None = None,
     model: str = "sonnet",
+    active_role: str | None = None,
 ) -> AsyncIterator[dict]:
     """Stream agent responses with full layered memory."""
+    from app.services.roles import classify_intent, get_role, get_default_role
 
     model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS["sonnet"])
     today = date.today()
+
+    # ── Intent classification → resolve role ────────────────
+    intent = classify_intent(user_message)
+    resolved_role = active_role or intent["role_id"]
+    role_obj = get_role(resolved_role) or get_default_role()
+
+    # Emit routing info to frontend
+    yield {
+        "type": "routing",
+        "gear": intent["gear"],
+        "role_id": role_obj.id,
+        "role_name": role_obj.name,
+        "role_avatar": role_obj.avatar,
+        "confidence": intent["confidence"],
+        "reason": intent["reason"],
+    }
 
     # Find campaign ID
     # ── Resolve the client account ID (MCC can't query metrics) ──
@@ -759,6 +777,13 @@ async def stream_agent_response(
         system_parts.append(f"\n=== PAST SESSION HISTORY ===")
         for s in summaries:
             system_parts.append(s)
+
+    # Inject active role prompt
+    if role_obj.id != "director":
+        system_parts.append(f"\n=== YOUR ACTIVE ROLE: {role_obj.name} ===")
+        system_parts.append(f"Specialty: {role_obj.specialty}")
+        system_parts.append(role_obj.system_prompt)
+        system_parts.append(f"\nYou are responding as the {role_obj.name}. Sign your analysis with your role perspective.")
 
     system_prompt = "\n".join(system_parts)
 
