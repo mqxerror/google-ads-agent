@@ -482,30 +482,46 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
 def _condense_for_memory(response_text: str, user_message: str, max_chars: int = 3000) -> str:
     """Condense an agent response into a memory-friendly format.
 
-    Instead of extracting keyword fragments, keep the full analysis but
-    remove noise (tool outputs, raw data tables, formatting).
-    The goal: the next role should read this and know exactly what was found.
+    Priority: preserve operational details (IDs, labels, URLs, container names)
+    that the next role MUST know to continue work correctly.
     """
+    import re
     lines = response_text.split("\n")
     parts = [f"**Task:** {user_message[:200]}"]
 
-    # Keep headings, key findings, recommendations — skip raw data/tables
+    # FIRST: Extract critical operational details that must never be lost
+    critical_patterns = [
+        (r'GTM-[A-Z0-9]+', 'GTM Container'),
+        (r'AW-\d+', 'Google Ads Account'),
+        (r'Conversion ID:\s*\d+', 'Conversion ID'),
+        (r'Label:\s*[\w-]+', 'Conversion Label'),
+        (r'(?:https?://[^\s<>"]+)', 'URL'),
+        (r'campaign[_\s]?id[=:\s]+\d+', 'Campaign ID'),
+    ]
+    found_critical = set()
+    for pattern, label in critical_patterns:
+        for match in re.finditer(pattern, response_text, re.IGNORECASE):
+            val = match.group(0)
+            if val not in found_critical:
+                found_critical.add(val)
+
+    if found_critical:
+        parts.append(f"\n**Critical Details:** {', '.join(found_critical)}")
+
+    # THEN: Keep headings, key findings, recommendations — skip noise
     skip_section = False
     kept_chars = 0
     for line in lines:
         ls = line.strip()
         if not ls:
             continue
-        # Skip raw data tables and code blocks
         if ls.startswith("```") or ls.startswith("---"):
             skip_section = not skip_section if ls.startswith("```") else False
             continue
         if skip_section:
             continue
-        # Skip very long data rows (metrics tables)
         if ls.count("|") > 3 and any(c.isdigit() for c in ls):
             continue
-        # Keep everything else (headings, analysis, recommendations)
         parts.append(ls[:400])
         kept_chars += len(ls)
         if kept_chars >= max_chars:
@@ -668,12 +684,14 @@ async def stream_agent_response(
         "Be FAST — answer the question directly from the context data. No unnecessary tool calls.",
         "",
         "",
-        "MEMORY AWARENESS: You have access to PINNED FACTS, PAST DECISIONS, and ROLE NOTES from previous sessions below.",
-        "ALWAYS check these before starting work. If a previous role already analyzed something, acknowledge it:",
-        "- 'The GTM Specialist previously found that...'",
-        "- 'Building on yesterday's search term audit...'",
-        "- 'Per the pinned fact about CPA targets...'",
-        "Do NOT repeat work that's already been done unless the user explicitly asks to redo it.",
+        "CRITICAL — MEMORY & CONTINUITY RULES (READ BEFORE EVERY RESPONSE):",
+        "1. BEFORE doing ANYTHING, read ALL sections below: PINNED FACTS, PAST DECISIONS, ROLE NOTES.",
+        "2. If a previous role already did work (GTM setup, search term audit, etc.), START from where they left off. NEVER redo completed work.",
+        "3. Use SPECIFIC details from memory: container IDs, conversion labels, URLs, tag names — not vague references.",
+        "4. When the user says 'continue' or 'finish the task', read the role notes to find exactly where work stopped.",
+        "5. If you find critical operational details (container IDs, conversion labels, account numbers, URLs), STATE THEM in your response so they persist in the next role notes.",
+        "6. ALWAYS acknowledge prior work: 'Per the GTM Specialist notes, container GTM-K6864NBH has 5 tags configured...'",
+        "7. Do NOT navigate to a different container/account/page than what's documented in the notes unless the user explicitly asks.",
         "",
         "For HIGH-IMPACT actions (pause campaign, change bid strategy, change budget >20%), ALWAYS confirm with the user BEFORE executing.",
         "For MEDIUM-IMPACT actions (add keywords, create ads, change targeting), confirm by default.",
@@ -839,18 +857,22 @@ async def stream_agent_response(
             if decisions and decisions.strip().count("|") > 10:
                 system_parts.append(f"\n=== RECENT DECISIONS (actions taken on this campaign) ===\n{decisions}")
 
-            # Load previous role findings so this role knows what others found
-            if role_obj and role_obj.id != "director":
-                # Load all role notes, not just current role
-                for rid in ["ppc_strategist", "search_term_hunter", "creative_director", "analytics_analyst"]:
-                    if rid != role_obj.id:
-                        notes = load_role_notes(account_id, campaign_id, rid)
-                        if notes:
-                            system_parts.append(f"\n=== FINDINGS FROM {rid.replace('_', ' ').upper()} ===\n{notes[:800]}")
-                # Load own notes (pick up where you left off)
-                own_notes = load_role_notes(account_id, campaign_id, role_obj.id)
-                if own_notes:
-                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) ===\n{own_notes[:1000]}")
+            # Load ALL role notes — every role sees every other role's findings
+            all_role_ids = [
+                "ppc_strategist", "search_term_hunter", "creative_director",
+                "analytics_analyst", "competitor_intel", "gtm_specialist",
+                "growth_hacker", "cro_specialist",
+            ]
+            active_role_id = role_obj.id if role_obj else "director"
+            for rid in all_role_ids:
+                notes = load_role_notes(account_id, campaign_id, rid)
+                if not notes:
+                    continue
+                if rid == active_role_id:
+                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) — CONTINUE FROM HERE ===\n{notes[:2000]}")
+                else:
+                    label = rid.replace('_', ' ').upper()
+                    system_parts.append(f"\n=== FINDINGS FROM {label} ===\n{notes[:1500]}")
         except Exception:
             pass
 
@@ -874,12 +896,12 @@ async def stream_agent_response(
 
     if recent_msgs:
         prompt_parts.append("\n=== RECENT CONVERSATION (team discussion) ===")
-        for msg in recent_msgs[-8:]:  # Last 8 messages
+        for msg in recent_msgs[-12:]:  # Last 12 messages for better continuity
             if msg["role"] == "user":
-                prompt_parts.append(f"User: {msg['content'][:300]}")
+                prompt_parts.append(f"User: {msg['content'][:400]}")
             else:
                 role_label = msg.get("agent_role_name", "Assistant")
-                prompt_parts.append(f"[{role_label}]: {msg['content'][:400]}")
+                prompt_parts.append(f"[{role_label}]: {msg['content'][:600]}")
 
     # Resolve @[title](conv:ID) references — load referenced conversation content
     import re
