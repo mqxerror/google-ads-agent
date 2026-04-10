@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Gauge, Zap, Search, Eye, Type, Shield, MousePointer,
   Link2, Activity, Smartphone, Users, Target,
@@ -9,7 +11,6 @@ import {
 import { cn } from '@/lib/utils';
 import { fetchLandingPageAnalysis, clearLandingPageAnalysis } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
 interface LandingPageAnalyzerProps {
@@ -66,16 +67,114 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
 };
 
+interface ParsedSection {
+  title: string;
+  score?: number;
+  grade?: string;
+  body: string;
+  number?: number;
+}
+
+interface ParsedReport {
+  overallScore?: number;
+  overallGrade?: string;
+  url?: string;
+  sections: ParsedSection[];
+  recommendations: string[];
+  abTests: string[];
+  introContent: string;
+}
+
+/** Parse markdown report to extract structure: STEP headings, scores, sections */
+function parseMarkdownReport(markdown: string): ParsedReport {
+  const result: ParsedReport = {
+    sections: [],
+    recommendations: [],
+    abTests: [],
+    introContent: '',
+  };
+
+  // Extract URL if mentioned
+  const urlMatch = markdown.match(/https?:\/\/[^\s)]+/);
+  if (urlMatch) result.url = urlMatch[0];
+
+  // Extract overall score (look for first big score or "CRO Score: X")
+  const overallMatch = markdown.match(/(?:CRO Score|Overall Score|Total Score|Final Score)[:\s]*(\d+)\s*\/\s*100/i);
+  if (overallMatch) {
+    result.overallScore = parseInt(overallMatch[1], 10);
+  }
+  const gradeMatch = markdown.match(/(?:Grade|Rating)[:\s]*([A-F][+-]?)/i);
+  if (gradeMatch) result.overallGrade = gradeMatch[1];
+
+  // Split by ### STEP headings or ## section headings
+  const sectionRegex = /(?:^|\n)#{1,3}\s*(?:STEP\s*(\d+)\s*[—\-:]?\s*)?([^\n]+)/gi;
+  const matches = [...markdown.matchAll(sectionRegex)];
+
+  if (matches.length > 0) {
+    // Content before first heading is intro
+    result.introContent = markdown.slice(0, matches[0].index || 0).trim();
+
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const nextStart = i + 1 < matches.length ? matches[i + 1].index! : markdown.length;
+      const sectionStart = (match.index || 0) + match[0].length;
+      const body = markdown.slice(sectionStart, nextStart).trim();
+      const title = match[2].trim();
+      const number = match[1] ? parseInt(match[1], 10) : undefined;
+
+      // Extract score from body: **Score: 82/100 (B)**
+      const scoreMatch = body.match(/Score:\s*(\d+)\s*\/\s*100\s*(?:\(([A-F][+-]?)\))?/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1], 10) : undefined;
+      const grade = scoreMatch?.[2];
+
+      // Skip generic top-level title like "CRO Analysis"
+      if (i === 0 && /^(cro\s+analysis|landing\s+page|summary|overview)/i.test(title) && !score) {
+        result.introContent = body;
+        continue;
+      }
+
+      result.sections.push({ title, number, score, grade, body });
+    }
+  } else {
+    result.introContent = markdown;
+  }
+
+  // Calculate overall score from section scores if not found
+  if (!result.overallScore && result.sections.length > 0) {
+    const scored = result.sections.filter(s => s.score !== undefined);
+    if (scored.length > 0) {
+      const avg = scored.reduce((sum, s) => sum + (s.score || 0), 0) / scored.length;
+      result.overallScore = Math.round(avg);
+    }
+  }
+
+  return result;
+}
+
+function gradeFromScore(score: number): string {
+  if (score >= 90) return 'A';
+  if (score >= 80) return 'B';
+  if (score >= 70) return 'C';
+  if (score >= 60) return 'D';
+  return 'F';
+}
+
 export default function LandingPageAnalyzer({ campaign, accountId }: LandingPageAnalyzerProps) {
   const queryClient = useQueryClient();
   const [showRawMd, setShowRawMd] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['landing-page-analysis', accountId, campaign.id],
     queryFn: () => fetchLandingPageAnalysis(accountId, campaign.id),
     refetchInterval: 5000, // Poll every 5s in case agent is running
     staleTime: 0,
   });
+
+  // Parse markdown if no structured JSON
+  const parsedReport = useMemo(() => {
+    if (!data?.raw_markdown) return null;
+    return parseMarkdownReport(data.raw_markdown);
+  }, [data?.raw_markdown]);
 
   const triggerCROAudit = () => {
     // Send a chat message to trigger CRO analysis
@@ -139,16 +238,36 @@ Save the full analysis to campaign memory.`,
 
   const { analysis, raw_markdown } = data;
 
-  // Has data but no parsed JSON — show raw markdown
-  if (!analysis) {
+  // Has data but no parsed JSON — display parsed markdown structure beautifully
+  if (!analysis && parsedReport) {
+    const overallScore = parsedReport.overallScore || 0;
+    const grade = parsedReport.overallGrade || (overallScore ? gradeFromScore(overallScore) : '');
+
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Gauge className="h-5 w-5" />
-            CRO Analysis (Raw)
-          </h3>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Gauge className="h-5 w-5" />
+              Landing Page Analysis
+            </h2>
+            {parsedReport.url && (
+              <a
+                href={parsedReport.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1 mt-1"
+              >
+                {parsedReport.url}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowRawMd(!showRawMd)}>
+              {showRawMd ? 'Hide Raw' : 'Raw'}
+            </Button>
             <Button variant="outline" size="sm" onClick={triggerCROAudit}>
               <RefreshCw className="h-3 w-3 mr-1" /> Re-run
             </Button>
@@ -157,11 +276,117 @@ Save the full analysis to campaign memory.`,
             </Button>
           </div>
         </div>
-        <div className="bg-secondary/30 border border-border rounded-md p-4 max-h-[600px] overflow-y-auto">
-          <pre className="text-xs whitespace-pre-wrap font-mono">{raw_markdown}</pre>
-        </div>
+
+        {/* CRO Score Card (if score detected) */}
+        {overallScore > 0 && (
+          <div className={cn('border rounded-lg p-6', getScoreBg(overallScore))}>
+            <div className="flex items-center gap-6">
+              <div className="text-center">
+                <div className={cn('text-6xl font-bold', getScoreColor(overallScore))}>
+                  {overallScore}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">CRO SCORE</div>
+                {grade && (
+                  <Badge className={cn('mt-2 text-lg', getScoreColor(overallScore))}>
+                    {grade}
+                  </Badge>
+                )}
+              </div>
+              {parsedReport.introContent && (
+                <div className="flex-1 prose prose-sm dark:prose-invert max-w-none [&_p]:my-1 [&_strong]:text-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {parsedReport.introContent.slice(0, 600)}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section Cards Grid */}
+        {parsedReport.sections.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
+              Analysis Steps ({parsedReport.sections.length})
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {parsedReport.sections.map((section, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'border rounded-lg p-4',
+                    section.score !== undefined ? getScoreBg(section.score) : 'border-border bg-secondary/20'
+                  )}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {section.number && (
+                        <span className="text-xs font-bold text-muted-foreground">
+                          {section.number}.
+                        </span>
+                      )}
+                      <h4 className="font-semibold text-sm">{section.title}</h4>
+                    </div>
+                    {section.score !== undefined && (
+                      <div className="text-right">
+                        <div className={cn('text-2xl font-bold', getScoreColor(section.score))}>
+                          {section.score}
+                        </div>
+                        {section.grade && (
+                          <div className={cn('text-[10px] font-bold', getScoreColor(section.score))}>
+                            {section.grade}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="prose prose-xs dark:prose-invert max-w-none text-xs
+                    [&_p]:my-1 [&_p]:text-xs
+                    [&_ul]:my-1 [&_ul]:pl-3 [&_ul]:text-xs
+                    [&_li]:my-0
+                    [&_strong]:text-foreground [&_strong]:font-semibold
+                    [&_table]:text-[10px] [&_table]:my-2
+                    [&_th]:px-1 [&_th]:py-0.5 [&_td]:px-1 [&_td]:py-0.5
+                    [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:my-1
+                    [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:my-1
+                    max-h-64 overflow-y-auto">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {section.body}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full markdown rendered (if no sections or as fallback) */}
+        {parsedReport.sections.length === 0 && (
+          <div className="prose prose-sm dark:prose-invert max-w-none border border-border rounded-lg p-6
+            [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm
+            [&_table]:text-xs
+            [&_strong]:text-foreground">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {raw_markdown}
+            </ReactMarkdown>
+          </div>
+        )}
+
+        {/* Raw markdown toggle */}
+        {showRawMd && (
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Raw Markdown</h3>
+            <div className="bg-secondary/30 border border-border rounded-md p-4 max-h-[400px] overflow-y-auto">
+              <pre className="text-xs whitespace-pre-wrap font-mono">{raw_markdown}</pre>
+            </div>
+          </div>
+        )}
       </div>
     );
+  }
+
+  if (!analysis) {
+    return null;
   }
 
   return (
