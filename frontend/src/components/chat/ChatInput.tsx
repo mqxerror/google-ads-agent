@@ -1,10 +1,19 @@
-import { useRef, useState, useCallback, useEffect, type KeyboardEvent } from 'react';
-import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown } from 'lucide-react';
+import { useRef, useState, useCallback, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import templates, { TEMPLATE_CATEGORIES, type ChatTemplate } from '@/lib/chatTemplates';
 import type { Campaign } from '@/types';
+
+export interface Attachment {
+  filename: string;
+  path: string;
+  is_image: boolean;
+  ext: string;
+  url: string;
+  size: number;
+}
 
 export type ModelId = 'sonnet' | 'opus' | 'haiku';
 
@@ -34,14 +43,16 @@ interface ConversationRef {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, model: ModelId, roleId?: string) => void;
+  onSend: (text: string, model: ModelId, roleId?: string, attachments?: Attachment[]) => void;
   disabled: boolean;
   campaignName?: string | null;
   onStop?: () => void;
   conversations?: ConversationRef[];
+  conversationId?: string | null;
+  onEnsureConversation?: () => Promise<string>;
 }
 
-export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [] }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [model, setModel] = useState<ModelId>('sonnet');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -53,7 +64,95 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
   const [showSlashRoles, setShowSlashRoles] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [slashFilter, setSlashFilter] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Upload a file to the backend
+  const uploadFile = useCallback(async (file: File): Promise<Attachment | null> => {
+    let convId = conversationId;
+    if (!convId && onEnsureConversation) {
+      try {
+        convId = await onEnsureConversation();
+      } catch {
+        return null;
+      }
+    }
+    if (!convId) return null;
+
+    const formData = new FormData();
+    formData.append('conversation_id', convId);
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/uploads', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('Upload failed:', err);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error('Upload error:', e);
+      return null;
+    }
+  }, [conversationId, onEnsureConversation]);
+
+  // Handle file selection from input
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded: Attachment[] = [];
+      for (const file of Array.from(files)) {
+        const result = await uploadFile(file);
+        if (result) uploaded.push(result);
+      }
+      setAttachments((prev) => [...prev, ...uploaded]);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [uploadFile]);
+
+  // Handle clipboard paste — capture images
+  const handlePaste = useCallback(async (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // Generate a meaningful filename
+          const ext = file.type.split('/')[1] || 'png';
+          const renamed = new File([file], `pasted-${Date.now()}.${ext}`, { type: file.type });
+          imageFiles.push(renamed);
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      setUploading(true);
+      try {
+        const uploaded: Attachment[] = [];
+        for (const file of imageFiles) {
+          const result = await uploadFile(file);
+          if (result) uploaded.push(result);
+        }
+        setAttachments((prev) => [...prev, ...uploaded]);
+      } finally {
+        setUploading(false);
+      }
+    }
+  }, [uploadFile]);
+
+  const removeAttachment = (filename: string) => {
+    setAttachments((prev) => prev.filter((a) => a.filename !== filename));
+  };
 
   // Fetch available roles
   useEffect(() => {
@@ -65,11 +164,12 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed && attachments.length === 0) return;
+    if (disabled) return;
 
     // Check for /role_name at start of message → override role for this message
     const slashMatch = trimmed.match(/^\/(\w+)\s+(.*)/s);
-    let messageText = trimmed;
+    let messageText = trimmed || '(see attached files)';
     let messageRole = activeRole || undefined;
     if (slashMatch) {
       const matchedRole = roles.find(r => r.id === slashMatch[1] || r.name.toLowerCase().replace(/\s+/g, '_') === slashMatch[1]);
@@ -79,12 +179,13 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
       }
     }
 
-    onSend(messageText, model, messageRole);
+    onSend(messageText, model, messageRole, attachments);
     setValue('');
+    setAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, disabled, onSend, model, activeRole, roles]);
+  }, [value, disabled, onSend, model, activeRole, roles, attachments]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -391,15 +492,76 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
         </span>
       </div>
 
+      {/* Attachment previews */}
+      {(attachments.length > 0 || uploading) && (
+        <div className="flex flex-wrap gap-1.5 px-1">
+          {attachments.map((att) => (
+            <div
+              key={att.filename}
+              className="group relative flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/60 border border-border text-[11px]"
+            >
+              {att.is_image ? (
+                <img
+                  src={att.url}
+                  alt={att.filename}
+                  className="h-8 w-8 rounded object-cover"
+                />
+              ) : (
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              <span className="max-w-[140px] truncate">{att.filename}</span>
+              <span className="text-[9px] text-muted-foreground">
+                {att.size > 1024 * 1024
+                  ? `${(att.size / (1024 * 1024)).toFixed(1)}MB`
+                  : `${Math.round(att.size / 1024)}KB`}
+              </span>
+              <button
+                onClick={() => removeAttachment(att.filename)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
+                title="Remove"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          {uploading && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/60 border border-border text-[11px]">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Uploading…</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Input + send */}
       <div className="flex items-end gap-2">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => handleFileSelect(e.target.files)}
+        />
+        {/* Attach button */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 shrink-0 self-end"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled || uploading}
+          title="Attach file"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => { setValue(e.target.value); handleInput(); }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           disabled={disabled}
-          placeholder="Ask about this campaign..."
+          placeholder="Ask about this campaign... (paste images with Cmd+V)"
           rows={1}
           className="flex-1 resize-none bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
         />
@@ -417,7 +579,7 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
           <Button
             size="icon"
             className="h-9 w-9 shrink-0"
-            disabled={disabled || !value.trim()}
+            disabled={disabled || (!value.trim() && attachments.length === 0)}
             onClick={handleSend}
           >
             <SendHorizonal className="h-4 w-4" />

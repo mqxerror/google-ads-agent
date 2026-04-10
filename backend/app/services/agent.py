@@ -543,6 +543,7 @@ async def stream_agent_response(
     campaign_guidelines: str | None = None,
     model: str = "sonnet",
     active_role: str | None = None,
+    attachments: list[dict] | None = None,
 ) -> AsyncIterator[dict]:
     """Stream agent responses with full layered memory."""
     from app.services.roles import classify_intent, get_role, get_default_role
@@ -926,6 +927,16 @@ async def stream_agent_response(
         clean_message = ref_pattern.sub(lambda m: f"(ref: {m.group(1)})", user_message)
     else:
         clean_message = user_message
+
+    # Inject attachment file paths so the agent can Read them
+    if attachments:
+        prompt_parts.append("\n=== USER ATTACHMENTS ===")
+        prompt_parts.append("The user has attached the following files. Use the Read tool to view them.")
+        prompt_parts.append("For images, Read will show you the image directly. For documents, you'll get the text content.")
+        for att in attachments:
+            kind = "image" if att.get("is_image") else "file"
+            prompt_parts.append(f"- {kind}: {att.get('filename', 'unknown')} → path: {att.get('path', '')}")
+        prompt_parts.append("READ EACH ATTACHMENT before responding so you can reference what's in them.")
 
     prompt_parts.append(f"\n=== CURRENT QUESTION ===\n{clean_message}")
 

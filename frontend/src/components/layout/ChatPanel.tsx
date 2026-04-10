@@ -7,7 +7,7 @@ import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { fetchConversations, createConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask } from '@/lib/api';
 import ContextBadge from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
-import ChatInput, { type ModelId } from '@/components/chat/ChatInput';
+import ChatInput, { type ModelId, type Attachment } from '@/components/chat/ChatInput';
 import MemoryPanel from '@/components/chat/MemoryPanel';
 import { Input } from '@/components/ui/input';
 import type { ChatMessage, ToolCall, Campaign, Conversation, ConversationSearchResult } from '@/types';
@@ -215,7 +215,7 @@ export default function ChatPanel() {
 
   // Send message
   const handleSend = useCallback(
-    async (text: string, model: ModelId = 'sonnet', roleId?: string) => {
+    async (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
       const userMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         role: 'user',
@@ -236,6 +236,7 @@ export default function ChatPanel() {
             campaign_id: selectedCampaignId,
             model,
             active_role: roleId || null,
+            attachments: attachments || [],
           }),
         });
 
@@ -487,6 +488,8 @@ export default function ChatPanel() {
           onSend={handleSend}
           disabled={isResponding}
           campaignName={campaign?.name}
+          conversationId={conversationId}
+          onEnsureConversation={ensureConversation}
           conversations={conversations.map(c => ({
             id: c.id,
             title: c.title || 'Untitled',

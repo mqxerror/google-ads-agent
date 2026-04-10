@@ -215,6 +215,7 @@ async def send_message(
                 campaign_guidelines=campaign_guidelines_text,
                 model=body.model or "sonnet",
                 active_role=getattr(body, 'active_role', None),
+                attachments=[a.model_dump() for a in (body.attachments or [])],
             ):
                 _agent_buffers[conv_id].append(event)
 

@@ -78,12 +78,20 @@ class ToolCall(BaseModel):
     requires_confirmation: bool = False
 
 
+class AttachmentInfo(BaseModel):
+    filename: str
+    path: str
+    is_image: bool = False
+    ext: str = ""
+
+
 class ChatMessageRequest(BaseModel):
     content: str
     account_id: str | None = None
     campaign_id: str | None = None
     model: str = "sonnet"  # sonnet, opus, haiku
     active_role: str | None = None  # force a specific specialist role
+    attachments: list[AttachmentInfo] = Field(default_factory=list)
 
 
 class ChatMessageResponse(BaseModel):
