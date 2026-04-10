@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import subprocess
+import re
 import threading
 import queue
 import uuid
@@ -1184,12 +1185,26 @@ async def stream_agent_response(
                         decisions_logged += 1
                         break
 
-            # Save comprehensive role findings — capture the FULL analysis, not just fragments
+            # Save role findings — smart: full audit overwrites, follow-ups append
             role_id = role_obj.id if role_obj else "director"
             if role_id != "director":
-                # Take the full response (up to 3000 chars) instead of extracting fragments
-                # This ensures the next role gets the complete picture
+                from app.services.campaign_memory import append_role_notes
+
                 condensed = _condense_for_memory(response_text, user_message, max_chars=10000)
-                save_role_notes(account_id, campaign_id, role_id, condensed)
+
+                # Detect if this is a full audit/report (multiple ### STEP headings or ## sections)
+                step_count = len(re.findall(r'(?:^|\n)#{2,3}\s*(?:STEP\s*\d+|step\s*\d+)', response_text))
+                section_count = len(re.findall(r'(?:^|\n)#{2,3}\s+\w+', response_text))
+                is_full_audit = step_count >= 3 or section_count >= 8
+
+                if is_full_audit:
+                    # Replace the existing report
+                    save_role_notes(account_id, campaign_id, role_id, condensed)
+                else:
+                    # Append as a follow-up entry, preserving the existing report
+                    append_role_notes(
+                        account_id, campaign_id, role_id, condensed,
+                        section_title=user_message[:80],
+                    )
         except Exception:
             pass

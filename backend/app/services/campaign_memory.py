@@ -15,6 +15,7 @@ only the files relevant to the current role + task.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -249,7 +250,7 @@ def save_role_notes(
     role: str,
     notes: str,
 ) -> None:
-    """Save findings from a specialist role."""
+    """Replace findings from a specialist role (overwrites file)."""
     d = _campaign_dir(account_id, campaign_id)
     role_dir = d / "role_notes"
     role_dir.mkdir(exist_ok=True)
@@ -260,7 +261,58 @@ def save_role_notes(
     header = f"# {role.replace('_', ' ').title()} Notes\n\n**Last updated:** {now}\n\n"
     role_file.write_text(header + notes, encoding="utf-8")
 
-    # Update MEMORY.md index
+    _update_memory_index(account_id, campaign_id, role)
+
+
+def append_role_notes(
+    account_id: str,
+    campaign_id: str,
+    role: str,
+    notes: str,
+    section_title: str = "Follow-up",
+) -> None:
+    """Append a follow-up note to existing role findings without overwriting.
+
+    Used when the agent provides a fix/conversation that should be added to the
+    history rather than replacing the main report.
+    """
+    d = _campaign_dir(account_id, campaign_id)
+    role_dir = d / "role_notes"
+    role_dir.mkdir(exist_ok=True)
+
+    role_file = role_dir / f"{role}.md"
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    if not role_file.exists():
+        # Nothing to append to — create fresh
+        header = f"# {role.replace('_', ' ').title()} Notes\n\n**Last updated:** {now}\n\n"
+        role_file.write_text(header + notes, encoding="utf-8")
+        _update_memory_index(account_id, campaign_id, role)
+        return
+
+    # Append to existing — under a "Session Log" section
+    existing = role_file.read_text(encoding="utf-8")
+
+    # Update the "Last updated" timestamp at the top
+    existing = re.sub(
+        r'\*\*Last updated:\*\* [\d\-: ]+',
+        f"**Last updated:** {now}",
+        existing,
+        count=1,
+    )
+
+    # Check if there's already a Session Log section
+    if "## Session Log" in existing:
+        # Append a new entry under the existing log
+        new_entry = f"\n\n### {now} — {section_title}\n\n{notes}\n"
+        # Insert at the end of the file
+        existing = existing.rstrip() + new_entry
+    else:
+        # Add Session Log section at the end
+        new_section = f"\n\n---\n\n## Session Log\n\n### {now} — {section_title}\n\n{notes}\n"
+        existing = existing.rstrip() + new_section
+
+    role_file.write_text(existing, encoding="utf-8")
     _update_memory_index(account_id, campaign_id, role)
 
 

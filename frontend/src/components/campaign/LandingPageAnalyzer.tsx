@@ -112,6 +112,13 @@ function parseMarkdownReport(markdown: string): ParsedReport {
         continue;
       }
 
+      // Skip empty sections (no real content) and structural-only headings
+      const cleanBody = body.replace(/[#*`|\-\s]/g, '').trim();
+      if (cleanBody.length < 30) continue;
+
+      // Skip the "Session Log" wrapper heading itself
+      if (/^session\s+log$/i.test(title)) continue;
+
       result.sections.push({ title, number, score, grade, body });
     }
   } else {
@@ -636,7 +643,18 @@ Save the full analysis to campaign memory.`,
     const title = 'title' in sectionOrItem ? sectionOrItem.title : sectionOrItem.title;
     const event = new CustomEvent('chat:send', {
       detail: {
-        text: `As CRO Specialist, help me fix "${title}" on the "${campaign.name}" landing page. Walk me through the specific changes step by step, and use Chrome MCP to verify the change works.`,
+        text: `As CRO Specialist, I need help fixing ONE specific issue on the "${campaign.name}" landing page: "${title}".
+
+IMPORTANT INSTRUCTIONS:
+- DO NOT re-run the full 12-point audit
+- DO NOT regenerate the existing CRO report
+- The existing audit is already saved — just READ it from your role notes for context
+- Focus ONLY on fixing this one issue
+- Walk me through the specific changes step by step
+- If you need to verify on the live site, use Chrome MCP for that ONE check
+- Keep your response focused and actionable
+
+Your previous CRO audit findings should be in your role notes (cro_specialist.md). Reference them but don't repeat them.`,
         roleId: 'cro_specialist',
       },
     });
