@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
+from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -22,6 +24,15 @@ from app.services.roles import list_roles, classify_intent, get_role_detail, sav
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+# ── Background agent tasks — survive page refresh ──────────────────
+# Each conversation can have one running agent task. Events are buffered
+# so the frontend can reconnect and get events it missed.
+
+_agent_tasks: dict[str, asyncio.Task] = {}
+_agent_buffers: dict[str, list[dict]] = defaultdict(list)
+_agent_done: dict[str, bool] = {}
+_agent_cursor: dict[str, int] = defaultdict(int)  # per-connection cursor
 
 _guidelines_svc = GuidelinesService(settings.GUIDELINES_DIR)
 
@@ -185,57 +196,83 @@ async def send_message(
     except Exception:
         pass
 
-    # Stream agent response
-    async def event_stream():
+    # Run agent in background task — survives page refresh
+    async def _run_agent_background(conv_id: str):
+        """Run agent and buffer events. Persists response even if frontend disconnects."""
         assistant_msg_id = str(uuid.uuid4())
         full_text_parts: list[str] = []
         tool_calls_json: list[dict] = []
         agent_role_id: str | None = None
         agent_role_name: str | None = None
 
-        async for event in stream_agent_response(
-            user_message=body.content,
-            account_id=account_id,
-            campaign_name=campaign_name,
-            conversation_id=conversation_id,
-            base_guidelines=base_guidelines,
-            campaign_guidelines=campaign_guidelines_text,
-            model=body.model or "sonnet",
-            active_role=getattr(body, 'active_role', None),
-        ):
-            # Forward each event as SSE
-            yield f"data: {json.dumps(event)}\n\n"
+        try:
+            async for event in stream_agent_response(
+                user_message=body.content,
+                account_id=account_id,
+                campaign_name=campaign_name,
+                conversation_id=conv_id,
+                base_guidelines=base_guidelines,
+                campaign_guidelines=campaign_guidelines_text,
+                model=body.model or "sonnet",
+                active_role=getattr(body, 'active_role', None),
+            ):
+                _agent_buffers[conv_id].append(event)
 
-            # Accumulate for persistence
-            if event.get("type") == "text":
-                full_text_parts.append(event.get("content", ""))
-            elif event.get("type") == "tool_call":
-                tool_calls_json.append(event)
-            elif event.get("type") == "routing":
-                agent_role_id = event.get("role_id")
-                agent_role_name = event.get("role_name")
+                if event.get("type") == "text":
+                    full_text_parts.append(event.get("content", ""))
+                elif event.get("type") == "tool_call":
+                    tool_calls_json.append(event)
+                elif event.get("type") == "routing":
+                    agent_role_id = event.get("role_id")
+                    agent_role_name = event.get("role_name")
 
-        # Persist the full assistant response with role attribution
-        full_text = "".join(full_text_parts)
-        if full_text:
-            db2 = await get_db()
-            try:
-                await db2.execute(
-                    "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        assistant_msg_id,
-                        conversation_id,
-                        "assistant",
-                        full_text,
-                        json.dumps(tool_calls_json) if tool_calls_json else None,
-                        agent_role_id,
-                        agent_role_name,
-                    ),
-                )
-                await db2.commit()
-            finally:
-                await db2.close()
+            # Persist response — this runs even if frontend disconnected
+            full_text = "".join(full_text_parts)
+            if full_text:
+                db2 = await get_db()
+                try:
+                    await db2.execute(
+                        "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            assistant_msg_id, conv_id, "assistant", full_text,
+                            json.dumps(tool_calls_json) if tool_calls_json else None,
+                            agent_role_id, agent_role_name,
+                        ),
+                    )
+                    await db2.commit()
+                finally:
+                    await db2.close()
+        except Exception as e:
+            _agent_buffers[conv_id].append({"type": "error", "message": str(e)})
+        finally:
+            _agent_done[conv_id] = True
+            _agent_tasks.pop(conv_id, None)
+
+    # Start background task (or reuse if already running)
+    if conversation_id not in _agent_tasks or _agent_tasks[conversation_id].done():
+        _agent_buffers[conversation_id] = []
+        _agent_done[conversation_id] = False
+        _agent_tasks[conversation_id] = asyncio.create_task(
+            _run_agent_background(conversation_id)
+        )
+
+    # Stream events from buffer — frontend can reconnect anytime
+    async def event_stream():
+        cursor = 0
+        while True:
+            # Yield any buffered events we haven't sent yet
+            buf = _agent_buffers.get(conversation_id, [])
+            while cursor < len(buf):
+                yield f"data: {json.dumps(buf[cursor])}\n\n"
+                cursor += 1
+
+            # Check if agent is done
+            if _agent_done.get(conversation_id, False) and cursor >= len(buf):
+                break
+
+            # Wait briefly for more events
+            await asyncio.sleep(0.05)
 
     return StreamingResponse(
         event_stream(),
@@ -342,6 +379,39 @@ async def search_conversations(
         return []
     finally:
         await db.close()
+
+
+# ── Agent status — check if agent is running / reconnect ───────────
+
+
+@router.get("/conversations/{conversation_id}/agent/status")
+async def agent_status(conversation_id: str):
+    """Check if an agent is running for this conversation."""
+    is_running = conversation_id in _agent_tasks and not _agent_tasks[conversation_id].done()
+    buffered = len(_agent_buffers.get(conversation_id, []))
+    done = _agent_done.get(conversation_id, True)
+    return {"running": is_running, "buffered_events": buffered, "done": done}
+
+
+@router.get("/conversations/{conversation_id}/agent/stream")
+async def agent_reconnect(conversation_id: str, cursor: int = 0):
+    """Reconnect to a running agent and get events from cursor position."""
+    async def reconnect_stream():
+        pos = cursor
+        while True:
+            buf = _agent_buffers.get(conversation_id, [])
+            while pos < len(buf):
+                yield f"data: {json.dumps(buf[pos])}\n\n"
+                pos += 1
+            if _agent_done.get(conversation_id, True) and pos >= len(buf):
+                break
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(
+        reconnect_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── Roles ──────────────────────────────────────────────────────────

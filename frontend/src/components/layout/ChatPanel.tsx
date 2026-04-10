@@ -64,10 +64,72 @@ export default function ChatPanel() {
   // Auto-load last conversation for current campaign
   useEffect(() => {
     if (conversations.length > 0 && !conversationId) {
-      // Load the most recent conversation for this campaign
       loadConversation(conversations[0].id);
     }
   }, [conversations, conversationId, loadConversation]);
+
+  // Reconnect to running agent after page refresh
+  useEffect(() => {
+    if (!conversationId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}/agent/status`);
+        const status = await res.json();
+        if (status.running && !cancelled) {
+          setIsResponding(true);
+          // Reconnect to the stream from where the buffer is
+          const streamRes = await fetch(`/api/conversations/${conversationId}/agent/stream?cursor=0`);
+          const reader = streamRes.body?.getReader();
+          if (!reader) return;
+
+          const decoder = new TextDecoder();
+          const assistantMsgId = `msg-${Date.now()}-reconnect`;
+          let assistantText = '';
+          const toolCalls: ToolCall[] = [];
+
+          // Add a placeholder message for the reconnected stream
+          setMessages((prev) => {
+            // Don't add if already has a streaming message
+            if (prev.some(m => m.content === '' && m.role === 'assistant')) return prev;
+            return [...prev, { id: assistantMsgId, role: 'assistant', content: '(reconnecting...)\n\n', toolCalls: [], createdAt: new Date().toISOString() }];
+          });
+
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done || cancelled) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const dataStr = line.slice(6).trim();
+              if (!dataStr) continue;
+              try {
+                const event = JSON.parse(dataStr);
+                if (event.type === 'text') {
+                  assistantText += event.content || '';
+                  setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
+                } else if (event.type === 'routing') {
+                  setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: event.role_id, agentRoleName: event.role_name, agentRoleAvatar: event.role_avatar } : m));
+                } else if (event.type === 'done' || event.type === 'error') {
+                  setIsResponding(false);
+                }
+              } catch {}
+            }
+          }
+          setIsResponding(false);
+        }
+      } catch {
+        // Agent status check failed — no agent running, that's fine
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [conversationId]);
 
   // Reset when campaign changes
   useEffect(() => {
