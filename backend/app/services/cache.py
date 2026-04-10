@@ -39,7 +39,13 @@ class CacheService:
                     return json.loads(row["data"])
 
             # Cache miss or stale -- fetch fresh data
-            data = await fetch_fn()
+            try:
+                data = await fetch_fn()
+            except Exception:
+                # API failed — return stale cache if we have any
+                if row is not None:
+                    return json.loads(row["data"])
+                raise
             # Handle Pydantic models
             if isinstance(data, list) and data and hasattr(data[0], 'model_dump'):
                 serializable = [item.model_dump() for item in data]
