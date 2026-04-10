@@ -3,6 +3,7 @@ import CampaignOverview from './CampaignOverview';
 import KeywordTable from './KeywordTable';
 import AdList from './AdList';
 import SearchTermManager from './SearchTermManager';
+import LandingPageAnalyzer from './LandingPageAnalyzer';
 import GuidelinesViewer from '@/components/guidelines/GuidelinesViewer';
 import { formatBiddingStrategy } from '@/lib/formatters';
 import type { Campaign } from '@/types';
@@ -28,6 +29,7 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
           <TabsTrigger value="keywords">Keywords</TabsTrigger>
           <TabsTrigger value="search-terms">Search Terms</TabsTrigger>
           <TabsTrigger value="ads">Ads</TabsTrigger>
+          <TabsTrigger value="landing-page">Landing Page</TabsTrigger>
           <TabsTrigger value="guidelines">Guidelines</TabsTrigger>
         </TabsList>
 
@@ -45,6 +47,10 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
 
         <TabsContent value="ads" className="mt-4">
           <AdList accountId={accountId} campaignId={campaign.id} />
+        </TabsContent>
+
+        <TabsContent value="landing-page" className="mt-4">
+          <LandingPageAnalyzer campaign={campaign} accountId={accountId} />
         </TabsContent>
 
         <TabsContent value="guidelines" className="mt-4">

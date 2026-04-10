@@ -498,6 +498,85 @@ Using browser tools (if available) + campaign data:
 
 If browser tools are not available, analyze based on the campaign's landing page URL and keywords.`,
   },
+  {
+    id: 'cro-full-audit',
+    label: 'Full CRO Audit (12-point)',
+    icon: '🔬',
+    category: 'audit',
+    needsCampaign: true,
+    description: 'Comprehensive 12-point CRO audit with competitor analysis and ad strength scoring',
+    suggestedModel: 'opus',
+    prompt: `As the CRO Specialist, run a comprehensive 12-point CRO audit for "{campaign}":
+
+WORKFLOW:
+1. Find the landing page URL from the campaign's ads (final_urls)
+2. Run the FULL 12-step analysis using Chrome MCP browser tools:
+   - Performance audit (Core Web Vitals, page speed)
+   - DOM element analysis (CTAs, forms, headings, trust signals)
+   - Visual analysis (desktop + mobile screenshots)
+   - Copy quality scoring (value prop, benefit-driven)
+   - Trust signal detection (reviews, badges, certifications)
+   - Conversion element audit (form fields, CTA placement)
+   - Ad-to-page alignment check
+   - Conversion tracking verification (network requests for GTM/GA4/Ads)
+   - Mobile UX (touch targets, responsive design)
+   - Competitor research (find 2-3 competitors, analyze their pages)
+3. Score against industry benchmarks
+4. Generate 5-8 A/B test ideas with expected impact
+5. Calculate CRO Score (0-100)
+6. Analyze ad strength and suggest improvements to reach "Excellent" rating
+
+CRITICAL: Output structured data wrapped in <!-- STRUCTURED_DATA_START --> and <!-- STRUCTURED_DATA_END --> markers so the Landing Page tab can display results.
+
+Save the full analysis to campaign memory after completion.`,
+  },
+  {
+    id: 'ad-strength-optimizer',
+    label: 'Ad Strength → Excellent',
+    icon: '⭐',
+    category: 'optimize',
+    needsCampaign: true,
+    description: 'Optimize ad strength to "Excellent" rating with 15 headlines + 4 descriptions',
+    suggestedModel: 'opus',
+    prompt: `As the CRO Specialist, optimize all ads in "{campaign}" to achieve "Excellent" ad strength rating:
+
+REQUIREMENTS for Excellent rating:
+- 15 distinct, varied headlines (different angles, benefits, features)
+- 4 distinct descriptions (full 90-char usage)
+- Main keywords in at least 3 headlines
+- No near-duplicates (Google penalizes similarity)
+- Mix of: benefit-driven, feature-driven, urgency, trust, CTA-focused
+
+WORKFLOW:
+1. Pull current ads in this campaign
+2. Audit each ad: count headlines, descriptions, identify duplicates and weak ones
+3. Check landing page promises (run quick analysis or read existing CRO notes)
+4. Generate replacement headlines/descriptions that match landing page value prop
+5. Suggest which headlines to pin (position 1) for compliance/branding
+6. Show before/after comparison with expected ad strength improvement
+
+Save findings to campaign memory.`,
+  },
+  {
+    id: 'competitor-landing-pages',
+    label: 'Competitor Landing Page Spy',
+    icon: '🕵️',
+    category: 'audit',
+    needsCampaign: true,
+    description: 'Analyze competitor landing pages and extract winning patterns',
+    suggestedModel: 'opus',
+    prompt: `As the CRO Specialist, analyze competitor landing pages for "{campaign}":
+
+WORKFLOW:
+1. Identify 3 main competitors in this niche (use Chrome to search Google for top results on main keywords)
+2. For each competitor: open in new tab, screenshot, analyze CTAs/forms/copy/trust signals
+3. Build comparison table: us vs each competitor across key dimensions
+4. Identify patterns and winning elements
+5. Generate 5-10 specific ideas to steal/adapt with priority levels
+6. Save findings to campaign memory as cro_specialist notes
+
+Output structured data so the Landing Page tab can display competitor insights.`,
+  },
 
   // ── Report ─────────────────────────────────────────────
   {

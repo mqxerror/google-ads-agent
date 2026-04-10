@@ -470,6 +470,79 @@ export async function updateSettings(data: {
   return res.json();
 }
 
+// ── Landing Page Analyzer ────────────────────────────────────────
+
+export interface CategoryScore {
+  score: number;
+  grade: string;
+  findings: string[];
+}
+
+export interface Recommendation {
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  category: string;
+  expected_impact?: string;
+  effort?: string;
+}
+
+export interface ABTestIdea {
+  hypothesis: string;
+  expected_impact: string;
+  effort: string;
+  category: string;
+}
+
+export interface CompetitorInsight {
+  competitor: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  ideas_to_steal?: string[];
+}
+
+export interface AdStrengthAnalysis {
+  current_rating?: string;
+  headlines_count?: number;
+  descriptions_count?: number;
+  missing?: string[];
+  suggested_headlines?: string[];
+  suggested_descriptions?: string[];
+}
+
+export interface LandingPageAnalysis {
+  url: string;
+  analyzed_at: string;
+  cro_score: number;
+  grade: string;
+  executive_summary: string;
+  categories: Record<string, CategoryScore>;
+  critical_issues?: Array<{ title: string; category: string; impact: string; fix: string }>;
+  recommendations: Recommendation[];
+  ab_test_ideas: ABTestIdea[];
+  competitor_insights?: CompetitorInsight[];
+  ad_strength_analysis?: AdStrengthAnalysis;
+}
+
+export interface LandingPageAnalysisResponse {
+  analysis: LandingPageAnalysis | null;
+  raw_markdown: string;
+  has_data: boolean;
+}
+
+export function fetchLandingPageAnalysis(
+  accountId: string,
+  campaignId: string,
+): Promise<LandingPageAnalysisResponse> {
+  return request<LandingPageAnalysisResponse>(`/accounts/${accountId}/campaigns/${campaignId}/landing-page/analysis`);
+}
+
+export function clearLandingPageAnalysis(
+  accountId: string,
+  campaignId: string,
+): Promise<{ deleted: boolean }> {
+  return request(`/accounts/${accountId}/campaigns/${campaignId}/landing-page/analysis`, { method: 'DELETE' });
+}
+
 export async function launchChrome(): Promise<{ status: string; message?: string; profile_dir?: string }> {
   const res = await fetch('/api/settings/chrome/launch', { method: 'POST' });
   if (!res.ok) {

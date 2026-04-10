@@ -200,6 +200,19 @@ export default function ChatPanel() {
     [chatPanelWidth, setChatPanelWidth]
   );
 
+  // Listen for external "chat:send" events (from Landing Page tab and other components)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.text) {
+        handleSend(detail.text, detail.model || 'opus', detail.roleId);
+      }
+    };
+    window.addEventListener('chat:send', handler);
+    return () => window.removeEventListener('chat:send', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, selectedCampaignId, ACCOUNT_ID]);
+
   // Send message
   const handleSend = useCallback(
     async (text: string, model: ModelId = 'sonnet', roleId?: string) => {
