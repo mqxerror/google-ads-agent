@@ -304,11 +304,11 @@ def _load_campaign_guidelines(campaign_name: str | None, account_id: str | None 
         if "mena" in name_lower or "arabic" in name_lower:
             mena_file = gdir / "MENA_CAMPAIGN_GUIDELINES.md"
             if mena_file.exists():
-                parts.append(mena_file.read_text(encoding="utf-8")[:2000])
+                parts.append(mena_file.read_text(encoding="utf-8"))
         elif "greece" in name_lower:
             greece_file = gdir / "GREECE_CAMPAIGN_GUIDELINES.md"
             if greece_file.exists():
-                parts.append(greece_file.read_text(encoding="utf-8")[:2000])
+                parts.append(greece_file.read_text(encoding="utf-8"))
 
     return "\n\n".join(parts)
 
@@ -331,7 +331,7 @@ async def _get_recent_messages(conversation_id: str, limit: int = 10) -> list[di
         rows = await cur.fetchall()
         result = []
         for r in reversed(rows):
-            entry = {"role": r["role"], "content": r["content"][:500]}
+            entry = {"role": r["role"], "content": r["content"]}
             # Add role attribution for assistant messages
             if r["role"] == "assistant" and r["agent_role_name"]:
                 entry["agent_role"] = r["agent_role"]
@@ -834,10 +834,10 @@ async def stream_agent_response(
         ])
 
     if business_ctx:
-        system_parts.append(f"\n=== BUSINESS CONTEXT ===\n{business_ctx[:2000]}")
+        system_parts.append(f"\n=== BUSINESS CONTEXT ===\n{business_ctx}")
 
     if guidelines:
-        system_parts.append(f"\n=== CAMPAIGN GUIDELINES ===\n{guidelines[:3000]}")
+        system_parts.append(f"\n=== CAMPAIGN GUIDELINES ===\n{guidelines}")
 
     if summaries:
         system_parts.append(f"\n=== PAST SESSION HISTORY ===")
@@ -869,10 +869,10 @@ async def stream_agent_response(
                 if not notes:
                     continue
                 if rid == active_role_id:
-                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) — CONTINUE FROM HERE ===\n{notes[:2000]}")
+                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) — CONTINUE FROM HERE ===\n{notes}")
                 else:
                     label = rid.replace('_', ' ').upper()
-                    system_parts.append(f"\n=== FINDINGS FROM {label} ===\n{notes[:1500]}")
+                    system_parts.append(f"\n=== FINDINGS FROM {label} ===\n{notes}")
         except Exception:
             pass
 
@@ -896,12 +896,12 @@ async def stream_agent_response(
 
     if recent_msgs:
         prompt_parts.append("\n=== RECENT CONVERSATION (team discussion) ===")
-        for msg in recent_msgs[-12:]:  # Last 12 messages for better continuity
+        for msg in recent_msgs[-15:]:  # Last 15 messages — full context, no truncation
             if msg["role"] == "user":
-                prompt_parts.append(f"User: {msg['content'][:400]}")
+                prompt_parts.append(f"User: {msg['content']}")
             else:
                 role_label = msg.get("agent_role_name", "Assistant")
-                prompt_parts.append(f"[{role_label}]: {msg['content'][:600]}")
+                prompt_parts.append(f"[{role_label}]: {msg['content']}")
 
     # Resolve @[title](conv:ID) references — load referenced conversation content
     import re
@@ -1189,7 +1189,7 @@ async def stream_agent_response(
             if role_id != "director":
                 # Take the full response (up to 3000 chars) instead of extracting fragments
                 # This ensures the next role gets the complete picture
-                condensed = _condense_for_memory(response_text, user_message, max_chars=3000)
+                condensed = _condense_for_memory(response_text, user_message, max_chars=10000)
                 save_role_notes(account_id, campaign_id, role_id, condensed)
         except Exception:
             pass
