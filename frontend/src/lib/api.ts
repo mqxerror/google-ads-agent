@@ -543,6 +543,48 @@ export function clearLandingPageAnalysis(
   return request(`/accounts/${accountId}/campaigns/${campaignId}/landing-page/analysis`, { method: 'DELETE' });
 }
 
+// ── Roles (specialist personas) ──────────────────────────────────
+
+export interface AgencyRoleSummary {
+  id: string;
+  name: string;
+  avatar: string;
+  specialty: string;
+  customized?: boolean;
+}
+
+export interface AgencyRoleDetail {
+  id: string;
+  name: string;
+  avatar: string;
+  specialty: string;
+  system_prompt: string;
+  tools_focus?: string[];
+  context_needs?: string[];
+}
+
+export function fetchRoles(): Promise<{ roles: AgencyRoleSummary[] }> {
+  return request('/roles');
+}
+
+export function fetchRoleDetail(roleId: string): Promise<AgencyRoleDetail> {
+  return request(`/roles/${roleId}`);
+}
+
+export function customizeRole(
+  roleId: string,
+  updates: Partial<AgencyRoleDetail>,
+): Promise<{ status: string; role_id: string }> {
+  return request(`/roles/${roleId}/customize`, {
+    method: 'POST',
+    body: JSON.stringify(updates),
+  });
+}
+
+export function resetRole(roleId: string): Promise<{ status: string; role_id: string }> {
+  return request(`/roles/${roleId}/customize`, { method: 'DELETE' });
+}
+
 export async function launchChrome(): Promise<{ status: string; message?: string; profile_dir?: string }> {
   const res = await fetch('/api/settings/chrome/launch', { method: 'POST' });
   if (!res.ok) {

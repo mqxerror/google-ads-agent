@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, X, Loader2, Play, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchSettings, updateSettings, launchChrome, stopChrome } from '@/lib/api';
+import RolesEditor from './RolesEditor';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -277,6 +278,9 @@ go build -o google-tag-manager-mcp .`}</pre>
         </section>
 
         {/* Google Ads Credentials */}
+        {/* Roles editor */}
+        <RolesEditor />
+
         <section>
           <h2 className="text-sm font-semibold mb-1">Google Ads API</h2>
           <p className="text-xs text-muted-foreground mb-4">
