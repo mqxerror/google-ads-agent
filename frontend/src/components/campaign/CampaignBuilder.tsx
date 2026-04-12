@@ -80,15 +80,20 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     }
   }, []);
 
+  const [noLandingPage, setNoLandingPage] = useState(false);
+
   // Start build
   const handleStartBuild = async () => {
+    const finalUrl = noLandingPage ? `NO_LANDING_PAGE: ${brief.slice(0, 50)}` : url;
     const res = await fetch('/api/campaigns/build', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         account_id: accountId,
-        landing_page_url: url,
-        brief,
+        landing_page_url: finalUrl,
+        brief: noLandingPage
+          ? `${brief}\n\nIMPORTANT: The user does NOT have a landing page yet. As part of this campaign build, suggest a landing page structure, wireframe, and key sections that should be created BEFORE launching ads. The CRO Specialist should provide a landing page blueprint.`
+          : brief,
         budget_daily: budget,
         geo_targets: geoTargets.split(',').map(s => s.trim()),
         languages: languages.split(',').map(s => s.trim()),
@@ -98,8 +103,11 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     const session = await res.json();
     setSessionId(session.id);
     setStages(session.stages);
-    setCurrentStage(0);
+    setCurrentStage(1); // Start at stage 1, not 0
     setStep('pipeline');
+
+    // Auto-run stage 1 after a short delay
+    setTimeout(() => runStage(1), 500);
   };
 
   // Run a pipeline stage — sends to chat
@@ -124,22 +132,43 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     });
     window.dispatchEvent(event);
 
-    // Mark complete after a delay (user will see the chat output)
-    // In v2, we'd listen for the agent's done event
-    setTimeout(() => {
+    // Listen for agent done event, then auto-advance
+    const handleDone = () => {
       setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
       setPipelineRunning(false);
-
-      // Mark on backend
       fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' });
 
-      // Auto-advance to next stage prompt
       if (stageNum < 7) {
         setCurrentStage(stageNum + 1);
+        // Auto-run next stage after brief pause
+        setTimeout(() => runStage(stageNum + 1), 2000);
       } else {
         setStep('review');
       }
-    }, 3000);
+    };
+
+    // Poll for agent completion by checking agent status
+    const pollInterval = setInterval(async () => {
+      try {
+        // Check latest conversation for agent status
+        const convRes = await fetch('/api/conversations');
+        const convs = await convRes.json();
+        if (convs.length > 0) {
+          const statusRes = await fetch(`/api/conversations/${convs[0].id}/agent/status`);
+          const status = await statusRes.json();
+          if (status.done) {
+            clearInterval(pollInterval);
+            handleDone();
+          }
+        }
+      } catch {}
+    }, 5000);
+
+    // Fallback: mark done after 2 minutes max
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      handleDone();
+    }, 120000);
   }, [sessionId, stages]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
@@ -166,15 +195,54 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
           <div>
             <label className="text-sm font-medium flex items-center gap-2 mb-2">
               <LinkIcon className="h-4 w-4" />
-              Landing Page URL *
+              Landing Page URL {noLandingPage ? '' : '*'}
             </label>
-            <Input
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="https://example.com/landing-page"
-              className="text-sm"
-            />
-            <p className="text-xs text-muted-foreground mt-1">The CRO Specialist will analyze this page first</p>
+            {!noLandingPage ? (
+              <>
+                <Input
+                  value={url}
+                  onChange={e => setUrl(e.target.value)}
+                  placeholder="https://example.com/landing-page"
+                  className="text-sm"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">The CRO Specialist will analyze this page first</p>
+                  <button
+                    onClick={() => setNoLandingPage(true)}
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    I don't have a landing page yet
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-semibold mb-1">Landing Page Creation Mode</h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      The CRO Specialist will design a landing page blueprint with recommended sections,
+                      copy structure, and conversion elements. Each role will build their strategy around this blueprint.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        value={url}
+                        onChange={e => setUrl(e.target.value)}
+                        placeholder="Your website URL (optional, for brand reference)"
+                        className="text-sm flex-1"
+                      />
+                      <button
+                        onClick={() => setNoLandingPage(false)}
+                        className="text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+                      >
+                        I have a landing page
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Brief */}
@@ -293,7 +361,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             onClick={handleStartBuild}
             size="lg"
             className="w-full gap-2"
-            disabled={!url.trim()}
+            disabled={!noLandingPage && !url.trim()}
           >
             <Sparkles className="h-4 w-4" />
             Start Building Campaign
