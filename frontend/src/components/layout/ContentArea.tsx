@@ -163,26 +163,8 @@ function CampaignRow({ campaign, isSelected, onToggleSelect }: { campaign: Campa
 export default function ContentArea() {
   const { selectedCampaignId } = useAppStore();
   const accountId = useClientAccountId();
-  // Persist builder state — auto-reopen if there's an active build
-  const [showBuilder, setShowBuilder] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem('campaign-builder-pipeline');
-      if (saved) {
-        const pipeline = JSON.parse(saved);
-        // Auto-show builder if there's an in-progress build
-        return pipeline?.stages?.length > 0 && !pipeline.stages.every((s: { status: string }) => s.status === 'completed');
-      }
-    } catch {}
-    return false;
-  });
-
-  // Persist showBuilder state
-  const handleShowBuilder = (show: boolean) => {
-    setShowBuilder(show);
-    if (!show) {
-      // Don't clear pipeline data — user might want to resume later
-    }
-  };
+  const [showBuilder, setShowBuilder] = useState(false);
+  const handleShowBuilder = (show: boolean) => setShowBuilder(show);
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['campaigns', accountId],

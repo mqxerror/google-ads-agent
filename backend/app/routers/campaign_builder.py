@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
+
+from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["campaign-builder"])
 
@@ -307,3 +310,54 @@ async def mark_stage_complete(session_id: str, stage_num: int):
     if stage_num >= len(PIPELINE_STAGES):
         session.status = "completed"
     return {"status": "ok", "current_stage": session.current_stage}
+
+
+# ── Derive pipeline status from actual role_notes files ──────────
+
+STAGE_ROLE_MAP = [
+    (1, "cro_specialist"),
+    (2, "competitor_intel"),
+    (3, "search_term_hunter"),
+    (4, "creative_director"),
+    (5, "ppc_strategist"),
+    (6, "gtm_specialist"),
+    (7, "director"),
+]
+
+
+@router.get("/campaigns/build/status/{account_id}/{campaign_id}")
+async def get_pipeline_status_from_memory(account_id: str, campaign_id: str):
+    """Derive pipeline completion status from actual role_notes files.
+
+    This is the SOURCE OF TRUTH — not sessionStorage, not in-memory state.
+    If role_notes/cro_specialist.md exists, Stage 1 is done. Period.
+    """
+    memory_dir = settings.MEMORY_DIR / account_id / campaign_id / "role_notes"
+
+    completed_stages = []
+    first_incomplete = None
+
+    for stage_num, role_id in STAGE_ROLE_MAP:
+        note_file = memory_dir / f"{role_id}.md"
+        if note_file.exists() and note_file.stat().st_size > 50:
+            completed_stages.append(stage_num)
+        elif first_incomplete is None:
+            first_incomplete = stage_num
+
+    return {
+        "completed_stages": completed_stages,
+        "next_stage": first_incomplete or (len(STAGE_ROLE_MAP) + 1),
+        "total_stages": len(STAGE_ROLE_MAP),
+        "all_done": len(completed_stages) == len(STAGE_ROLE_MAP),
+        "stages": [
+            {
+                "stage": stage_num,
+                "role_id": role_id,
+                "role_name": PIPELINE_STAGES[stage_num - 1]["role_name"],
+                "title": PIPELINE_STAGES[stage_num - 1]["title"],
+                "avatar": PIPELINE_STAGES[stage_num - 1]["avatar"],
+                "status": "completed" if stage_num in completed_stages else "pending",
+            }
+            for stage_num, role_id in STAGE_ROLE_MAP
+        ],
+    }

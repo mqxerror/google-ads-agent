@@ -66,16 +66,8 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const setGeoSaved = (v: string) => { setGeoTargets(v); save('geo', v); };
   const setLangSaved = (v: string) => { setLanguages(v); save('lang', v); };
 
-  // Pipeline state — persisted to sessionStorage
-  const loadPipeline = () => {
-    try {
-      const saved = sessionStorage.getItem('campaign-builder-pipeline');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  };
-  const savedPipeline = loadPipeline();
-
-  const [sessionId, setSessionId] = useState<string | null>(savedPipeline?.sessionId || null);
+  // Pipeline state — derived from BACKEND role_notes files (the source of truth)
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [stages, setStages] = useState<Array<{
     stage: number;
     role_id: string;
@@ -83,28 +75,30 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     avatar: string;
     title: string;
     status: string;
-    prompt: string;
-  }>>(savedPipeline?.stages || []);
-  const [currentStage, setCurrentStage] = useState(savedPipeline?.currentStage || 0);
+    prompt?: string;
+  }>>([]);
+  const [currentStage, setCurrentStage] = useState(1);
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [step, setStep] = useState<WizardStep>('input');
 
-  // Auto-restore to pipeline step if there's saved progress
-  const [step, setStep] = useState<WizardStep>(
-    savedPipeline?.stages?.length > 0
-      ? (savedPipeline.stages.every((s: { status: string }) => s.status === 'completed') ? 'review' : 'pipeline')
-      : 'input'
-  );
-
-  // Auto-save pipeline state whenever it changes
+  // On mount: check backend for existing pipeline progress
   useEffect(() => {
-    if (stages.length > 0) {
-      try {
-        sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({
-          sessionId, stages, currentStage,
-        }));
-      } catch {}
-    }
-  }, [sessionId, stages, currentStage]);
+    if (!accountId) return;
+    // Use a known campaign_id or a "build" namespace
+    const campaignId = loadSaved('build_campaign_id', '');
+    if (!campaignId) return;
+
+    fetch(`/api/campaigns/build/status/${accountId}/${campaignId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.completed_stages?.length > 0) {
+          setStages(data.stages);
+          setCurrentStage(data.next_stage);
+          setStep(data.all_done ? 'review' : 'pipeline');
+        }
+      })
+      .catch(() => {});
+  }, [accountId]);
 
   // File upload
   const handleFileUpload = useCallback(async (files: FileList | null) => {
@@ -154,68 +148,60 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     setCurrentStage(1);
     setStep('pipeline');
 
-    // Save immediately (useEffect will also catch this, but belt-and-suspenders)
-    try {
-      sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({
-        sessionId: session.id, stages: session.stages, currentStage: 1,
-      }));
-    } catch {}
-
-    // Auto-run stage 1 after a short delay
-    setTimeout(() => runStage(1), 500);
+    // Save campaign context so we can derive status on reload
+    save('build_campaign_id', session.input?.campaign_id || `build-${session.id.slice(0, 8)}`);
   };
 
-  // Run a pipeline stage — sends to chat
+  // Refresh pipeline status from backend
+  const refreshPipelineStatus = useCallback(async () => {
+    const campaignId = loadSaved('build_campaign_id', '');
+    if (!accountId || !campaignId) return;
+    try {
+      const res = await fetch(`/api/campaigns/build/status/${accountId}/${campaignId}`);
+      const data = await res.json();
+      if (data.stages) {
+        setStages(data.stages);
+        setCurrentStage(data.next_stage);
+        if (data.all_done) setStep('review');
+      }
+    } catch {}
+  }, [accountId]);
+
+  // Run a pipeline stage — sends to chat, then user clicks "Run Next" for the next one
   const runStage = useCallback(async (stageNum: number) => {
     const stage = stages.find(s => s.stage === stageNum);
     if (!stage) return;
 
-    // Mark as running — use updater function to always get latest state
     setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s));
     setCurrentStage(stageNum);
     setPipelineRunning(true);
 
-    // Register listener FIRST (before dispatching chat:send to avoid race)
-    const handleDone = () => {
-      // Use updater function — this always sees the latest state
-      setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
-      setPipelineRunning(false);
-
-      if (sessionId) {
-        fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' }).catch(() => {});
-      }
-
-      if (stageNum < 7) {
-        setCurrentStage(stageNum + 1);
-        setTimeout(() => runStage(stageNum + 1), 3000);
-      } else {
-        setStep('review');
-      }
-    };
-
+    // Listen for completion — then refresh status from backend
     const doneHandler = () => {
       window.removeEventListener('agent:done', doneHandler);
       clearTimeout(fallbackTimer);
-      handleDone();
+      setPipelineRunning(false);
+      // Refresh from backend to get actual file-based status
+      setTimeout(() => refreshPipelineStatus(), 2000);
     };
     window.addEventListener('agent:done', doneHandler);
 
-    // Fallback timer
     const fallbackTimer = setTimeout(() => {
       window.removeEventListener('agent:done', doneHandler);
-      handleDone();
+      setPipelineRunning(false);
+      refreshPipelineStatus();
     }, 240000);
 
-    // NOW dispatch to chat (listener is already registered)
+    // Send to chat
     const chatEvent = new CustomEvent('chat:send', {
       detail: {
-        text: stage.prompt,
+        text: stage.prompt || `Run stage ${stageNum} for campaign build`,
         roleId: stage.role_id,
         model: buildModel,
       },
     });
     window.dispatchEvent(chatEvent);
-  }, [sessionId, stages, buildModel]);
+  }, [stages, buildModel, refreshPipelineStatus]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
   if (step === 'input') {
@@ -237,25 +223,6 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         </div>
 
         <div className="space-y-6">
-          {/* Resume banner */}
-          {savedPipeline?.stages?.length > 0 && step === 'input' && (
-            <div className="border border-blue-500/40 bg-blue-500/5 rounded-lg p-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Resume Previous Build?</h3>
-                <p className="text-xs text-muted-foreground">
-                  {savedPipeline.stages.filter((s: { status: string }) => s.status === 'completed').length} of 7 stages completed
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => setStep('pipeline')}>Resume</Button>
-                <Button size="sm" variant="outline" onClick={() => {
-                  sessionStorage.removeItem('campaign-builder-pipeline');
-                  setSessionId(null); setStages([]); setCurrentStage(0);
-                }}>Discard</Button>
-              </div>
-            </div>
-          )}
-
           {/* URL */}
           <div>
             <label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -566,22 +533,31 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         </div>
 
         {/* Progress info */}
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-3">
           <p className="text-xs text-muted-foreground">
-            Stage {currentStage} of {stages.length} · Each role reads the previous role's findings automatically
+            {stages.filter(s => s.status === 'completed').length} of {stages.length} stages completed · Each role reads previous findings
           </p>
-          {currentStage > 0 && currentStage <= stages.length && (
+          <div className="flex gap-2 justify-center">
+          {currentStage > 0 && currentStage <= stages.length && !pipelineRunning && (
             <Button
-              variant="outline"
               size="sm"
-              className="mt-3 gap-1"
+              className="gap-1"
               onClick={() => runStage(currentStage)}
-              disabled={pipelineRunning}
             >
-              <ArrowRight className="h-3 w-3" />
+              <Play className="h-3 w-3" />
               Run Stage {currentStage}
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={() => refreshPipelineStatus()}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Refresh Status
+          </Button>
+          </div>
         </div>
       </div>
     );
