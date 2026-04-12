@@ -170,19 +170,16 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     const stage = stages.find(s => s.stage === stageNum);
     if (!stage) return;
 
-    // Mark as running + persist
-    const updatedStages = stages.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s);
-    setStages(updatedStages);
+    // Mark as running — use updater function to always get latest state
+    setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s));
     setCurrentStage(stageNum);
     setPipelineRunning(true);
-    // state auto-saved via useEffect
 
     // Register listener FIRST (before dispatching chat:send to avoid race)
     const handleDone = () => {
-      const completed = updatedStages.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s);
-      setStages(completed);
+      // Use updater function — this always sees the latest state
+      setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
       setPipelineRunning(false);
-      // state auto-saved via useEffect
 
       if (sessionId) {
         fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' }).catch(() => {});
@@ -190,7 +187,6 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
       if (stageNum < 7) {
         setCurrentStage(stageNum + 1);
-        // state auto-saved via useEffect
         setTimeout(() => runStage(stageNum + 1), 3000);
       } else {
         setStep('review');
