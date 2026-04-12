@@ -5,14 +5,15 @@ import { fetchCampaigns, updateCampaignStatus } from '@/lib/api';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { formatMicros, formatNumber, formatBiddingStrategy } from '@/lib/formatters';
 import CampaignTabs from '@/components/campaign/CampaignTabs';
+import CampaignBuilder from '@/components/campaign/CampaignBuilder';
 import CampaignActivityFeed from '@/components/dashboard/CampaignActivityFeed';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2 } from 'lucide-react';
+import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Campaign } from '@/types';
 
-function AccountOverview() {
+function AccountOverview({ onOpenBuilder }: { onOpenBuilder?: () => void }) {
   const clientAccountId = useClientAccountId();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -59,7 +60,15 @@ function AccountOverview() {
 
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold mb-6">Account Overview</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold">Account Overview</h2>
+        {onOpenBuilder && (
+          <Button onClick={onOpenBuilder} className="gap-2">
+            <Rocket className="h-4 w-4" />
+            Create Campaign
+          </Button>
+        )}
+      </div>
       <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2"><BarChart3 className="h-3.5 w-3.5" />Impressions</div>
@@ -154,6 +163,7 @@ function CampaignRow({ campaign, isSelected, onToggleSelect }: { campaign: Campa
 export default function ContentArea() {
   const { selectedCampaignId } = useAppStore();
   const accountId = useClientAccountId();
+  const [showBuilder, setShowBuilder] = useState(false);
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['campaigns', accountId],
@@ -167,10 +177,12 @@ export default function ContentArea() {
   return (
     <div className="flex-1 min-w-0 overflow-hidden">
       <ScrollArea className="h-full">
-        {campaign ? (
+        {showBuilder ? (
+          <CampaignBuilder onClose={() => setShowBuilder(false)} />
+        ) : campaign ? (
           <CampaignTabs campaign={campaign} accountId={accountId} />
         ) : (
-          <AccountOverview />
+          <AccountOverview onOpenBuilder={() => setShowBuilder(true)} />
         )}
       </ScrollArea>
     </div>
