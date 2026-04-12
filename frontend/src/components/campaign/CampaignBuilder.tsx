@@ -40,7 +40,6 @@ type WizardStep = 'input' | 'pipeline' | 'review';
 
 export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const accountId = useClientAccountId();
-  const [step, setStep] = useState<WizardStep>('input');
 
   // Persist form inputs in sessionStorage so they survive errors/restarts
   const loadSaved = (key: string, fallback: string) => {
@@ -67,8 +66,16 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const setGeoSaved = (v: string) => { setGeoTargets(v); save('geo', v); };
   const setLangSaved = (v: string) => { setLanguages(v); save('lang', v); };
 
-  // Pipeline state
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  // Pipeline state — persisted to sessionStorage
+  const loadPipeline = () => {
+    try {
+      const saved = sessionStorage.getItem('campaign-builder-pipeline');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  };
+  const savedPipeline = loadPipeline();
+
+  const [sessionId, setSessionId] = useState<string | null>(savedPipeline?.sessionId || null);
   const [stages, setStages] = useState<Array<{
     stage: number;
     role_id: string;
@@ -77,9 +84,23 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     title: string;
     status: string;
     prompt: string;
-  }>>([]);
-  const [currentStage, setCurrentStage] = useState(0);
+  }>>(savedPipeline?.stages || []);
+  const [currentStage, setCurrentStage] = useState(savedPipeline?.currentStage || 0);
   const [pipelineRunning, setPipelineRunning] = useState(false);
+
+  // Auto-restore to pipeline step if there's saved progress
+  const [step, setStep] = useState<WizardStep>(
+    savedPipeline?.stages?.length > 0
+      ? (savedPipeline.stages.every((s: { status: string }) => s.status === 'completed') ? 'review' : 'pipeline')
+      : 'input'
+  );
+
+  // Save pipeline state whenever it changes
+  const savePipeline = useCallback((sid: string | null, stg: typeof stages, cs: number) => {
+    try {
+      sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({ sessionId: sid, stages: stg, currentStage: cs }));
+    } catch {}
+  }, []);
 
   // File upload
   const handleFileUpload = useCallback(async (files: FileList | null) => {
@@ -135,55 +156,59 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
   // Run a pipeline stage — sends to chat
   const runStage = useCallback(async (stageNum: number) => {
-    if (!sessionId) return;
-
     const stage = stages.find(s => s.stage === stageNum);
     if (!stage) return;
 
-    // Mark as running
-    setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s));
+    // Mark as running + persist
+    const updatedStages = stages.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s);
+    setStages(updatedStages);
     setCurrentStage(stageNum);
     setPipelineRunning(true);
+    savePipeline(sessionId, updatedStages, stageNum);
 
-    // Send to chat via window event
-    const event = new CustomEvent('chat:send', {
-      detail: {
-        text: stage.prompt,
-        roleId: stage.role_id,
-        model: buildModel,
-      },
-    });
-    window.dispatchEvent(event);
-
-    // Listen for agent completion via custom event from ChatPanel
+    // Register listener FIRST (before dispatching chat:send to avoid race)
     const handleDone = () => {
-      setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
+      const completed = updatedStages.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s);
+      setStages(completed);
       setPipelineRunning(false);
+      savePipeline(sessionId, completed, stageNum);
+
       if (sessionId) {
-        fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' });
+        fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' }).catch(() => {});
       }
 
       if (stageNum < 7) {
         setCurrentStage(stageNum + 1);
+        savePipeline(sessionId, completed, stageNum + 1);
         setTimeout(() => runStage(stageNum + 1), 3000);
       } else {
         setStep('review');
       }
     };
 
-    // Listen for "agent:done" event dispatched by ChatPanel when response finishes
     const doneHandler = () => {
       window.removeEventListener('agent:done', doneHandler);
+      clearTimeout(fallbackTimer);
       handleDone();
     };
     window.addEventListener('agent:done', doneHandler);
 
-    // Fallback: mark done after 4 minutes max
-    setTimeout(() => {
+    // Fallback timer
+    const fallbackTimer = setTimeout(() => {
       window.removeEventListener('agent:done', doneHandler);
-      if (pipelineRunning) handleDone();
+      handleDone();
     }, 240000);
-  }, [sessionId, stages]);
+
+    // NOW dispatch to chat (listener is already registered)
+    const chatEvent = new CustomEvent('chat:send', {
+      detail: {
+        text: stage.prompt,
+        roleId: stage.role_id,
+        model: buildModel,
+      },
+    });
+    window.dispatchEvent(chatEvent);
+  }, [sessionId, stages, buildModel, savePipeline]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
   if (step === 'input') {
@@ -205,6 +230,25 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         </div>
 
         <div className="space-y-6">
+          {/* Resume banner */}
+          {savedPipeline?.stages?.length > 0 && step === 'input' && (
+            <div className="border border-blue-500/40 bg-blue-500/5 rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Resume Previous Build?</h3>
+                <p className="text-xs text-muted-foreground">
+                  {savedPipeline.stages.filter((s: { status: string }) => s.status === 'completed').length} of 7 stages completed
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => setStep('pipeline')}>Resume</Button>
+                <Button size="sm" variant="outline" onClick={() => {
+                  sessionStorage.removeItem('campaign-builder-pipeline');
+                  setSessionId(null); setStages([]); setCurrentStage(0);
+                }}>Discard</Button>
+              </div>
+            </div>
+          )}
+
           {/* URL */}
           <div>
             <label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -398,17 +442,30 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             </div>
           </div>
 
-          {/* Start button */}
+          {/* Buttons */}
+          <div className="flex gap-3">
           <Button
             onClick={handleStartBuild}
             size="lg"
-            className="w-full gap-2"
+            className="flex-1 gap-2"
             disabled={!noLandingPage && !url.trim()}
           >
             <Sparkles className="h-4 w-4" />
             Start Building Campaign
           </Button>
-        </div>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              sessionStorage.removeItem('campaign-builder-pipeline');
+              ['url', 'brief', 'budget', 'geo', 'lang'].forEach(k => sessionStorage.removeItem(`campaign-builder-${k}`));
+              setUrl(''); setBrief(''); setBudget(50); setGeoTargets('United States'); setLanguages('English');
+              setAttachments([]); setSessionId(null); setStages([]); setCurrentStage(0);
+            }}
+          >
+            Clear All
+          </Button>
+          </div>
       </div>
     );
   }
@@ -523,6 +580,32 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }
 
   // ── REVIEW STEP ────────────────────────────────────────────
+  const handleExportReport = () => {
+    // Combine all role notes + chat into a markdown report
+    const event = new CustomEvent('chat:send', {
+      detail: {
+        text: `As the Agency Director, compile a COMPLETE CAMPAIGN BUILD REPORT combining ALL role findings into one document:
+
+Include these sections:
+1. EXECUTIVE SUMMARY
+2. LANDING PAGE ANALYSIS (from CRO Specialist notes)
+3. COMPETITOR RESEARCH (from Competitor Intel notes)
+4. KEYWORD STRATEGY (from Search Term Hunter notes)
+5. AD COPY (from Creative Director notes — all headlines & descriptions)
+6. CAMPAIGN STRUCTURE (from PPC Strategist notes)
+7. TRACKING STATUS (from GTM Specialist notes)
+8. LAUNCH CHECKLIST
+9. EXPECTED RESULTS
+
+READ ALL role_notes from campaign memory and compile them.
+Format as a clean, professional document that could be shared with a client or stakeholder.`,
+        roleId: 'director',
+        model: buildModel,
+      },
+    });
+    window.dispatchEvent(event);
+  };
+
   return (
     <div className="max-w-2xl mx-auto py-8 px-6 text-center">
       <CheckCircle2 className="h-16 w-16 mx-auto text-emerald-500 mb-4" />
@@ -531,9 +614,13 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         All 7 specialists have contributed. The Agency Director's final plan is in the chat.
         Review it and say "CREATE" to build the campaign via Google Ads.
       </p>
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-3 justify-center flex-wrap">
         <Button variant="outline" onClick={onClose}>
           Close Builder
+        </Button>
+        <Button variant="outline" onClick={handleExportReport}>
+          <ArrowRight className="h-4 w-4 mr-1" />
+          Export Full Report
         </Button>
         <Button onClick={() => {
           const event = new CustomEvent('chat:send', {
@@ -546,6 +633,9 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
           Create Campaign
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground mt-4">
+        Pipeline progress saved. You can close and resume later.
+      </p>
     </div>
   );
 }
