@@ -42,15 +42,30 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const accountId = useClientAccountId();
   const [step, setStep] = useState<WizardStep>('input');
 
-  // Input state
-  const [url, setUrl] = useState('');
-  const [brief, setBrief] = useState('');
-  const [budget, setBudget] = useState(50);
-  const [geoTargets, setGeoTargets] = useState('United States');
-  const [languages, setLanguages] = useState('English');
+  // Persist form inputs in sessionStorage so they survive errors/restarts
+  const loadSaved = (key: string, fallback: string) => {
+    try { return sessionStorage.getItem(`campaign-builder-${key}`) || fallback; } catch { return fallback; }
+  };
+  const save = (key: string, value: string) => {
+    try { sessionStorage.setItem(`campaign-builder-${key}`, value); } catch {}
+  };
+
+  // Input state — restored from sessionStorage
+  const [url, setUrl] = useState(() => loadSaved('url', ''));
+  const [brief, setBrief] = useState(() => loadSaved('brief', ''));
+  const [budget, setBudget] = useState(() => Number(loadSaved('budget', '50')));
+  const [geoTargets, setGeoTargets] = useState(() => loadSaved('geo', 'United States'));
+  const [languages, setLanguages] = useState(() => loadSaved('lang', 'English'));
   const [attachments, setAttachments] = useState<BuildAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-save inputs as user types
+  const setUrlSaved = (v: string) => { setUrl(v); save('url', v); };
+  const setBriefSaved = (v: string) => { setBrief(v); save('brief', v); };
+  const setBudgetSaved = (v: number) => { setBudget(v); save('budget', String(v)); };
+  const setGeoSaved = (v: string) => { setGeoTargets(v); save('geo', v); };
+  const setLangSaved = (v: string) => { setLanguages(v); save('lang', v); };
 
   // Pipeline state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -156,9 +171,10 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     };
 
     // Poll for agent completion by checking agent status
+    let pollCount = 0;
     const pollInterval = setInterval(async () => {
+      pollCount++;
       try {
-        // Check latest conversation for agent status
         const convRes = await fetch('/api/conversations');
         const convs = await convRes.json();
         if (convs.length > 0) {
@@ -169,14 +185,21 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             handleDone();
           }
         }
-      } catch {}
+      } catch (e) {
+        // After 3 failed polls, mark as error
+        if (pollCount > 3) {
+          clearInterval(pollInterval);
+          setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'error' } : s));
+          setPipelineRunning(false);
+        }
+      }
     }, 5000);
 
-    // Fallback: mark done after 2 minutes max
+    // Fallback: mark done after 3 minutes max
     setTimeout(() => {
       clearInterval(pollInterval);
-      handleDone();
-    }, 120000);
+      if (pipelineRunning) handleDone();
+    }, 180000);
   }, [sessionId, stages]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
@@ -209,7 +232,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
               <>
                 <Input
                   value={url}
-                  onChange={e => setUrl(e.target.value)}
+                  onChange={e => setUrlSaved(e.target.value)}
                   placeholder="https://example.com/landing-page"
                   className="text-sm"
                 />
@@ -236,7 +259,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                     <div className="flex items-center gap-3">
                       <Input
                         value={url}
-                        onChange={e => setUrl(e.target.value)}
+                        onChange={e => setUrlSaved(e.target.value)}
                         placeholder="Your website URL (optional, for brand reference)"
                         className="text-sm flex-1"
                       />
@@ -258,7 +281,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             <label className="text-sm font-medium mb-2 block">Campaign Brief</label>
             <textarea
               value={brief}
-              onChange={e => setBrief(e.target.value)}
+              onChange={e => setBriefSaved(e.target.value)}
               placeholder="Describe the product/service, target audience, and campaign goals..."
               rows={4}
               className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
@@ -275,7 +298,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
               <Input
                 type="number"
                 value={budget}
-                onChange={e => setBudget(Number(e.target.value))}
+                onChange={e => setBudgetSaved(Number(e.target.value))}
                 min={1}
                 className="text-sm"
               />
@@ -287,7 +310,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
               </label>
               <Input
                 value={geoTargets}
-                onChange={e => setGeoTargets(e.target.value)}
+                onChange={e => setGeoSaved(e.target.value)}
                 placeholder="US, UK, Canada"
                 className="text-sm"
               />
@@ -299,7 +322,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
               </label>
               <Input
                 value={languages}
-                onChange={e => setLanguages(e.target.value)}
+                onChange={e => setLangSaved(e.target.value)}
                 placeholder="English"
                 className="text-sm"
               />
@@ -469,10 +492,15 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                         Completed — findings saved to campaign memory
                       </p>
                     )}
+                    {stage.status === 'error' && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Failed — click Run to retry
+                      </p>
+                    )}
                   </div>
 
-                  {/* Run button */}
-                  {isActive && !isDone && !isRunning && (
+                  {/* Run / Retry button */}
+                  {(isActive || stage.status === 'error') && !isDone && !isRunning && (
                     <Button
                       size="sm"
                       onClick={() => runStage(stage.stage)}
@@ -480,7 +508,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                       className="gap-1"
                     >
                       <Play className="h-3 w-3" />
-                      Run
+                      {stage.status === 'error' ? 'Retry' : 'Run'}
                     </Button>
                   )}
                 </div>
