@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2 } from 'lucide-react';
+import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { fetchAccountsV2, removeAccount } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ interface HeaderProps {
 export default function Header({ onOpenCommandPalette, onOpenSettings }: HeaderProps) {
   const {
     selectedAccountId,
+    selectedCampaignId,
+    setSelectedCampaign,
     connectedAccounts,
     setConnectedAccounts,
     switchAccount,
@@ -67,6 +69,17 @@ export default function Header({ onOpenCommandPalette, onOpenSettings }: HeaderP
             Google Ads Agent
           </h1>
         </button>
+        {selectedCampaignId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground gap-1"
+            onClick={() => { setSelectedCampaign(null); setShowDashboard(false); }}
+          >
+            <Home className="h-3 w-3" />
+            Home
+          </Button>
+        )}
         {connectedAccounts.length > 1 && (
           <Button
             variant="ghost"
