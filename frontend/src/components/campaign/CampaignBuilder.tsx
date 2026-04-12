@@ -466,6 +466,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             Clear All
           </Button>
           </div>
+        </div>
       </div>
     );
   }
