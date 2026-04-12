@@ -5,6 +5,7 @@ import { fetchCampaigns, updateCampaignStatus } from '@/lib/api';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { formatMicros, formatNumber, formatBiddingStrategy } from '@/lib/formatters';
 import CampaignTabs from '@/components/campaign/CampaignTabs';
+import CampaignActivityFeed from '@/components/dashboard/CampaignActivityFeed';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2 } from 'lucide-react';
@@ -106,6 +107,11 @@ function AccountOverview() {
             onToggleSelect={() => toggleSelect(c.id)}
           />
         ))}
+      </div>
+
+      {/* Campaign Activity Feed */}
+      <div className="mt-8 pt-6 border-t border-border">
+        <CampaignActivityFeed />
       </div>
     </div>
   );
