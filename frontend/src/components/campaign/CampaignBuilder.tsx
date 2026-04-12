@@ -155,51 +155,34 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     });
     window.dispatchEvent(event);
 
-    // Listen for agent done event, then auto-advance
+    // Listen for agent completion via custom event from ChatPanel
     const handleDone = () => {
       setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
       setPipelineRunning(false);
-      fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' });
+      if (sessionId) {
+        fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' });
+      }
 
       if (stageNum < 7) {
         setCurrentStage(stageNum + 1);
-        // Auto-run next stage after brief pause
-        setTimeout(() => runStage(stageNum + 1), 2000);
+        setTimeout(() => runStage(stageNum + 1), 3000);
       } else {
         setStep('review');
       }
     };
 
-    // Poll for agent completion by checking agent status
-    let pollCount = 0;
-    const pollInterval = setInterval(async () => {
-      pollCount++;
-      try {
-        const convRes = await fetch('/api/conversations');
-        const convs = await convRes.json();
-        if (convs.length > 0) {
-          const statusRes = await fetch(`/api/conversations/${convs[0].id}/agent/status`);
-          const status = await statusRes.json();
-          if (status.done) {
-            clearInterval(pollInterval);
-            handleDone();
-          }
-        }
-      } catch (e) {
-        // After 3 failed polls, mark as error
-        if (pollCount > 3) {
-          clearInterval(pollInterval);
-          setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'error' } : s));
-          setPipelineRunning(false);
-        }
-      }
-    }, 5000);
+    // Listen for "agent:done" event dispatched by ChatPanel when response finishes
+    const doneHandler = () => {
+      window.removeEventListener('agent:done', doneHandler);
+      handleDone();
+    };
+    window.addEventListener('agent:done', doneHandler);
 
-    // Fallback: mark done after 3 minutes max
+    // Fallback: mark done after 4 minutes max
     setTimeout(() => {
-      clearInterval(pollInterval);
+      window.removeEventListener('agent:done', doneHandler);
       if (pipelineRunning) handleDone();
-    }, 180000);
+    }, 240000);
   }, [sessionId, stages]);
 
   // ── INPUT STEP ─────────────────────────────────────────────

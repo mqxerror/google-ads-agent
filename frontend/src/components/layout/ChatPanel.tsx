@@ -296,9 +296,12 @@ export default function ChatPanel() {
                 }
                 queryClient.invalidateQueries({ queryKey: ['campaigns'] });
                 refetchConversations();
+                // Notify Campaign Builder and other listeners that the agent is done
+                window.dispatchEvent(new Event('agent:done'));
               } else if (event.type === 'error') {
                 assistantText += `\n\n**Error:** ${event.message}`;
                 setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
+                window.dispatchEvent(new Event('agent:done'));
               }
             } catch {}
           }
