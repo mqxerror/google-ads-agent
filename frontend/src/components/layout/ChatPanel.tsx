@@ -200,18 +200,21 @@ export default function ChatPanel() {
     [chatPanelWidth, setChatPanelWidth]
   );
 
-  // Listen for external "chat:send" events (from Landing Page tab and other components)
+  // Listen for external "chat:send" events (from Landing Page tab, Builder, etc.)
+  // Use a ref to always call the latest handleSend (avoids stale closure)
+  const handleSendRef = useRef(handleSend);
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.text) {
-        handleSend(detail.text, detail.model || 'opus', detail.roleId);
+        handleSendRef.current(detail.text, detail.model || 'opus', detail.roleId);
       }
     };
     window.addEventListener('chat:send', handler);
     return () => window.removeEventListener('chat:send', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, selectedCampaignId, ACCOUNT_ID]);
+  }, []);
 
   // Send message
   const handleSend = useCallback(
