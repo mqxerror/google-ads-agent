@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Gauge, Eye, Search, Palette, Target, Code, Briefcase,
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
@@ -95,12 +95,16 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       : 'input'
   );
 
-  // Save pipeline state whenever it changes
-  const savePipeline = useCallback((sid: string | null, stg: typeof stages, cs: number) => {
-    try {
-      sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({ sessionId: sid, stages: stg, currentStage: cs }));
-    } catch {}
-  }, []);
+  // Auto-save pipeline state whenever it changes
+  useEffect(() => {
+    if (stages.length > 0) {
+      try {
+        sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({
+          sessionId, stages, currentStage,
+        }));
+      } catch {}
+    }
+  }, [sessionId, stages, currentStage]);
 
   // File upload
   const handleFileUpload = useCallback(async (files: FileList | null) => {
@@ -147,8 +151,15 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     const session = await res.json();
     setSessionId(session.id);
     setStages(session.stages);
-    setCurrentStage(1); // Start at stage 1, not 0
+    setCurrentStage(1);
     setStep('pipeline');
+
+    // Save immediately (useEffect will also catch this, but belt-and-suspenders)
+    try {
+      sessionStorage.setItem('campaign-builder-pipeline', JSON.stringify({
+        sessionId: session.id, stages: session.stages, currentStage: 1,
+      }));
+    } catch {}
 
     // Auto-run stage 1 after a short delay
     setTimeout(() => runStage(1), 500);
@@ -164,14 +175,14 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     setStages(updatedStages);
     setCurrentStage(stageNum);
     setPipelineRunning(true);
-    savePipeline(sessionId, updatedStages, stageNum);
+    // state auto-saved via useEffect
 
     // Register listener FIRST (before dispatching chat:send to avoid race)
     const handleDone = () => {
       const completed = updatedStages.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s);
       setStages(completed);
       setPipelineRunning(false);
-      savePipeline(sessionId, completed, stageNum);
+      // state auto-saved via useEffect
 
       if (sessionId) {
         fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' }).catch(() => {});
@@ -179,7 +190,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
       if (stageNum < 7) {
         setCurrentStage(stageNum + 1);
-        savePipeline(sessionId, completed, stageNum + 1);
+        // state auto-saved via useEffect
         setTimeout(() => runStage(stageNum + 1), 3000);
       } else {
         setStep('review');
@@ -208,7 +219,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       },
     });
     window.dispatchEvent(chatEvent);
-  }, [sessionId, stages, buildModel, savePipeline]);
+  }, [sessionId, stages, buildModel]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
   if (step === 'input') {
