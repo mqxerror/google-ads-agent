@@ -54,7 +54,7 @@ interface ChatInputProps {
 
 export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [model, setModel] = useState<ModelId>('sonnet');
+  const [model, setModel] = useState<ModelId>('opus');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
   const [templateCategory, setTemplateCategory] = useState<string>('analyze');

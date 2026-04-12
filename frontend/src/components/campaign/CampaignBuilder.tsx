@@ -3,12 +3,19 @@ import {
   Gauge, Eye, Search, Palette, Target, Code, Briefcase,
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
   Circle, Upload, X, LinkIcon, Globe, Languages, DollarSign,
-  Sparkles, Rocket,
+  Sparkles, Rocket, Zap, Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+
+type ModelId = 'sonnet' | 'opus' | 'haiku';
+const MODELS: { id: ModelId; label: string; desc: string; icon: typeof Zap }[] = [
+  { id: 'opus', label: 'Opus', desc: 'Best quality (recommended)', icon: Brain },
+  { id: 'sonnet', label: 'Sonnet', desc: 'Fast & smart', icon: Zap },
+  { id: 'haiku', label: 'Haiku', desc: 'Quick & cheap', icon: Sparkles },
+];
 
 interface CampaignBuilderProps {
   onClose: () => void;
@@ -81,6 +88,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }, []);
 
   const [noLandingPage, setNoLandingPage] = useState(false);
+  const [buildModel, setBuildModel] = useState<ModelId>('opus');
 
   // Start build
   const handleStartBuild = async () => {
@@ -127,7 +135,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       detail: {
         text: stage.prompt,
         roleId: stage.role_id,
-        model: 'opus',
+        model: buildModel,
       },
     });
     window.dispatchEvent(event);
@@ -356,6 +364,34 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             </div>
           </div>
 
+          {/* Model selector */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">AI Model</label>
+            <div className="flex gap-2">
+              {MODELS.map((m) => {
+                const Icon = m.icon;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setBuildModel(m.id)}
+                    className={cn(
+                      'flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border text-left transition-colors',
+                      buildModel === m.id
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border bg-card hover:bg-secondary/50 text-muted-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <div>
+                      <div className="text-sm font-medium">{m.label}</div>
+                      <div className="text-[10px]">{m.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Start button */}
           <Button
             onClick={handleStartBuild}
@@ -490,7 +526,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         </Button>
         <Button onClick={() => {
           const event = new CustomEvent('chat:send', {
-            detail: { text: 'CREATE the campaign based on the plan above', roleId: 'director', model: 'opus' },
+            detail: { text: 'CREATE the campaign based on the plan above', roleId: 'director', model: buildModel },
           });
           window.dispatchEvent(event);
           onClose();
