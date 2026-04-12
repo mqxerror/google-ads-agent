@@ -200,22 +200,6 @@ export default function ChatPanel() {
     [chatPanelWidth, setChatPanelWidth]
   );
 
-  // Listen for external "chat:send" events (from Landing Page tab, Builder, etc.)
-  // Use a ref to always call the latest handleSend (avoids stale closure)
-  const handleSendRef = useRef(handleSend);
-  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.text) {
-        handleSendRef.current(detail.text, detail.model || 'opus', detail.roleId);
-      }
-    };
-    window.addEventListener('chat:send', handler);
-    return () => window.removeEventListener('chat:send', handler);
-  }, []);
-
   // Send message
   const handleSend = useCallback(
     async (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
@@ -337,6 +321,21 @@ export default function ChatPanel() {
     },
     [ensureConversation, selectedCampaignId, ACCOUNT_ID, queryClient, refetchConversations]
   );
+
+  // Listen for external "chat:send" events (from Landing Page tab, Builder, etc.)
+  const handleSendRef = useRef(handleSend);
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.text) {
+        handleSendRef.current(detail.text, detail.model || 'opus', detail.roleId);
+      }
+    };
+    window.addEventListener('chat:send', handler);
+    return () => window.removeEventListener('chat:send', handler);
+  }, []);
 
   const panelWidth = expanded ? Math.max(chatPanelWidth, 700) : chatPanelWidth;
 
