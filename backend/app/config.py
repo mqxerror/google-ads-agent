@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     SESSION_SUMMARIES_LIMIT: int = 5
     MAX_SNAPSHOT_DAYS: int = 30
 
+    # Context budget management
+    CONTEXT_BUDGET_SAFETY_RATIO: float = 0.85   # Use 85% of model's context window
+    CONTEXT_WARN_THRESHOLD: float = 0.70        # Show warning badge at 70%
+    CONTEXT_COMPACT_THRESHOLD: float = 0.85     # Auto-compact at 85%
+    CONTEXT_RELEVANCE_WEIGHT: float = 0.7       # Weight for keyword overlap in message selection
+    CONTEXT_RECENCY_WEIGHT: float = 0.3         # Weight for recency in message selection
+    CONTEXT_MAX_SELECTED_MESSAGES: int = 12     # Max messages after relevance selection
+    CONTEXT_PRESERVE_LAST_N: int = 4            # Always keep last N messages verbatim
+
     model_config = {
         "env_prefix": "",
         "env_file": str(_PROJECT_ROOT / ".env"),

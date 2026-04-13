@@ -19,6 +19,16 @@ from typing import AsyncIterator
 from app.config import settings
 from app.database import get_db
 from app.services.google_ads import GoogleAdsService
+from app.services.token_counter import (
+    TokenBudget, LayerAllocation, allocate_budget, build_layer_breakdown,
+    P_CRITICAL, P_IMPORTANT, P_NICE_TO_HAVE, P_DROPPABLE,
+)
+from app.services.message_selector import select_relevant_messages, format_selected_messages
+from app.services.campaign_memory import build_campaign_context
+from app.services.compaction import (
+    get_compaction_status, compact_conversation, load_checkpoint_context,
+    WARN_THRESHOLD, COMPACT_THRESHOLD,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -316,23 +326,23 @@ def _load_campaign_guidelines(campaign_name: str | None, account_id: str | None 
 
 # ── Layer 3: Recent Conversation (sliding window) ────────────────
 
-async def _get_recent_messages(conversation_id: str, limit: int = 10) -> list[dict]:
+async def _get_recent_messages(conversation_id: str, limit: int = 30) -> list[dict]:
     """Get the last N messages with role attribution (Layer 3).
 
-    Each assistant message includes which specialist role said it,
-    so the next role knows who said what and can build on prior analysis.
+    Returns full content (no truncation) — the message selector handles
+    relevance-based filtering and the token budget enforces size limits.
     """
     db = await get_db()
     try:
         cur = await db.execute(
-            "SELECT role, content, agent_role, agent_role_name FROM messages WHERE conversation_id = ? "
+            "SELECT role, content, created_at, agent_role, agent_role_name FROM messages WHERE conversation_id = ? "
             "ORDER BY created_at DESC LIMIT ?",
             (conversation_id, limit),
         )
         rows = await cur.fetchall()
         result = []
         for r in reversed(rows):
-            entry = {"role": r["role"], "content": r["content"]}
+            entry = {"role": r["role"], "content": r["content"], "created_at": r["created_at"]}
             # Add role attribution for assistant messages
             if r["role"] == "assistant" and r["agent_role_name"]:
                 entry["agent_role"] = r["agent_role"]
@@ -595,7 +605,9 @@ async def stream_agent_response(
         except Exception:
             pass
 
-    # Layer 0: Marketing Intelligence (NEW in V2)
+    # ── Load all context layers ──────────────────────────────
+
+    # Layer 0: Marketing Intelligence
     marketing_intel = await _get_marketing_intelligence(account_id, campaign_id, campaign_name)
 
     # Layer 1: Business context
@@ -604,16 +616,37 @@ async def stream_agent_response(
     # Layer 2: Campaign guidelines
     guidelines = _load_campaign_guidelines(campaign_name, account_id)
 
-    # Layer 3: Recent conversation
-    recent_msgs = []
+    # Layer 3: Recent conversation (load more, select smartly)
+    all_recent_msgs = []
     if conversation_id:
-        recent_msgs = await _get_recent_messages(conversation_id, limit=10)
+        all_recent_msgs = await _get_recent_messages(conversation_id, limit=30)
 
     # Layer 4: Past session summaries
     summaries = await _get_session_summaries(campaign_id, limit=5)
 
     # Layer 5: Live data
     live_data = await _get_campaign_data(api_account_id, campaign_id)
+
+    # Layer 6: Campaign memory (decisions, pinned facts, role notes)
+    campaign_memory_ctx = ""
+    if account_id and campaign_id:
+        campaign_memory_ctx = build_campaign_context(account_id, campaign_id)
+
+    # Layer 7: Conversation checkpoint (compressed older messages)
+    checkpoint_ctx = ""
+    if conversation_id:
+        checkpoint_ctx = await load_checkpoint_context(conversation_id)
+
+    # Smart message selection — relevance-based instead of blind window
+    selected_msgs = select_relevant_messages(
+        query=user_message,
+        messages=all_recent_msgs,
+        max_messages=settings.CONTEXT_MAX_SELECTED_MESSAGES,
+        relevance_weight=settings.CONTEXT_RELEVANCE_WEIGHT,
+        recency_weight=settings.CONTEXT_RECENCY_WEIGHT,
+        pin_last_n=settings.CONTEXT_PRESERVE_LAST_N,
+    )
+    selected_messages_text = format_selected_messages(selected_msgs)
 
     # ── Build system prompt ──────────────────────────────────
 
@@ -835,49 +868,6 @@ async def stream_agent_response(
             "- Only interact with pages the user has explicitly authorized",
         ])
 
-    if business_ctx:
-        system_parts.append(f"\n=== BUSINESS CONTEXT ===\n{business_ctx}")
-
-    if guidelines:
-        system_parts.append(f"\n=== CAMPAIGN GUIDELINES ===\n{guidelines}")
-
-    if summaries:
-        system_parts.append(f"\n=== PAST SESSION HISTORY ===")
-        for s in summaries:
-            system_parts.append(s)
-
-    # Campaign memory: pinned facts + decisions + role notes
-    if account_id and campaign_id:
-        try:
-            from app.services.campaign_memory import load_pinned_facts, load_decisions, load_role_notes
-
-            pinned = load_pinned_facts(account_id, campaign_id)
-            if pinned and pinned.strip().count("\n") > 4:
-                system_parts.append(f"\n=== PINNED FACTS (always active, never forget these) ===\n{pinned}")
-
-            decisions = load_decisions(account_id, campaign_id, limit=10)
-            if decisions and decisions.strip().count("|") > 10:
-                system_parts.append(f"\n=== RECENT DECISIONS (actions taken on this campaign) ===\n{decisions}")
-
-            # Load ALL role notes — every role sees every other role's findings
-            all_role_ids = [
-                "ppc_strategist", "search_term_hunter", "creative_director",
-                "analytics_analyst", "competitor_intel", "gtm_specialist",
-                "growth_hacker", "cro_specialist",
-            ]
-            active_role_id = role_obj.id if role_obj else "director"
-            for rid in all_role_ids:
-                notes = load_role_notes(account_id, campaign_id, rid)
-                if not notes:
-                    continue
-                if rid == active_role_id:
-                    system_parts.append(f"\n=== YOUR PREVIOUS FINDINGS ({role_obj.name}) — CONTINUE FROM HERE ===\n{notes}")
-                else:
-                    label = rid.replace('_', ' ').upper()
-                    system_parts.append(f"\n=== FINDINGS FROM {label} ===\n{notes}")
-        except Exception:
-            pass
-
     # Inject active role prompt
     if role_obj.id != "director":
         system_parts.append(f"\n=== YOUR ACTIVE ROLE: {role_obj.name} ===")
@@ -885,28 +875,11 @@ async def stream_agent_response(
         system_parts.append(role_obj.system_prompt)
         system_parts.append(f"\nYou are responding as the {role_obj.name}. Sign your analysis with your role perspective.")
 
-    system_prompt = "\n".join(system_parts)
+    # Assemble the base system prompt (P0 — always included)
+    system_prompt_base = "\n".join(system_parts)
 
-    # ── Build user prompt with context ───────────────────────
-
-    prompt_parts = [
-        f"=== LIVE CAMPAIGN DATA (as of {today.isoformat()}) ===",
-        "This data includes daily metrics, ad groups, keywords, search terms, and targeting.",
-        "Use this data directly for analysis. Do NOT re-fetch it via API calls.",
-        f"\n{live_data}",
-    ]
-
-    if recent_msgs:
-        prompt_parts.append("\n=== RECENT CONVERSATION (team discussion) ===")
-        for msg in recent_msgs[-15:]:  # Last 15 messages — full context, no truncation
-            if msg["role"] == "user":
-                prompt_parts.append(f"User: {msg['content']}")
-            else:
-                role_label = msg.get("agent_role_name", "Assistant")
-                prompt_parts.append(f"[{role_label}]: {msg['content']}")
-
-    # Resolve @[title](conv:ID) references — load referenced conversation content
-    import re
+    # Resolve @[title](conv:ID) references
+    ref_parts = []
     ref_pattern = re.compile(r'@\[([^\]]+)\]\(conv:([a-f0-9-]+)\)')
     ref_matches = ref_pattern.findall(user_message)
     if ref_matches:
@@ -914,37 +887,94 @@ async def stream_agent_response(
             try:
                 ref_msgs = await _get_recent_messages(ref_conv_id, limit=15)
                 if ref_msgs:
-                    prompt_parts.append(f"\n=== REFERENCED CONVERSATION: {ref_title} ===")
+                    ref_parts.append(f"\n=== REFERENCED CONVERSATION: {ref_title} ===")
                     for msg in ref_msgs:
                         if msg["role"] == "user":
-                            prompt_parts.append(f"User: {msg['content'][:300]}")
+                            ref_parts.append(f"User: {msg['content'][:300]}")
                         else:
                             rl = msg.get("agent_role_name", "Assistant")
-                            prompt_parts.append(f"[{rl}]: {msg['content'][:400]}")
+                            ref_parts.append(f"[{rl}]: {msg['content'][:400]}")
             except Exception:
                 pass
-        # Clean the references from the displayed message
         clean_message = ref_pattern.sub(lambda m: f"(ref: {m.group(1)})", user_message)
     else:
         clean_message = user_message
 
-    # Inject attachment file paths so the agent can Read them
+    # Build attachment context
+    attachment_ctx = ""
     if attachments:
-        prompt_parts.append("\n=== USER ATTACHMENTS ===")
-        prompt_parts.append("The user has attached the following files. Use the Read tool to view them.")
-        prompt_parts.append("For images, Read will show you the image directly. For documents, you'll get the text content.")
+        att_parts = [
+            "\n=== USER ATTACHMENTS ===",
+            "The user has attached the following files. Use the Read tool to view them.",
+            "For images, Read will show you the image directly. For documents, you'll get the text content.",
+        ]
         for att in attachments:
             kind = "image" if att.get("is_image") else "file"
-            prompt_parts.append(f"- {kind}: {att.get('filename', 'unknown')} → path: {att.get('path', '')}")
-        prompt_parts.append("READ EACH ATTACHMENT before responding so you can reference what's in them.")
+            att_parts.append(f"- {kind}: {att.get('filename', 'unknown')} → path: {att.get('path', '')}")
+        att_parts.append("READ EACH ATTACHMENT before responding so you can reference what's in them.")
+        attachment_ctx = "\n".join(att_parts)
 
-    prompt_parts.append(f"\n=== CURRENT QUESTION ===\n{clean_message}")
+    # ── Budget-aware context assembly ──────────────────────────
+    budget = TokenBudget.for_model(model_id)
 
-    full_prompt = "\n".join(prompt_parts)
+    layers = [
+        LayerAllocation("system_base", system_prompt_base, priority=P_CRITICAL),
+        LayerAllocation("campaign_memory", f"\n=== CAMPAIGN MEMORY (decisions, facts, role notes) ===\n{campaign_memory_ctx}" if campaign_memory_ctx else "", priority=P_IMPORTANT),
+        LayerAllocation("business_context", f"\n=== BUSINESS CONTEXT ===\n{business_ctx}" if business_ctx else "", priority=P_IMPORTANT),
+        LayerAllocation("guidelines", f"\n=== CAMPAIGN GUIDELINES ===\n{guidelines}" if guidelines else "", priority=P_IMPORTANT),
+        LayerAllocation("checkpoint_history", checkpoint_ctx, priority=P_NICE_TO_HAVE),
+        LayerAllocation("live_data", (
+            f"=== LIVE CAMPAIGN DATA (as of {today.isoformat()}) ===\n"
+            "This data includes daily metrics, ad groups, keywords, search terms, and targeting.\n"
+            "Use this data directly for analysis. Do NOT re-fetch it via API calls.\n\n"
+            f"{live_data}"
+        ), priority=P_NICE_TO_HAVE),
+        LayerAllocation("recent_messages", (
+            f"=== RECENT CONVERSATION (smart-selected for relevance) ===\n{selected_messages_text}"
+            if selected_messages_text else ""
+        ), priority=P_NICE_TO_HAVE),
+        LayerAllocation("referenced_conversations", "\n".join(ref_parts) if ref_parts else "", priority=P_NICE_TO_HAVE),
+        LayerAllocation("attachments", attachment_ctx, priority=P_IMPORTANT),
+        LayerAllocation("session_summaries", (
+            "=== PAST SESSION HISTORY ===\n" + "\n".join(summaries)
+            if summaries else ""
+        ), priority=P_DROPPABLE),
+        LayerAllocation("current_question", f"\n=== CURRENT QUESTION ===\n{clean_message}", priority=P_CRITICAL),
+    ]
 
-    # ── Run Claude CLI ───────────────────────────────────────
-    # Combine system prompt into the user prompt to avoid Windows arg length issues
-    combined_prompt = f"{system_prompt}\n\n---\n\n{full_prompt}"
+    # Filter empty layers
+    layers = [la for la in layers if la.content.strip()]
+
+    budget_result = allocate_budget(layers, budget)
+
+    # Log budget warnings
+    for warning in budget_result.warnings:
+        logger.warning("Context budget: %s", warning)
+
+    # Build combined prompt from allocated layers
+    combined_parts = [la.content for la in budget_result.layers if not la.was_dropped and la.content.strip()]
+    combined_prompt = "\n\n---\n\n".join(combined_parts)
+
+    # ── Check compaction ──────────────────────────────────────
+    compaction_status = None
+    if conversation_id:
+        compaction_status = await get_compaction_status(conversation_id, budget_result.usage_ratio)
+
+        if compaction_status["should_compact"] and all_recent_msgs:
+            checkpoint = await compact_conversation(
+                conversation_id, all_recent_msgs,
+                preserve_last_n=settings.CONTEXT_PRESERVE_LAST_N,
+            )
+            if checkpoint:
+                logger.info("Auto-compacted conversation %s: saved ~%d tokens", conversation_id, checkpoint.get("tokens_saved", 0))
+
+    # ── Emit context metadata to frontend ─────────────────────
+    context_meta = {
+        "type": "context_meta",
+        **build_layer_breakdown(budget_result),
+    }
+    if compaction_status:
+        context_meta["compaction"] = compaction_status
 
     # Refresh runtime settings from DB, then regenerate MCP config so toggles
     # in the Settings UI take effect immediately without a backend restart.
@@ -1114,6 +1144,9 @@ async def stream_agent_response(
             logger.info("Auto-continuing session %s (#%d, %d turns, $%.4f)", current_session_id, continuation_count, accumulated_turns, accumulated_cost)
 
         result_queue.put(None)  # sentinel
+
+    # Yield context metadata BEFORE starting the CLI
+    yield context_meta
 
     thread = threading.Thread(target=_run_cli, daemon=True)
     thread.start()

@@ -296,6 +296,46 @@ async def stop_agent_task(conversation_id: str) -> dict:
     return {"stopped": stopped}
 
 
+@router.get("/conversations/{conversation_id}/context-usage")
+async def get_context_usage(conversation_id: str) -> dict:
+    """Return current context usage stats for a conversation."""
+    from app.services.token_counter import estimate_tokens
+    from app.services.compaction import get_compaction_status
+
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT content FROM messages WHERE conversation_id = ? ORDER BY created_at",
+            (conversation_id,),
+        )
+        rows = await cur.fetchall()
+        total_message_tokens = sum(estimate_tokens(r["content"]) for r in rows)
+        message_count = len(rows)
+
+        estimated_system_tokens = 15_000
+        estimated_data_tokens = 10_000
+        total_estimated = total_message_tokens + estimated_system_tokens + estimated_data_tokens
+
+        budget = 200_000
+        effective = int(budget * 0.85) - 8192
+        usage_ratio = total_estimated / effective if effective > 0 else 0
+
+        compaction = await get_compaction_status(conversation_id, usage_ratio)
+
+        return {
+            "conversation_id": conversation_id,
+            "message_count": message_count,
+            "message_tokens": total_message_tokens,
+            "total_estimated_tokens": total_estimated,
+            "budget": effective,
+            "usage_ratio": round(usage_ratio, 3),
+            "usage_percent": int(usage_ratio * 100),
+            "compaction": compaction,
+        }
+    finally:
+        await db.close()
+
+
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(conversation_id: str) -> dict:
     """Delete a conversation and its messages."""

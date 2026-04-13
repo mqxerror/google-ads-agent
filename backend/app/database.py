@@ -237,6 +237,22 @@ CREATE INDEX IF NOT EXISTS idx_decision_log_campaign
     ON decision_log(account_id, campaign_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_pinned_facts_campaign
     ON pinned_facts(account_id, campaign_id);
+
+-- Context management: conversation compaction checkpoints
+CREATE TABLE IF NOT EXISTS conversation_checkpoints (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    checkpoint_number INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    messages_compressed INTEGER DEFAULT 0,
+    tokens_saved INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    UNIQUE(conversation_id, checkpoint_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_checkpoints_conv
+    ON conversation_checkpoints(conversation_id, checkpoint_number);
 """
 
 # FTS5 must be created separately (not inside executescript easily)

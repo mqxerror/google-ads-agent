@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { fetchConversations, createConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask } from '@/lib/api';
-import ContextBadge from '@/components/chat/ContextBadge';
+import ContextBadge, { type ContextMetaData } from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
 import ChatInput, { type ModelId, type Attachment } from '@/components/chat/ChatInput';
 import MemoryPanel from '@/components/chat/MemoryPanel';
@@ -20,6 +20,7 @@ export default function ChatPanel() {
   const [expanded, setExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [contextMeta, setContextMeta] = useState<ContextMetaData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   const queryClient = useQueryClient();
@@ -256,7 +257,9 @@ export default function ChatPanel() {
             if (!dataStr || dataStr === '[DONE]') continue;
             try {
               const event = JSON.parse(dataStr);
-              if (event.type === 'routing') {
+              if (event.type === 'context_meta') {
+                setContextMeta(event as ContextMetaData);
+              } else if (event.type === 'routing') {
                 resolvedRole = { id: event.role_id || '', name: event.role_name || '', avatar: event.role_avatar || '' };
                 setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: resolvedRole.id, agentRoleName: resolvedRole.name, agentRoleAvatar: resolvedRole.avatar } : m));
               } else if (event.type === 'text') {
@@ -360,7 +363,7 @@ export default function ChatPanel() {
         {/* Toolbar */}
         <div className="border-b border-border flex items-center justify-between pr-2">
           <div className="flex items-center gap-1">
-            <ContextBadge campaignName={campaign?.name ?? null} guidelinesLoaded={true} />
+            <ContextBadge campaignName={campaign?.name ?? null} guidelinesLoaded={true} contextMeta={contextMeta} />
             {conversations.length > 0 && (
               <button
                 onClick={() => setShowHistory(!showHistory)}
