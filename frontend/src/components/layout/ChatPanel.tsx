@@ -451,15 +451,41 @@ export default function ChatPanel() {
   const handleSendRef = useRef(handleSend);
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
-  // Listen for 'chat:display' — switch to a specific conversation (no message sending)
+  // Listen for 'chat:display' — switch to a conversation and poll for updates
   useEffect(() => {
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
     const displayHandler = (e: Event) => {
       const { conversationId: convId } = (e as CustomEvent).detail || {};
       if (convId) {
         setConversationId(convId);
         setMessages([]);
+        setIsResponding(true);
         fetchMessages(convId).then(setMessages).catch(() => {});
         refetchConversations();
+        // Poll for new messages while agent is responding
+        if (pollTimer) clearInterval(pollTimer);
+        let unchangedCount = 0;
+        let lastMsgCount = 0;
+        pollTimer = setInterval(async () => {
+          try {
+            const msgs = await fetchMessages(convId);
+            setMessages(msgs);
+            if (msgs.length === lastMsgCount) {
+              unchangedCount++;
+              // If no new messages for 6 seconds after agent has responded, stop polling
+              if (unchangedCount >= 3 && msgs.length > 1 && msgs[msgs.length - 1]?.role === 'assistant') {
+                if (pollTimer) clearInterval(pollTimer);
+                setIsResponding(false);
+                window.dispatchEvent(new Event('agent:done'));
+              }
+            } else {
+              unchangedCount = 0;
+              lastMsgCount = msgs.length;
+            }
+          } catch {}
+        }, 2000);
+        // Safety: stop after 5 min
+        setTimeout(() => { if (pollTimer) clearInterval(pollTimer); setIsResponding(false); }, 300000);
       }
     };
     // chat:send — send a message via the normal streaming path

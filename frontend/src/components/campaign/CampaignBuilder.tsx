@@ -194,18 +194,17 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       refreshPipelineStatus();
     }, 240000);
 
-    // Atomic: create conversation if needed, then tell ChatPanel to send via its normal streaming path
+    // Atomic approach: create conversation + send message in one flow, no events
     try {
       const isFirstStage = stageNum === 1;
       let convId = buildConversationId;
+      const tempCampaignId = loadSaved('build_campaign_id', '');
 
       if (isFirstStage || !convId) {
-        // Create conversation with temp campaign ID so role_notes save to the right folder
         const { createConversation } = await import('@/lib/api');
-        const tempCampaignId = loadSaved('build_campaign_id', `build-${sessionId?.slice(0, 8) || Date.now()}`);
         const conv = await createConversation({
           account_id: accountId,
-          campaign_id: tempCampaignId,
+          campaign_id: tempCampaignId || undefined,
           campaign_name: `Build: ${url || 'New Campaign'}`,
           title: `Campaign Build: ${url || 'New Campaign'}`,
         });
@@ -213,19 +212,23 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         setBuildConversationId(convId);
       }
 
-      // Tell ChatPanel: switch to this conversation, then send the message
-      // chat:display sets the conversation, chat:send sends the message
-      // Using two events with a small delay ensures state propagates
+      // Send the message directly to the API — bypasses all React state issues
+      const msgRes = await fetch(`/api/conversations/${convId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: stage.prompt || `Run stage ${stageNum} for campaign build`,
+          account_id: accountId,
+          campaign_id: tempCampaignId || undefined,
+          model: buildModel,
+          active_role: stage.role_id,
+        }),
+      });
+
+      if (!msgRes.ok) throw new Error(`API error ${msgRes.status}`);
+
+      // Tell ChatPanel to show this conversation (it will load messages from DB)
       window.dispatchEvent(new CustomEvent('chat:display', { detail: { conversationId: convId } }));
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('chat:send', {
-          detail: {
-            text: stage.prompt || `Run stage ${stageNum} for campaign build`,
-            roleId: stage.role_id,
-            model: buildModel,
-          },
-        }));
-      }, 300);
     } catch (err) {
       setPipelineRunning(false);
       console.error('Builder send failed:', err);
@@ -469,12 +472,17 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                   account_id: accountId,
                   title: `Research: ${url || brief || 'New Campaign'}`,
                 });
+                await fetch(`/api/conversations/${conv.id}/message`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    content: researchPrompt,
+                    account_id: accountId,
+                    model: buildModel,
+                    active_role: 'competitor_intel',
+                  }),
+                });
                 window.dispatchEvent(new CustomEvent('chat:display', { detail: { conversationId: conv.id } }));
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('chat:send', {
-                    detail: { text: researchPrompt, roleId: 'competitor_intel', model: buildModel },
-                  }));
-                }, 300);
               } catch (err) {
                 console.error('Research send failed:', err);
               }
