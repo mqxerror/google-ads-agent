@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Uses @microsoft/clarity-mcp-server (official, npm)
     # Setup: get API token from Clarity → Settings → Data Export → Generate
     CLARITY_MCP_ENABLED: bool = False
+    CLARITY_PROJECT_ID: str = ""
     CLARITY_API_TOKEN: str = ""
 
     # Agent auto-continuation — prevents stopping mid-task

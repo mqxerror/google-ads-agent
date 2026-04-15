@@ -474,6 +474,46 @@ For your chosen strategy, provide:
 I'll approve the strategy before you make any GTM changes.`,
   },
   {
+    id: 'auto-install-tracking',
+    label: 'Auto-Install All Tracking',
+    icon: '⚡',
+    category: 'create',
+    description: 'Scan landing page and auto-install missing Clarity, GA4, and conversion tags via GTM',
+    suggestedModel: 'opus',
+    prompt: `As the GTM Specialist, scan the landing page for this campaign and auto-install any missing tracking:
+
+1. **Open the landing page** using Chrome browser tools
+2. **Check network requests** for existing tracking:
+   - Microsoft Clarity script loaded?
+   - Google Tag Manager container loaded?
+   - Google Ads conversion tag (gtag) loaded?
+   - GA4 measurement ID present?
+
+3. **For each MISSING tracker, install it via GTM MCP:**
+
+   If Clarity is missing:
+   → Create Custom HTML tag with the Clarity tracking script
+   → Trigger: All Pages
+   → Publish
+
+   If GA4 is missing:
+   → Create GA4 Configuration tag
+   → Trigger: All Pages
+   → Publish
+
+   If Google Ads conversion tag is missing:
+   → Create Google Ads Conversion Tracking tag (use existing conversion action)
+   → Create appropriate trigger (thank-you page or form submit)
+   → Publish
+
+4. **Verify** each installed tag is firing by checking network requests after publish
+
+5. **Report** what was installed, what was already present, and what needs manual attention
+
+Landing page URL: [THE CAMPAIGN'S LANDING PAGE]
+GTM Container: GTM-K6864NBH`,
+  },
+  {
     id: 'landing-page-audit',
     label: 'Landing Page Audit',
     icon: '🔍',

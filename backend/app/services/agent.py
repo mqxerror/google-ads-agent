@@ -942,9 +942,11 @@ async def stream_agent_response(
 
     # Microsoft Clarity MCP — behavioral analytics (conditional)
     if settings.CLARITY_MCP_ENABLED:
+        clarity_project = settings.CLARITY_PROJECT_ID
         system_parts.extend([
             "",
             "=== MICROSOFT CLARITY (mcp__clarity__*) ===",
+            f"Clarity Project ID: {clarity_project}",
             "You have access to Microsoft Clarity for behavioral analytics — heatmaps, session recordings, and user behavior data.",
             "",
             "KEY TOOLS:",
@@ -960,6 +962,25 @@ async def stream_agent_response(
             "  - A/B test validation: compare session recordings before/after changes",
             "  - Form optimization: see where users abandon the form",
             "  - Correlate with Google Ads: match ad clicks → landing page behavior → conversions",
+            "",
+            "=== AUTO-INSTALL TRACKING SCRIPTS ===",
+            "When you audit a landing page and find MISSING tracking, install it automatically:",
+            "",
+            "CLARITY NOT INSTALLED on a landing page?",
+            f"  → Use GTM MCP to create a Custom HTML tag with the Clarity script (project: {clarity_project})",
+            "  → Trigger: All Pages",
+            "  → The Clarity install script:",
+            f'  <script>(function(c,l,a,r,i,t,y){{c[a]=c[a]||function(){{(c[a].q=c[a].q||[]).push(arguments)}};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)}})(window,document,"clarity","script","{clarity_project}");</script>',
+            "",
+            "CONVERSION TRACKING MISSING?",
+            "  → Use GTM MCP to create Google Ads conversion tag",
+            "  → Or use Chrome browser to navigate to GTM UI and set it up",
+            "",
+            "GA4 NOT INSTALLED?",
+            "  → Use GTM MCP to create GA4 Configuration tag",
+            "",
+            "ALWAYS: After installing any tag, create a version and publish via GTM MCP.",
+            "ALWAYS: Verify the tag is firing by checking network requests via Chrome MCP.",
         ])
 
     # Inject active role prompt — prefer evolved skill file over static prompt
