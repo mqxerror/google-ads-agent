@@ -81,6 +81,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const [currentStage, setCurrentStage] = useState(1);
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [buildConversationId, setBuildConversationId] = useState<string | null>(null);
+  const [autoMode, setAutoMode] = useState(true); // true = run all stages non-stop
   const [step, setStep] = useState<WizardStep>('input');
 
   // On mount: check backend for existing pipeline progress
@@ -178,21 +179,39 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     setCurrentStage(stageNum);
     setPipelineRunning(true);
 
-    // Listen for completion — then refresh status from backend
+    // Listen for completion — mark done and optionally auto-advance
     const doneHandler = () => {
       window.removeEventListener('agent:done', doneHandler);
       clearTimeout(fallbackTimer);
-      setPipelineRunning(false);
-      // Refresh from backend to get actual file-based status
-      setTimeout(() => refreshPipelineStatus(), 2000);
+
+      // Mark current stage as completed
+      setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'completed' } : s));
+      if (sessionId) {
+        fetch(`/api/campaigns/build/${sessionId}/stage/${stageNum}/complete`, { method: 'POST' }).catch(() => {});
+      }
+
+      if (stageNum >= 7) {
+        setPipelineRunning(false);
+        setStep('review');
+        return;
+      }
+
+      const nextStage = stageNum + 1;
+      setCurrentStage(nextStage);
+
+      if (autoMode) {
+        // Auto-advance: run next stage after a short delay
+        setTimeout(() => runStage(nextStage), 1500);
+      } else {
+        setPipelineRunning(false);
+      }
     };
     window.addEventListener('agent:done', doneHandler);
 
     const fallbackTimer = setTimeout(() => {
       window.removeEventListener('agent:done', doneHandler);
       setPipelineRunning(false);
-      refreshPipelineStatus();
-    }, 240000);
+    }, 300000); // 5 min timeout per stage
 
     // Atomic approach: create conversation + send message in one flow, no events
     try {
@@ -448,6 +467,26 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             </div>
           </div>
 
+          {/* Build mode toggle */}
+          <div className="flex items-center gap-3 bg-secondary/30 rounded-lg p-3">
+            <label className="flex items-center gap-2 cursor-pointer flex-1">
+              <input
+                type="checkbox"
+                checked={autoMode}
+                onChange={(e) => setAutoMode(e.target.checked)}
+                className="rounded"
+              />
+              <div>
+                <span className="text-sm font-medium">{autoMode ? 'Automatic Mode' : 'Manual Mode'}</span>
+                <p className="text-[10px] text-muted-foreground">
+                  {autoMode
+                    ? 'All 7 stages run non-stop. Review the final plan when done.'
+                    : 'You control each stage. Click "Run" to advance, edit between stages.'}
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Buttons */}
           <div className="flex gap-3">
           <Button
@@ -457,7 +496,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             disabled={!noLandingPage && !url.trim()}
           >
             <Sparkles className="h-4 w-4" />
-            Start Building Campaign
+            {autoMode ? 'Start Building (Auto)' : 'Start Building (Manual)'}
           </Button>
           <Button
             variant="outline"
