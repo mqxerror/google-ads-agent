@@ -590,6 +590,26 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                       {stage.status === 'error' ? 'Retry' : 'Run'}
                     </Button>
                   )}
+                  {/* Mark complete — when auto-detection fails */}
+                  {isRunning && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        if (sessionId) {
+                          await fetch(`/api/campaigns/build/${sessionId}/stage/${stage.stage}/complete`, { method: 'POST' });
+                        }
+                        setStages(prev => prev.map(s => s.stage === stage.stage ? { ...s, status: 'completed' } : s));
+                        setCurrentStage(stage.stage + 1);
+                        setPipelineRunning(false);
+                        if (stage.stage >= 7) setStep('review');
+                      }}
+                      className="gap-1"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Mark Done
+                    </Button>
+                  )}
                 </div>
               </div>
             );
