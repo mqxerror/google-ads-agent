@@ -1,0 +1,767 @@
+uid=5_0 RootWebArea "Overview - Mercan Group Main Account - Google Ads" url="https://ads.google.com/aw/overview?campaignId=23688200557&ocid=247889176&authuser=0&__u=6296228149&__c=8568590424"
+  uid=5_1 banner "Top navigation"
+    uid=5_2 status atomic live="polite" relevant="additions text"
+    uid=5_3 button expandable expanded
+    uid=5_4 button "Google Ads – Go to starting page"
+    uid=5_5 generic
+      uid=5_6 StaticText "Search for a page or campaign"
+      uid=5_7 combobox "Search for a page or campaign" autocomplete="list" expandable haspopup="listbox"
+    uid=5_8 button "Ads Advisor"
+    uid=5_9 button "Appearance" expandable haspopup="menu"
+    uid=5_10 button "Refresh"
+    uid=5_11 button "Open the quick help panel"
+    uid=5_12 button "Notifications" description="You have 7 notifications"
+    uid=5_13 StaticText "717-823-9091 Mercan Group Main Account"
+    uid=5_14 StaticText "mercan.group.1989@gmail.com"
+    uid=5_15 button "Google account" expandable haspopup="menu"
+  uid=5_16 group atomic focusable focused live="polite" relevant="additions text"
+    uid=5_17 status atomic live="polite" relevant="additions text"
+      uid=5_18 StaticText "View auto-apply activity"
+      uid=5_19 StaticText " - "
+      uid=5_20 StaticText "4 recommendations were automatically applied from 3/30/26 to 4/5/26."
+    uid=5_21 button "View"
+    uid=5_22 button "Learn more" haspopup="dialog"
+    uid=5_23 button "Dismiss"
+  uid=5_24 button "Create" haspopup="menu"
+  uid=5_25 StaticText "Create"
+  uid=5_26 menu orientation="vertical"
+    uid=5_27 menu orientation="vertical"
+      uid=5_28 menuitem "Campaigns" description="Campaigns"
+      uid=5_29 menuitem "Goals" description="Goals"
+      uid=5_30 menuitem "Tools" description="Tools"
+      uid=5_31 menuitem "Billing" description="Billing"
+      uid=5_32 menuitem "Admin" description="Admin"
+  uid=5_33 navigation
+    uid=5_34 menu orientation="vertical"
+      uid=5_35 menuitem "Overview"
+      uid=5_36 menuitem "Recommendations"
+      uid=5_37 menuitem "Insights and reports" description="Insights and reports" expandable
+      uid=5_38 menuitem "Campaigns" description="Campaigns" expandable
+      uid=5_39 menuitem "Assets" description="Assets" expandable
+      uid=5_40 menuitem "Audiences, keywords, and content" description="Audiences, keywords, and content" expandable
+      uid=5_41 menuitem "Change history"
+  uid=5_42 button "View (2 filters) All campaigns" haspopup="dialog"
+    uid=5_43 button "All campaigns"
+  uid=5_44 button "Campaign Golden Visa Programs - Arabic (MENA)" haspopup="dialog"
+    uid=5_45 button "Golden Visa Programs - Arabic (MENA)"
+  uid=5_46 button "Ad groups (5) Select an ad group" haspopup="dialog"
+  uid=5_47 button "Change status" haspopup="menu"
+  uid=5_48 StaticText " "
+  uid=5_49 StaticText "Status:"
+  uid=5_50 button "Limited by bid strategy"
+  uid=5_51 StaticText "Type:"
+  uid=5_52 StaticText " "
+  uid=5_53 StaticText "Search"
+  uid=5_54 StaticText "Budget:"
+  uid=5_55 StaticText " "
+  uid=5_56 link "$84.00/day"
+    uid=5_57 StaticText "$84.00/day"
+  uid=5_58 StaticText "Optimization score:"
+  uid=5_59 link "77.6%" url="https://ads.google.com/aw/recommendations?campaignId=23688200557&ocid=247889176&src=OptimizationScoreInfosnack&authuser=0&__u=6296228149&__c=8568590424"
+    uid=5_60 StaticText "77.6%"
+  uid=5_61 button "The bid simulator isn't available because this campaign doesn't have enough recent performance data." disableable disabled
+  uid=5_62 button "Settings"
+  uid=5_63 heading "Overview" level="2"
+  uid=5_64 StaticText "Today"
+  uid=5_65 button "Apr 9, 2026 Not applicable" expandable haspopup="dialog"
+  uid=5_66 button "Previous"
+  uid=5_67 button "Next" disableable disabled
+  uid=5_68 button "Show last 30 days"
+  uid=5_69 main
+    uid=5_70 button "Campaign options menu" haspopup="menu"
+    uid=5_71 button "Button to download the overview cards content in a selected format." expandable haspopup="menu"
+    uid=5_72 button "Button to submit feedback about the overview page." expandable haspopup="menu"
+    uid=5_73 heading "Performance diagnostics" level="2"
+    uid=5_74 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_75 heading "Campaign diagnostics" level="1"
+      uid=5_76 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_77 button "Your campaign was unable to spend most of its average daily budget in the past week It is only eligible to serve to a limited audience" expandable expanded
+      uid=5_78 region "Your campaign was unable to spend most of its average daily budget in the past week It is only eligible to serve to a limited audience"
+        uid=5_79 tab "All " selectable selected
+        uid=5_80 tab "Ads warning" selectable
+        uid=5_81 tab "Budget & bidding warning" selectable
+        uid=5_82 tab "Audiences warning" selectable
+        uid=5_83 tab "Account success" selectable
+        uid=5_84 tab "Goals success" selectable
+        uid=5_85 StaticText "Campaign is limited by bid strategy"
+        uid=5_86 button "View details"
+        uid=5_87 StaticText "Ad strength is poor"
+        uid=5_88 button "View details"
+        uid=5_89 StaticText "Not targeting relevant searches"
+        uid=5_90 button "View details"
+        uid=5_91 button "View campaign diagnostics"
+    uid=5_92 heading "Performance summary" level="2"
+    uid=5_93 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_94 heading "Time series" level="1"
+      uid=5_95 button "Choose metric 1 of 4 for the Time series card. Current metric: Clicks" expandable haspopup="menu"
+      uid=5_96 button "Clicks. 29. Hide this metric in the time series chart."
+      uid=5_97 button "Choose metric 2 of 4 for the Time series card. Current metric: Cost" expandable haspopup="menu"
+      uid=5_98 button "Cost. $62.77. Hide this metric in the time series chart."
+      uid=5_99 button "Choose metric 3 of 4 for the Time series card. Current metric: Impressions" expandable haspopup="menu"
+      uid=5_100 button "Impressions. 641. Hide this metric in the time series chart."
+      uid=5_101 button "Choose metric 4 of 4 for the Time series card. Current metric: Conversions" expandable haspopup="menu"
+      uid=5_102 button "Conversions. 1.00. Hide this metric in the time series chart."
+      uid=5_103 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_104 generic
+        uid=5_105 StaticText "Time series chart showing the performance of your account over time for up to 4 selected metrics. Use left and right keys to move between date points."
+    uid=5_106 heading "Optimize performance" level="2"
+    uid=5_107 StaticText "Your optimization score:"
+    uid=5_108 StaticText "77.6%"
+    uid=5_109 progressbar "active progress" value="77" valuemax="100" valuemin="0" valuetext=""
+    uid=5_110 button "View all recommendations"
+    uid=5_111 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_112 heading "Recommendation" level="1"
+      uid=5_113 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_114 StaticText "Create a Performance Max campaign"
+      uid=5_115 button "Apply this recommendation to increase your optimization score by 6.2%" expandable
+      uid=5_116 StaticText "Get more conversions at a similar cost with a Performance Max campaign. It uses Google AI to show ads across Search, YouTube, Display, Discover, Gmail, and Maps to driver better results."
+      uid=5_117 StaticText "Recommended because advertisers who adopt Performance Max (PMax) see "
+      uid=5_118 StaticText "+27% more conversion/value uplift "
+      uid=5_119 StaticText "at a similar cost per action/return on ad spend (CPA/ROAS) regardless of their level of Broad Match adoption"
+      uid=5_120 button "More information" haspopup="menu"
+      uid=5_121 button "View"
+    uid=5_122 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_123 heading "Recommendation" level="1"
+      uid=5_124 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_125 StaticText "Use Display Expansion"
+      uid=5_126 button "Apply this recommendation to increase your optimization score by 0.8%" expandable
+      uid=5_127 StaticText "Get more conversions at a similar CPA using unspent budget with the revamped Google Display Network Expansion feature"
+      uid=5_128 StaticText "Recommended because some of your Search campaigns have unspent budget that can benefit from Display Expansion"
+      uid=5_129 button "More information" haspopup="menu"
+      uid=5_130 button "Apply"
+      uid=5_131 button "View"
+    uid=5_132 heading "Explore more" level="2"
+    uid=5_133 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_134 heading "Day & hour" level="1"
+      uid=5_135 button "Choose a metric for the Day & hour card. Current metric: Impressions" expandable haspopup="menu"
+      uid=5_136 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_137 StaticText "Your performance by day of week and time of day"
+      uid=5_138 tab "Day" selectable
+      uid=5_139 tab "Day & Hour" selectable
+      uid=5_140 tab "Hour" selectable selected
+      uid=5_141 grid
+        uid=5_142 generic
+          uid=5_143 generic
+          uid=5_144 generic
+          uid=5_145 generic
+          uid=5_146 generic
+          uid=5_147 generic
+          uid=5_148 generic
+          uid=5_149 generic
+        uid=5_150 generic
+          uid=5_151 generic
+          uid=5_152 generic
+          uid=5_153 generic
+          uid=5_154 generic
+          uid=5_155 generic
+          uid=5_156 generic
+          uid=5_157 generic
+        uid=5_158 generic
+          uid=5_159 generic
+          uid=5_160 generic
+          uid=5_161 generic
+          uid=5_162 generic
+          uid=5_163 generic
+          uid=5_164 generic
+          uid=5_165 generic
+        uid=5_166 generic
+          uid=5_167 generic
+          uid=5_168 generic
+          uid=5_169 generic
+          uid=5_170 generic
+          uid=5_171 generic
+          uid=5_172 generic
+          uid=5_173 generic
+        uid=5_174 generic
+          uid=5_175 generic
+          uid=5_176 generic
+          uid=5_177 generic
+          uid=5_178 generic
+          uid=5_179 generic
+          uid=5_180 generic
+          uid=5_181 generic
+        uid=5_182 generic
+          uid=5_183 generic
+          uid=5_184 generic
+          uid=5_185 generic
+          uid=5_186 generic
+          uid=5_187 generic
+          uid=5_188 generic
+          uid=5_189 generic
+        uid=5_190 generic
+          uid=5_191 generic
+          uid=5_192 generic
+          uid=5_193 generic
+          uid=5_194 generic
+          uid=5_195 generic
+          uid=5_196 generic
+          uid=5_197 generic
+        uid=5_198 generic
+          uid=5_199 generic
+          uid=5_200 generic
+          uid=5_201 generic
+          uid=5_202 generic
+          uid=5_203 generic
+          uid=5_204 generic
+          uid=5_205 generic
+        uid=5_206 generic
+          uid=5_207 generic
+          uid=5_208 generic
+          uid=5_209 generic
+          uid=5_210 generic
+          uid=5_211 generic
+          uid=5_212 generic
+          uid=5_213 generic
+        uid=5_214 generic
+          uid=5_215 generic
+          uid=5_216 generic
+          uid=5_217 generic
+          uid=5_218 generic
+          uid=5_219 generic
+          uid=5_220 generic
+          uid=5_221 generic
+        uid=5_222 generic
+          uid=5_223 generic
+          uid=5_224 generic
+          uid=5_225 generic
+          uid=5_226 generic
+          uid=5_227 generic
+          uid=5_228 generic
+          uid=5_229 generic
+        uid=5_230 generic
+          uid=5_231 generic
+          uid=5_232 generic
+          uid=5_233 generic
+          uid=5_234 generic
+          uid=5_235 generic
+          uid=5_236 generic
+          uid=5_237 generic
+        uid=5_238 generic
+          uid=5_239 generic
+          uid=5_240 generic
+          uid=5_241 generic
+          uid=5_242 generic
+          uid=5_243 generic
+          uid=5_244 generic
+          uid=5_245 generic
+        uid=5_246 generic
+          uid=5_247 generic
+          uid=5_248 generic
+          uid=5_249 generic
+          uid=5_250 generic
+          uid=5_251 generic
+          uid=5_252 generic
+          uid=5_253 generic
+        uid=5_254 generic
+          uid=5_255 generic
+          uid=5_256 generic
+          uid=5_257 generic
+          uid=5_258 generic
+          uid=5_259 generic
+          uid=5_260 generic
+          uid=5_261 generic
+        uid=5_262 generic
+          uid=5_263 generic
+          uid=5_264 generic
+          uid=5_265 generic
+          uid=5_266 generic
+          uid=5_267 generic
+          uid=5_268 generic
+          uid=5_269 generic
+        uid=5_270 generic
+          uid=5_271 generic
+          uid=5_272 generic
+          uid=5_273 generic
+          uid=5_274 generic
+          uid=5_275 generic
+          uid=5_276 generic
+          uid=5_277 generic
+        uid=5_278 generic
+          uid=5_279 generic
+          uid=5_280 generic
+          uid=5_281 generic
+          uid=5_282 generic
+          uid=5_283 generic
+          uid=5_284 generic
+          uid=5_285 generic
+        uid=5_286 generic
+          uid=5_287 generic
+          uid=5_288 generic
+          uid=5_289 generic
+          uid=5_290 generic
+          uid=5_291 generic
+          uid=5_292 generic
+          uid=5_293 generic
+        uid=5_294 generic
+          uid=5_295 generic
+          uid=5_296 generic
+          uid=5_297 generic
+          uid=5_298 generic
+          uid=5_299 generic
+          uid=5_300 generic
+          uid=5_301 generic
+        uid=5_302 generic
+          uid=5_303 generic
+          uid=5_304 generic
+          uid=5_305 generic
+          uid=5_306 generic
+          uid=5_307 generic
+          uid=5_308 generic
+          uid=5_309 generic
+        uid=5_310 generic
+          uid=5_311 generic
+          uid=5_312 generic
+          uid=5_313 generic
+          uid=5_314 generic
+          uid=5_315 generic
+          uid=5_316 generic
+          uid=5_317 generic
+        uid=5_318 generic
+          uid=5_319 generic
+          uid=5_320 generic
+          uid=5_321 generic
+          uid=5_322 generic
+          uid=5_323 generic
+          uid=5_324 generic
+          uid=5_325 generic
+        uid=5_326 generic
+          uid=5_327 generic
+          uid=5_328 generic
+          uid=5_329 generic
+          uid=5_330 generic
+          uid=5_331 generic
+          uid=5_332 generic
+          uid=5_333 generic
+      uid=5_334 button "Go to the ad schedule table"
+    uid=5_335 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_336 heading "Demographics" level="1"
+      uid=5_337 button "Choose a metric for the Demographics card. Current metric: Conversions" expandable haspopup="menu"
+      uid=5_338 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_339 StaticText "Summary of the demographic groups your ads are reaching by age and gender"
+      uid=5_340 tab "Gender" selectable
+      uid=5_341 tab "Gender & Age" selectable selected
+      uid=5_342 tab "Age" selectable
+      uid=5_343 grid
+        uid=5_344 row
+          uid=5_345 gridcell
+          uid=5_346 gridcell
+          uid=5_347 gridcell
+          uid=5_348 gridcell
+          uid=5_349 gridcell
+          uid=5_350 gridcell
+        uid=5_351 row
+          uid=5_352 gridcell
+          uid=5_353 gridcell
+          uid=5_354 gridcell
+          uid=5_355 gridcell
+          uid=5_356 gridcell
+          uid=5_357 gridcell
+      uid=5_358 StaticText "Based on the 100% of your conversions with known gender and age."
+      uid=5_359 button "More information" haspopup="menu"
+      uid=5_360 button "Demographics"
+    uid=5_361 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_362 heading "Devices" level="1"
+      uid=5_363 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_364 StaticText "Ad performance across devices"
+      uid=5_365 table "Segmented data. Use arrow keys to navigate between cells."
+        uid=5_366 cell
+        uid=5_367 cell
+        uid=5_368 cell
+        uid=5_369 StaticText "75.9%"
+        uid=5_370 StaticText "0.0%"
+        uid=5_371 StaticText "24.1%"
+        uid=5_372 cell
+        uid=5_373 cell
+        uid=5_374 cell
+        uid=5_375 StaticText "83.5%"
+        uid=5_376 StaticText "0.3%"
+        uid=5_377 StaticText "16.2%"
+        uid=5_378 cell
+        uid=5_379 cell
+        uid=5_380 cell
+        uid=5_381 StaticText "86.2%"
+        uid=5_382 StaticText "0.0%"
+        uid=5_383 StaticText "13.8%"
+      uid=5_384 button "Choose metric 1 of 3 for the Devices card. Current metric: Cost" expandable haspopup="menu"
+      uid=5_385 button "Choose metric 2 of 3 for the Devices card. Current metric: Impressions" expandable haspopup="menu"
+      uid=5_386 button "Choose metric 3 of 3 for the Devices card. Current metric: Clicks" expandable haspopup="menu"
+      uid=5_387 StaticText "Bid adjustments"
+      uid=5_388 button "Mobile phones: —"
+      uid=5_389 button "Computers: —"
+      uid=5_390 button "Tablets: —"
+      uid=5_391 button "Go to the devices table"
+    uid=5_392 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_393 button "Searches" haspopup="menu"
+      uid=5_394 StaticText "Sort by:"
+      uid=5_395 button "Choose a metric for the Searches card. Current metric: Impressions" expandable haspopup="menu"
+      uid=5_396 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_397 StaticText "Top searches and words within searches where people saw your ads"
+      uid=5_398 tab "Searches" selectable selected
+      uid=5_399 tab "Words" selectable
+      uid=5_400 listbox "100 results including: portugal golden visa, greece golden visa, portugal passport by investment" orientation="vertical"
+        uid=5_401 option "portugal golden visa" selectable value="portugal golden visa"
+        uid=5_402 option "greece golden visa" selectable value="greece golden visa"
+        uid=5_403 option "portugal passport by investment" selectable value="portugal passport by investment"
+        uid=5_404 option "portugal citizenship by investment" selectable value="portugal citizenship by investment"
+        uid=5_405 option "greece residency by investment" selectable value="greece residency by investment"
+        uid=5_406 option "portugal golden visa requirements" selectable value="portugal golden visa requirements"
+        uid=5_407 option "portugal residency by investment" selectable value="portugal residency by investment"
+        uid=5_408 option "golden visa" selectable value="golden visa"
+        uid=5_409 option "greece citizenship by investment" selectable value="greece citizenship by investment"
+        uid=5_410 option "portugal investment visa" selectable value="portugal investment visa"
+        uid=5_411 option "portuguese passport through investment" selectable value="portuguese passport through investment"
+        uid=5_412 option "الاقامه الذهبيه" selectable value="الاقامه الذهبيه"
+        uid=5_413 option "greece golden visa requirements" selectable value="greece golden visa requirements"
+        uid=5_414 option "hqa visa" selectable value="hqa visa"
+        uid=5_415 option "bulgaria golden visa" selectable value="bulgaria golden visa"
+        uid=5_416 option "golden visa greece" selectable value="golden visa greece"
+        uid=5_417 option "golden visa portugal" selectable value="golden visa portugal"
+        uid=5_418 option "ireland investment visa" selectable value="ireland investment visa"
+        uid=5_419 option "الاستثمار العقاري في اليونان" selectable value="الاستثمار العقاري في اليونان"
+        uid=5_420 option "الاقامه الذهبية" selectable value="الاقامه الذهبية"
+        uid=5_421 option "citizenship by investment in portugal" selectable value="citizenship by investment in portugal"
+        uid=5_422 option "greece passport by investment" selectable value="greece passport by investment"
+        uid=5_423 option "how to get portugal golden visa" selectable value="how to get portugal golden visa"
+        uid=5_424 option "portugal cbi" selectable value="portugal cbi"
+        uid=5_425 option "portugal hqa visa" selectable value="portugal hqa visa"
+        uid=5_426 option "كيفية التقديم على الإقامة الذهبية في الإمارات" selectable value="كيفية التقديم على الإقامة الذهبية في الإمارات"
+        uid=5_427 option "andorra residency by investment" selectable value="andorra residency by investment"
+        uid=5_428 option "bulgaria golden visa requirements" selectable value="bulgaria golden visa requirements"
+        uid=5_429 option "d 7 visa" selectable value="d 7 visa"
+        uid=5_430 option "d3 visa portugal requirements" selectable value="d3 visa portugal requirements"
+        uid=5_431 option "europe golden visa" selectable value="europe golden visa"
+        uid=5_432 option "european golden visa" selectable value="european golden visa"
+        uid=5_433 option "european residency by investment" selectable value="european residency by investment"
+        uid=5_434 option "golden visa application" selectable value="golden visa application"
+        uid=5_435 option "golden visa by investment" selectable value="golden visa by investment"
+        uid=5_436 option "golden visa countries europe" selectable value="golden visa countries europe"
+        uid=5_437 option "golden visa rate" selectable value="golden visa rate"
+        uid=5_438 option "greece golden visa minimum investment" selectable value="greece golden visa minimum investment"
+        uid=5_439 option "greece golden visa program" selectable value="greece golden visa program"
+        uid=5_440 option "greece permanent residency by investment" selectable value="greece permanent residency by investment"
+        uid=5_441 option "greek citizenship by investment" selectable value="greek citizenship by investment"
+        uid=5_442 option "greek passport by investment" selectable value="greek passport by investment"
+        uid=5_443 option "how to get a spanish golden visa" selectable value="how to get a spanish golden visa"
+        uid=5_444 option "how to get greece citizenship by investment" selectable value="how to get greece citizenship by investment"
+        uid=5_445 option "investment citizenship portugal" selectable value="investment citizenship portugal"
+        uid=5_446 option "investment immigration europe" selectable value="investment immigration europe"
+        uid=5_447 option "investment in portugal for citizenship" selectable value="investment in portugal for citizenship"
+        uid=5_448 option "investor visa portugal" selectable value="investor visa portugal"
+        uid=5_449 option "passive income requirements portugal" selectable value="passive income requirements portugal"
+        uid=5_450 option "portugal permanent residency by investment" selectable value="portugal permanent residency by investment"
+        uid=5_451 option "portuguese citizenship by buying property" selectable value="portuguese citizenship by buying property"
+        uid=5_452 option "portuguese golden visa news" selectable value="portuguese golden visa news"
+        uid=5_453 option "whats a golden visa" selectable value="whats a golden visa"
+        uid=5_454 option "احصل على جواز سفر ثاني" selectable value="احصل على جواز سفر ثاني"
+        uid=5_455 option "ارخص جواز سفر ثاني" selectable value="ارخص جواز سفر ثاني"
+        uid=5_456 option "اقامة الذهبية السعودية" selectable value="اقامة الذهبية السعودية"
+        uid=5_457 option "الإقامة الذهبية" selectable value="الإقامة الذهبية"
+        uid=5_458 option "الاقامة الذهبية في البرتغال" selectable value="الاقامة الذهبية في البرتغال"
+        uid=5_459 option "الجنسية عن طريق الاستثمار" selectable value="الجنسية عن طريق الاستثمار"
+        uid=5_460 option "السفر الى بنما" selectable value="السفر الى بنما"
+        uid=5_461 option "ترشيح الاقامة الذهبية" selectable value="ترشيح الاقامة الذهبية"
+        uid=5_462 option "جواز سفر عن طريق الاستثمار" selectable value="جواز سفر عن طريق الاستثمار"
+        uid=5_463 option "سعر جنسية دومينيكا" selectable value="سعر جنسية دومينيكا"
+        uid=5_464 option "سلبيات الإقامة الذهبية" selectable value="سلبيات الإقامة الذهبية"
+        uid=5_465 option "شروط الاقامة الذهبية في البحرين" selectable value="شروط الاقامة الذهبية في البحرين"
+        uid=5_466 option "فيزا بنما للمصريين" selectable value="فيزا بنما للمصريين"
+        uid=5_467 option "كيف اقدم على الاقامة الذهبية" selectable value="كيف اقدم على الاقامة الذهبية"
+        uid=5_468 option "كيفية التقديم على الاقامة الذهبية" selectable value="كيفية التقديم على الاقامة الذهبية"
+        uid=5_469 option "كيفية الحصول على الاقامة الذهبية في السعودية" selectable value="كيفية الحصول على الاقامة الذهبية في السعودية"
+        uid=5_470 option "d2 portugal" selectable value="d2 portugal"
+        uid=5_471 option "does italy have a golden visa program" selectable value="does italy have a golden visa program"
+        uid=5_472 option "eu golden visa countries" selectable value="eu golden visa countries"
+        uid=5_473 option "eu residency by investment" selectable value="eu residency by investment"
+        uid=5_474 option "european passport by investment" selectable value="european passport by investment"
+        uid=5_475 option "finland citizenship by investment" selectable value="finland citizenship by investment"
+        uid=5_476 option "france citizenship by investment" selectable value="france citizenship by investment"
+        uid=5_477 option "friendly nation visa panama" selectable value="friendly nation visa panama"
+        uid=5_478 option "golden greece visa" selectable value="golden greece visa"
+        uid=5_479 option "golden residence permit program" selectable value="golden residence permit program"
+        uid=5_480 option "golden visa eu" selectable value="golden visa eu"
+        uid=5_481 option "golden visa portugal price" selectable value="golden visa portugal price"
+        uid=5_482 option "golden visa programs in europe" selectable value="golden visa programs in europe"
+        uid=5_483 option "golden visa switzerland" selectable value="golden visa switzerland"
+        uid=5_484 option "greece golden visa to citizenship" selectable value="greece golden visa to citizenship"
+        uid=5_485 option "how to get a golden visa" selectable value="how to get a golden visa"
+        uid=5_486 option "how to get golden visa in italy" selectable value="how to get golden visa in italy"
+        uid=5_487 option "investment citizenship europe" selectable value="investment citizenship europe"
+        uid=5_488 option "ireland golden visa requirements" selectable value="ireland golden visa requirements"
+        uid=5_489 option "italian golden visa" selectable value="italian golden visa"
+        uid=5_490 option "italian golden visa 2026" selectable value="italian golden visa 2026"
+        uid=5_491 option "italy residency by investment" selectable value="italy residency by investment"
+        uid=5_492 option "panama permanent residency requirements" selectable value="panama permanent residency requirements"
+        uid=5_493 option "panama residency" selectable value="panama residency"
+        uid=5_494 option "portugal citizenship by investment cost" selectable value="portugal citizenship by investment cost"
+        uid=5_495 option "portugal golden visa program" selectable value="portugal golden visa program"
+        uid=5_496 option "portugal residence by investment" selectable value="portugal residence by investment"
+        uid=5_497 option "portugal visa by investment" selectable value="portugal visa by investment"
+        uid=5_498 option "portuguese citizenship by investment" selectable value="portuguese citizenship by investment"
+        uid=5_499 option "portuguese passport by investment" selectable value="portuguese passport by investment"
+        uid=5_500 option "pr by investment in europe" selectable value="pr by investment in europe"
+      uid=5_501 button "Navigate to the Searches table"
+      uid=5_502 StaticText "1"
+      uid=5_503 StaticText " / "
+      uid=5_504 StaticText "11"
+    uid=5_505 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_506 heading "Keywords" level="1"
+      uid=5_507 link "Add a keyword"
+        uid=5_508 StaticText "Add keyword"
+      uid=5_509 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_510 generic "Keywords sorted by Clicks, in high to low order. Use arrow keys to select, E to edit budget, enter to navigate to an overview page for that keyword"
+        uid=5_511 StaticText "Summary of how your keywords are performing"
+        uid=5_512 StaticText "Keywords sorted by Clicks, in high to low order. Use arrow keys to select, E to edit budget, enter to navigate to an overview page for that keyword"
+        uid=5_513 StaticText ""portugal residency investment""
+        uid=5_514 StaticText ""greece residency investment""
+        uid=5_515 StaticText ""فيزا بنما""
+        uid=5_516 StaticText ""الجنسية عن طريق الاستثمار""
+        uid=5_517 StaticText ""الاقامة الذهبية""
+        uid=5_518 button "Choose metric 1 of 3 for the Keywords card. Current metric: Cost" expandable haspopup="menu"
+        uid=5_519 StaticText "$29.71"
+        uid=5_520 StaticText "$14.05"
+        uid=5_521 StaticText "$5.57"
+        uid=5_522 StaticText "$4.57"
+        uid=5_523 StaticText "$2.37"
+        uid=5_524 button "Choose metric 2 of 3 for the Keywords card. Current metric: Clicks" expandable haspopup="menu"
+        uid=5_525 StaticText "8"
+        uid=5_526 StaticText "5"
+        uid=5_527 StaticText "4"
+        uid=5_528 StaticText "4"
+        uid=5_529 StaticText "2"
+        uid=5_530 button "Choose metric 3 of 3 for the Keywords card. Current metric: CTR" expandable haspopup="menu"
+        uid=5_531 StaticText "3.02%"
+        uid=5_532 StaticText "5.15%"
+        uid=5_533 StaticText "57.14%"
+        uid=5_534 StaticText "11.43%"
+        uid=5_535 StaticText "2.86%"
+      uid=5_536 button "Go to the keywords table"
+      uid=5_537 button "Go to the negative keywords table"
+      uid=5_538 StaticText "1"
+      uid=5_539 StaticText " / "
+      uid=5_540 StaticText "9"
+    uid=5_541 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_542 heading "Auction insights" level="1"
+      uid=5_543 button "Auction insights Card: Mouseover or press enter on this icon for more information" haspopup="menu"
+      uid=5_544 button "Compare metrics"
+      uid=5_545 button "Show metric over time"
+      uid=5_546 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_547 StaticText "Other advertisers who are participating in the same ad auctions"
+      uid=5_548 button "Choose metric 1 of 2 for the Auction insights card. Current metric: Impression share" expandable haspopup="menu"
+      uid=5_549 StaticText "40.00%"
+      uid=5_550 StaticText "25.00%"
+      uid=5_551 StaticText "< 10%"
+      uid=5_552 generic
+        uid=5_553 generic
+        uid=5_554 generic
+        uid=5_555 generic
+        uid=5_556 generic
+        uid=5_557 generic
+        uid=5_558 generic
+        uid=5_559 generic
+        uid=5_560 generic
+        uid=5_561 generic
+      uid=5_562 StaticText "0.00%"
+      uid=5_563 StaticText "100.00%"
+      uid=5_564 StaticText "You"
+      uid=5_565 StaticText "henleyglobal.com"
+      uid=5_566 StaticText "goldenvisas.com"
+      uid=5_567 StaticText "savoryandpartners.com"
+      uid=5_568 StaticText "portugalpathways.io"
+      uid=5_569 StaticText "virtuzone.com"
+      uid=5_570 StaticText "Others"
+      uid=5_571 button "Choose metric 2 of 2 for the Auction insights card. Current metric: Top of page rate" expandable haspopup="menu"
+      uid=5_572 button "Navigate to the Search Auction Insights table"
+    uid=5_573 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_574 heading "Ad groups" level="1"
+      uid=5_575 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_576 region "Ad groups sorted by Cost, in high to low order. Use arrow keys to select, E to edit budget, enter to navigate to an overview page for that ad group"
+        uid=5_577 StaticText "Ad groups sorted by Cost, in high to low order. Use arrow keys to select, E to edit budget, enter to navigate to an overview page for that ad group"
+        uid=5_578 StaticText "Golden Visa Programs - EN (GCC)"
+        uid=5_579 StaticText "General Golden Visa - AR"
+        uid=5_580 StaticText "Panama Qualified Investor - AR"
+        uid=5_581 StaticText "Portugal Golden Visa - AR"
+        uid=5_582 StaticText "Greece Golden Visa - AR"
+        uid=5_583 button "Choose metric 1 of 3 for the Ad groups card. Current metric: Cost" expandable haspopup="menu"
+        uid=5_584 StaticText "$45.24"
+        uid=5_585 StaticText "$8.42"
+        uid=5_586 StaticText "$7.88"
+        uid=5_587 StaticText "$0.96"
+        uid=5_588 StaticText "$0.27"
+        uid=5_589 button "Choose metric 2 of 3 for the Ad groups card. Current metric: Conversions" expandable haspopup="menu"
+        uid=5_590 StaticText "1.00"
+        uid=5_591 StaticText "0.00"
+        uid=5_592 StaticText "0.00"
+        uid=5_593 StaticText "0.00"
+        uid=5_594 StaticText "0.00"
+        uid=5_595 button "Choose metric 3 of 3 for the Ad groups card. Current metric: CTR" expandable haspopup="menu"
+        uid=5_596 StaticText "2.87%"
+        uid=5_597 StaticText "5.69%"
+        uid=5_598 StaticText "35.29%"
+        uid=5_599 StaticText "16.67%"
+        uid=5_600 StaticText "14.29%"
+      uid=5_601 button "Go to the ad groups table"
+      uid=5_602 StaticText "1"
+      uid=5_603 StaticText " / "
+      uid=5_604 StaticText "1"
+    uid=5_605 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_606 heading "Locations" level="1"
+      uid=5_607 button "Choose a metric for the Locations card. Current metric: Clicks" expandable haspopup="menu"
+      uid=5_608 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_609 StaticText "Geographic location of people who interacted with your ads"
+      uid=5_610 region "Targeting 7 locations and excluding 0locations. Targeted locations were: Targeting United Arab Emirates, Egypt, Saudi Arabia, Kuwait, Bahrain, Qatar, Jordan. Excluded locationswere: ."
+        uid=5_611 StaticText "Targeting"
+        uid=5_612 StaticText "United Arab Emirates, Egypt, Saudi Arabia, Kuwait, Bahrain, Qatar, Jordan"
+      uid=5_613 generic
+        uid=5_614 listitem "Abu Dhabi had 3 Clicks" level="2"
+        uid=5_615 listitem "Ajloun Governorate had 0 Clicks" level="2"
+        uid=5_616 listitem "Ajman had 0 Clicks" level="2"
+        uid=5_617 listitem "Al Bahah Province had 0 Clicks" level="2"
+        uid=5_618 listitem "Al Jowf Province had 0 Clicks" level="2"
+        uid=5_619 listitem "Al Madinah Province had 0 Clicks" level="2"
+        uid=5_620 listitem "Al Qalyubia Governorate had 0 Clicks" level="2"
+        uid=5_621 listitem "Al Qassim Province had 0 Clicks" level="2"
+        uid=5_622 listitem "Alexandria Governorate had 1 Clicks" level="2"
+        uid=5_623 listitem "Amman Governorate had 0 Clicks" level="2"
+        uid=5_624 listitem "Aqaba Governorate had 0 Clicks" level="2"
+        uid=5_625 listitem "Aseer Province had 0 Clicks" level="2"
+        uid=5_626 listitem "Ash Sharqia Governorate had 0 Clicks" level="2"
+        uid=5_627 listitem "Assiut Governorate had 0 Clicks" level="2"
+        uid=5_628 listitem "Aswan Governorate had 0 Clicks" level="2"
+        uid=5_629 listitem "Bahrain had 1 Clicks" level="2"
+        uid=5_630 listitem "Balqa Governorate had 0 Clicks" level="2"
+        uid=5_631 listitem "Beni Suef Governorate had 0 Clicks" level="2"
+        uid=5_632 listitem "Cairo Governorate had 7 Clicks" level="2"
+        uid=5_633 listitem "Dakahlia Governorate had 0 Clicks" level="2"
+        uid=5_634 listitem "Damietta Governorate had 1 Clicks" level="2"
+        uid=5_635 listitem "Dubai had 6 Clicks" level="2"
+        uid=5_636 listitem "Eastern Province had 0 Clicks" level="2"
+        uid=5_637 listitem "Egypt had 0 Clicks" level="2"
+        uid=5_638 listitem "El Beheira Governorate had 0 Clicks" level="2"
+        uid=5_639 listitem "Faiyum Governorate had 0 Clicks" level="2"
+        uid=5_640 listitem "Fujairah had 0 Clicks" level="2"
+        uid=5_641 listitem "Gharbia Governorate had 1 Clicks" level="2"
+        uid=5_642 listitem "Giza Governorate had 0 Clicks" level="2"
+        uid=5_643 listitem "Hail Province had 0 Clicks" level="2"
+        uid=5_644 listitem "Irbid Governorate had 0 Clicks" level="2"
+        uid=5_645 listitem "Ismailia Governorate had 0 Clicks" level="2"
+        uid=5_646 listitem "Jazan Province had 0 Clicks" level="2"
+        uid=5_647 listitem "Jerash Governorate had 0 Clicks" level="2"
+        uid=5_648 listitem "Jordan had 0 Clicks" level="2"
+        uid=5_649 listitem "Kafr El Sheikh Governorate had 0 Clicks" level="2"
+        uid=5_650 listitem "Karak Governorate had 0 Clicks" level="2"
+        uid=5_651 listitem "Kuwait had 3 Clicks" level="2"
+        uid=5_652 listitem "Luxor Governorate had 0 Clicks" level="2"
+        uid=5_653 listitem "Ma'an Governorate had 0 Clicks" level="2"
+        uid=5_654 listitem "Madaba Governorate had 0 Clicks" level="2"
+        uid=5_655 listitem "Mafraq Governorate had 0 Clicks" level="2"
+        uid=5_656 listitem "Makkah Province had 1 Clicks" level="2"
+        uid=5_657 listitem "Matrouh Governorate had 0 Clicks" level="2"
+        uid=5_658 listitem "Menia Governorate had 0 Clicks" level="2"
+        uid=5_659 listitem "Menofia Governorate had 0 Clicks" level="2"
+        uid=5_660 listitem "Najran Province had 0 Clicks" level="2"
+        uid=5_661 listitem "New Valley Governorate had 0 Clicks" level="2"
+        uid=5_662 listitem "North Sinai Governorate had 0 Clicks" level="2"
+        uid=5_663 listitem "Northern Borders Province had 0 Clicks" level="2"
+        uid=5_664 listitem "Port Said Governorate had 0 Clicks" level="2"
+        uid=5_665 listitem "Qatar had 1 Clicks" level="2"
+        uid=5_666 listitem "Qena Governorate had 0 Clicks" level="2"
+        uid=5_667 listitem "Ras al Khaimah had 0 Clicks" level="2"
+        uid=5_668 listitem "Red Sea Governorate had 0 Clicks" level="2"
+        uid=5_669 listitem "Riyadh Province had 3 Clicks" level="2"
+        uid=5_670 listitem "Saudi Arabia had 0 Clicks" level="2"
+        uid=5_671 listitem "Sharjah had 1 Clicks" level="2"
+        uid=5_672 listitem "Sohag Governorate had 0 Clicks" level="2"
+        uid=5_673 listitem "South Sinai Governorate had 0 Clicks" level="2"
+        uid=5_674 listitem "Suez Governorate had 0 Clicks" level="2"
+        uid=5_675 listitem "Tabuk Province had 0 Clicks" level="2"
+        uid=5_676 listitem "Tafilah Governorate had 0 Clicks" level="2"
+        uid=5_677 listitem "Umm Al Quawain had 0 Clicks" level="2"
+        uid=5_678 listitem "United Arab Emirates had 0 Clicks" level="2"
+        uid=5_679 listitem "Zarqa Governorate had 0 Clicks" level="2"
+        uid=5_680 image "Targeting United Arab Emirates, Egypt, Saudi Arabia, Kuwait, Bahrain, Qatar, Jordan" url="data:image/png;base64,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"
+      uid=5_681 button "Navigate to the targeted locations table"
+      uid=5_682 button "Navigate to the excluded locations table"
+    uid=5_683 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_684 heading "Most-shown ads" level="1"
+      uid=5_685 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_686 list "Use left/right keys to move between ads, E to edit an ad, C to copy and enter to navigate to the ad url."
+        uid=5_687 link "Found in ad group Golden Visa Programs - EN (GCC) with status active "
+          uid=5_688 StaticText "Golden Visa Programs - EN (GCC)"
+        uid=5_689 listitem level="2"
+          uid=5_690 StaticText "Golden Visa From €250,000"
+          uid=5_691 StaticText " "
+          uid=5_692 StaticText "|"
+          uid=5_693 StaticText " "
+          uid=5_694 StaticText "Direct From The Developer"
+          uid=5_695 StaticText " "
+          uid=5_696 StaticText "|"
+          uid=5_697 StaticText " "
+          uid=5_698 StaticText "No Middlemen. No Brokers."
+          uid=5_699 StaticText "Ad"
+          uid=5_700 StaticText "goldenvisas.mercan.com"
+          uid=5_701 StaticText "/"
+          uid=5_702 StaticText "golden-visa"
+          uid=5_703 StaticText "/"
+          uid=5_704 StaticText "compare"
+          uid=5_705 StaticText "Golden Visa programs in Greece, Portugal & Panama. Direct from the developer. No brokers. EU residency from €250K. 4,100+ families trust Mercan. 37 years. €2B+ investments."
+          uid=5_706 StaticText "Book A Free Consultation · Explore News And Events · Subscribe To Newsletter"
+          uid=5_707 StaticText "Highlights: We Have Over 30 Years Of Experience, A Range Of Categories Available, We Have Offices In Multiple Locations"
+        uid=5_708 listitem level="2"
+        uid=5_709 listitem level="2"
+        uid=5_710 listitem level="2"
+        uid=5_711 listitem level="2"
+        uid=5_712 StaticText "Ad"
+        uid=5_713 StaticText "Enabled"
+        uid=5_714 listitem haspopup="menu" level="2"
+          uid=5_715 StaticText "Status"
+          uid=5_716 StaticText "Eligible"
+        uid=5_717 StaticText "Impressions"
+        uid=5_718 StaticText "488"
+        uid=5_719 listitem "Choose metric 1 of 2 for the Most-shown ads card. Current metric: Clicks" expandable haspopup="menu" level="2"
+          uid=5_720 StaticText "Clicks"
+          uid=5_721 StaticText "arrow_drop_down"
+        uid=5_722 StaticText "14"
+        uid=5_723 listitem "Choose metric 2 of 2 for the Most-shown ads card. Current metric: CTR" expandable haspopup="menu" level="2"
+          uid=5_724 StaticText "CTR"
+          uid=5_725 StaticText "arrow_drop_down"
+        uid=5_726 StaticText "2.87%"
+        uid=5_727 StaticText "Golden Visa From €250,000 | Direct From The Developer | No Middlemen. No Brokers."
+      uid=5_728 button "Go to the ads table"
+      uid=5_729 button "Go to the assets table"
+      uid=5_730 StaticText "1"
+      uid=5_731 StaticText " / "
+      uid=5_732 StaticText "5"
+    uid=5_733 listitem " Card 1 of 0. Use arrow keys to move to another card, tab to enter card content." level="1"
+      uid=5_734 button "Lead funnel. Press Enter to focus on the tooltip." haspopup="menu"
+      uid=5_735 button "A menu with additional card options. Press enter to open." haspopup="menu"
+      uid=5_736 StaticText "Total conversions through your entire lead funnel"
+      uid=5_737 generic
+        uid=5_738 StaticText "A chart to show conversions through different lead funnel stages. Press arrow keys to navigate from one bar to the next to see the hovercard. Tab to go to x-axis label."
+      uid=5_739 StaticText "29"
+      uid=5_740 generic "Interactions. Press Enter to focus on the tooltip."
+        uid=5_741 StaticText "Interactions"
+      uid=5_742 StaticText "1.00"
+      uid=5_743 generic "Raw leads. Press enter to focus on the tooltip."
+        uid=5_744 StaticText "Raw leads"
+      uid=5_745 StaticText "-"
+      uid=5_746 generic "Qualified leads. Press Enter to focus on the tooltip."
+        uid=5_747 StaticText "Qualified leads"
+      uid=5_748 StaticText "-"
+      uid=5_749 generic "Converted leads. Press Enter to focus on the tooltip."
+        uid=5_750 StaticText "Converted leads"
+      uid=5_751 image "Information"
+      uid=5_752 StaticText "Drive higher quality leads by measuring offline conversion with enhanced conversions for leads."
+      uid=5_753 StaticText " "
+      uid=5_754 link "Learn more about the lead funnel report card" haspopup="menu" url="https://support.google.com/google-ads/answer/14015122?hl=en_US"
+        uid=5_755 StaticText "Learn more about the lead funnel report card"
+      uid=5_756 button "Dismiss"
+      uid=5_757 button "Measure offline conversions"
+    uid=5_758 link "Reporting is not real-time." haspopup="menu" url="https://support.google.com/google-ads/?p=help_2544985&hl=en_US"
+      uid=5_759 StaticText "Reporting is not real-time."
+    uid=5_760 StaticText " "
+    uid=5_761 StaticText "Time zone for all dates and times: (GMT-04:00) Eastern Time."
+    uid=5_762 link "Learn more about changing your Google Ads account settings" haspopup="menu" url="https://support.google.com/google-ads/?p=help_9842104&hl=en_US"
+      uid=5_763 StaticText "Learn more"
+    uid=5_764 StaticText "Some inventory may be provided through third party intermediaries."
+    uid=5_765 StaticText "You'll see Media Rating Council (MRC) accreditation noted in the column header's hover text for accredited metrics."
+    uid=5_766 StaticText "© Google, 2026."
