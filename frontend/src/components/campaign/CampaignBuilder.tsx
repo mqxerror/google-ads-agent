@@ -3,12 +3,13 @@ import {
   Gauge, Eye, Search, Palette, Target, Code, Briefcase,
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
   Circle, Upload, X, LinkIcon, Globe, Languages, DollarSign,
-  Sparkles, Rocket, Zap, Brain,
+  Sparkles, Rocket, Zap, Brain, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+// chatApi used for atomic conversation creation in runStage and Research
 
 type ModelId = 'sonnet' | 'opus' | 'haiku';
 const MODELS: { id: ModelId; label: string; desc: string; icon: typeof Zap }[] = [
@@ -79,6 +80,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }>>([]);
   const [currentStage, setCurrentStage] = useState(1);
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [buildConversationId, setBuildConversationId] = useState<string | null>(null);
   const [step, setStep] = useState<WizardStep>('input');
 
   // On mount: check backend for existing pipeline progress
@@ -192,16 +194,40 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       refreshPipelineStatus();
     }, 240000);
 
-    // Send to chat
-    const chatEvent = new CustomEvent('chat:send', {
-      detail: {
-        text: stage.prompt || `Run stage ${stageNum} for campaign build`,
-        roleId: stage.role_id,
-        model: buildModel,
-      },
-    });
-    window.dispatchEvent(chatEvent);
-  }, [stages, buildModel, refreshPipelineStatus]);
+    // Atomic: create conversation if needed, then tell ChatPanel to send via its normal streaming path
+    try {
+      const isFirstStage = stageNum === 1;
+      let convId = buildConversationId;
+
+      if (isFirstStage || !convId) {
+        // Create conversation directly — no React state race
+        const { createConversation } = await import('@/lib/api');
+        const conv = await createConversation({
+          account_id: accountId,
+          title: `Campaign Build: ${url || 'New Campaign'}`,
+        });
+        convId = conv.id;
+        setBuildConversationId(convId);
+      }
+
+      // Tell ChatPanel: switch to this conversation, then send the message
+      // chat:display sets the conversation, chat:send sends the message
+      // Using two events with a small delay ensures state propagates
+      window.dispatchEvent(new CustomEvent('chat:display', { detail: { conversationId: convId } }));
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('chat:send', {
+          detail: {
+            text: stage.prompt || `Run stage ${stageNum} for campaign build`,
+            roleId: stage.role_id,
+            model: buildModel,
+          },
+        }));
+      }, 300);
+    } catch (err) {
+      setPipelineRunning(false);
+      console.error('Builder send failed:', err);
+    }
+  }, [stages, buildModel, refreshPipelineStatus, accountId, buildConversationId, url]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
   if (step === 'input') {
@@ -430,6 +456,33 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
           <Button
             variant="outline"
             size="lg"
+            className="gap-2"
+            disabled={!noLandingPage && !url.trim()}
+            onClick={async () => {
+              const researchPrompt = `Research the market and keywords for a new campaign:\n\nLanding page: ${url || 'Not provided'}\nBrief: ${brief || 'Not specified'}\nTarget: ${geoTargets}\nLanguage: ${languages}\nBudget: $${budget}/day\n\nDo a thorough analysis:\n1. Use keyword_plan_idea__generate_keyword_ideas_from_url to find keyword opportunities from the landing page\n2. Estimate search volume and competition for the top keywords\n3. Identify 3-5 competitor domains and their positioning\n4. Suggest optimal campaign structure (ad groups, match types)\n5. Recommend a realistic CPA target based on the niche\n\nPresent findings as a research report — do NOT create any campaigns yet.`;
+              try {
+                const { createConversation } = await import('@/lib/api');
+                const conv = await createConversation({
+                  account_id: accountId,
+                  title: `Research: ${url || brief || 'New Campaign'}`,
+                });
+                window.dispatchEvent(new CustomEvent('chat:display', { detail: { conversationId: conv.id } }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('chat:send', {
+                    detail: { text: researchPrompt, roleId: 'competitor_intel', model: buildModel },
+                  }));
+                }, 300);
+              } catch (err) {
+                console.error('Research send failed:', err);
+              }
+            }}
+          >
+            <Search className="h-4 w-4" />
+            Research First
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
             onClick={() => {
               sessionStorage.removeItem('campaign-builder-pipeline');
               ['url', 'brief', 'budget', 'geo', 'lang'].forEach(k => sessionStorage.removeItem(`campaign-builder-${k}`));
@@ -565,10 +618,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
   // ── REVIEW STEP ────────────────────────────────────────────
   const handleExportReport = () => {
-    // Combine all role notes + chat into a markdown report
-    const event = new CustomEvent('chat:send', {
-      detail: {
-        text: `As the Agency Director, compile a COMPLETE CAMPAIGN BUILD REPORT combining ALL role findings into one document:
+    const text = `As the Agency Director, compile a COMPLETE CAMPAIGN BUILD REPORT combining ALL role findings into one document:
 
 Include these sections:
 1. EXECUTIVE SUMMARY
@@ -582,12 +632,10 @@ Include these sections:
 9. EXPECTED RESULTS
 
 READ ALL role_notes from campaign memory and compile them.
-Format as a clean, professional document that could be shared with a client or stakeholder.`,
-        roleId: 'director',
-        model: buildModel,
-      },
-    });
-    window.dispatchEvent(event);
+Format as a clean, professional document that could be shared with a client or stakeholder.`;
+    window.dispatchEvent(new CustomEvent('chat:send', {
+      detail: { text, roleId: 'director', model: buildModel },
+    }));
   };
 
   return (
@@ -607,10 +655,9 @@ Format as a clean, professional document that could be shared with a client or s
           Export Full Report
         </Button>
         <Button onClick={() => {
-          const event = new CustomEvent('chat:send', {
+          window.dispatchEvent(new CustomEvent('chat:send', {
             detail: { text: 'CREATE the campaign based on the plan above', roleId: 'director', model: buildModel },
-          });
-          window.dispatchEvent(event);
+          }));
           onClose();
         }}>
           <Sparkles className="h-4 w-4 mr-1" />

@@ -69,6 +69,7 @@ export interface ChatMessage {
   agentRole?: string;      // role ID (e.g. "search_term_hunter")
   agentRoleName?: string;  // display name (e.g. "Search Term Hunter")
   agentRoleAvatar?: string; // avatar key (e.g. "search")
+  isPending?: boolean;     // queued message waiting to be sent
 }
 
 export interface ToolCall {

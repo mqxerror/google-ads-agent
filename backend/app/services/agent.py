@@ -187,6 +187,15 @@ def _get_mcp_config_path() -> Path:
                 "command": gtm_cmd,
             }
 
+    # Microsoft Clarity MCP — heatmaps, session recordings, behavioral analytics
+    if settings.CLARITY_MCP_ENABLED and settings.CLARITY_API_TOKEN:
+        clarity_npx = _MODERN_NPX if settings.CHROME_MCP_COMMAND == "npx" else (shutil.which("npx") or "npx")
+        servers["clarity"] = {
+            "type": "stdio",
+            "command": clarity_npx,
+            "args": ["-y", "@microsoft/clarity-mcp-server", f"--clarity_api_token={settings.CLARITY_API_TOKEN}"],
+        }
+
     config = {"mcpServers": servers}
     config_path = _BACKEND_DIR / "data" / "mcp_config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -355,19 +364,63 @@ async def _get_recent_messages(conversation_id: str, limit: int = 30) -> list[di
 
 # ── Layer 4: Session Summaries (compressed history) ──────────────
 
-async def _get_session_summaries(campaign_id: str | None, limit: int = 5) -> list[str]:
-    """Get past session summaries for this campaign (Layer 4)."""
+async def _get_session_summaries(campaign_id: str | None, limit: int | None = None) -> list[str]:
+    """Get past session summaries with tiered compression.
+
+    Recent 5: full text
+    Older: grouped by month ("March 2026 (12 sessions): keyword optimization, CRO audit...")
+    """
     if not campaign_id:
         return []
     db = await get_db()
     try:
-        cur = await db.execute(
-            "SELECT summary, created_at FROM session_summaries "
-            "WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?",
-            (campaign_id, limit),
-        )
+        query = "SELECT summary, created_at FROM session_summaries WHERE campaign_id = ? ORDER BY created_at DESC"
+        params: list = [campaign_id]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        cur = await db.execute(query, params)
         rows = await cur.fetchall()
-        return [f"[{r['created_at']}] {r['summary']}" for r in reversed(rows)]
+        if not rows:
+            return []
+
+        all_summaries = list(reversed(rows))
+        recent_count = 5
+
+        if len(all_summaries) <= recent_count:
+            return [f"[{r['created_at']}] {r['summary']}" for r in all_summaries]
+
+        # Recent 5: full detail
+        recent = all_summaries[-recent_count:]
+        older = all_summaries[:-recent_count]
+
+        # Compress older by month
+        months: dict[str, list[str]] = {}
+        for r in older:
+            month_key = (r["created_at"] or "")[:7]
+            if month_key not in months:
+                months[month_key] = []
+            # Take first 30 chars of each summary as a keyword
+            snippet = (r["summary"] or "")[:40].strip()
+            months[month_key].append(snippet)
+
+        result = []
+        for month_key in sorted(months.keys()):
+            snippets = months[month_key]
+            try:
+                from datetime import datetime as dt
+                month_label = dt.strptime(month_key, "%Y-%m").strftime("%B %Y")
+            except (ValueError, TypeError):
+                month_label = month_key
+            topics = ", ".join(dict.fromkeys(s for s in snippets[:4] if s))
+            result.append(f"[{month_label}] ({len(snippets)} sessions): {topics}")
+
+        result.append("--- Recent sessions ---")
+        for r in recent:
+            result.append(f"[{r['created_at']}] {r['summary']}")
+
+        return result
     finally:
         await db.close()
 
@@ -547,6 +600,7 @@ def _condense_for_memory(response_text: str, user_message: str, max_chars: int =
 async def stream_agent_response(
     user_message: str,
     account_id: str | None = None,
+    campaign_id: str | None = None,
     campaign_name: str | None = None,
     conversation_id: str | None = None,
     base_guidelines: str | None = None,
@@ -594,9 +648,9 @@ async def stream_agent_response(
     except Exception:
         pass
 
-    # Find campaign ID using the resolved client account (not MCC)
-    campaign_id = None
-    if campaign_name:
+    # Use passed-in campaign_id directly (from conversation record)
+    # Only fall back to name lookup if no ID was provided
+    if not campaign_id and campaign_name:
         try:
             campaigns = await _ads_svc.get_campaigns(api_account_id)
             match = next((c for c in campaigns if c.name == campaign_name), None)
@@ -630,9 +684,27 @@ async def stream_agent_response(
     # Layer 6: Campaign memory (decisions, pinned facts, role notes)
     campaign_memory_ctx = ""
     if account_id and campaign_id:
-        campaign_memory_ctx = build_campaign_context(account_id, campaign_id)
+        campaign_memory_ctx = build_campaign_context(account_id, campaign_id, active_role=role_obj.id if role_obj else None)
 
-    # Layer 7: Conversation checkpoint (compressed older messages)
+    # Layer 7: Outcome history (what worked, what didn't)
+    outcome_ctx = ""
+    if account_id and campaign_id:
+        try:
+            from app.services.outcome_tracker import get_outcomes_for_prompt
+            outcome_ctx = await get_outcomes_for_prompt(account_id, campaign_id)
+        except Exception:
+            pass
+
+    # Layer 8: Campaign chronicle (long-term structured timeline)
+    chronicle_ctx = ""
+    if account_id and campaign_id:
+        try:
+            from app.services.chronicle import load_chronicle
+            chronicle_ctx = load_chronicle(account_id, campaign_id)
+        except Exception:
+            pass
+
+    # Layer 9: Conversation checkpoint (compressed older messages)
     checkpoint_ctx = ""
     if conversation_id:
         checkpoint_ctx = await load_checkpoint_context(conversation_id)
@@ -868,11 +940,48 @@ async def stream_agent_response(
             "- Only interact with pages the user has explicitly authorized",
         ])
 
-    # Inject active role prompt
+    # Microsoft Clarity MCP — behavioral analytics (conditional)
+    if settings.CLARITY_MCP_ENABLED:
+        system_parts.extend([
+            "",
+            "=== MICROSOFT CLARITY (mcp__clarity__*) ===",
+            "You have access to Microsoft Clarity for behavioral analytics — heatmaps, session recordings, and user behavior data.",
+            "",
+            "KEY TOOLS:",
+            "  - get_project_info(project_id) — Get project details and setup status",
+            "  - get_session_recordings(project_id, ...) — Fetch session recordings with filters",
+            "  - get_heatmap_data(project_id, url) — Get click/scroll heatmap data for a page",
+            "  - get_metrics_summary(project_id, date_range) — Engagement metrics summary",
+            "  - get_funnel_data(project_id, ...) — Conversion funnel analysis",
+            "",
+            "USE CASES:",
+            "  - After landing page changes: check if user behavior improved (scroll depth, click patterns)",
+            "  - CRO analysis: identify where users drop off, what they click/ignore",
+            "  - A/B test validation: compare session recordings before/after changes",
+            "  - Form optimization: see where users abandon the form",
+            "  - Correlate with Google Ads: match ad clicks → landing page behavior → conversions",
+        ])
+
+    # Inject active role prompt — prefer evolved skill file over static prompt
     if role_obj.id != "director":
         system_parts.append(f"\n=== YOUR ACTIVE ROLE: {role_obj.name} ===")
         system_parts.append(f"Specialty: {role_obj.specialty}")
-        system_parts.append(role_obj.system_prompt)
+
+        # Try loading evolved skill file for this account
+        evolved_skill = None
+        if account_id:
+            try:
+                from app.services.skill_loader import load_skill
+                evolved_skill = load_skill(account_id, role_obj.id)
+            except Exception:
+                pass
+
+        if evolved_skill:
+            system_parts.append(f"\n=== EVOLVED SKILL (learned from this account's history) ===")
+            system_parts.append(evolved_skill)
+        else:
+            system_parts.append(role_obj.system_prompt)
+
         system_parts.append(f"\nYou are responding as the {role_obj.name}. Sign your analysis with your role perspective.")
 
     # Assemble the base system prompt (P0 — always included)
@@ -920,6 +1029,8 @@ async def stream_agent_response(
     layers = [
         LayerAllocation("system_base", system_prompt_base, priority=P_CRITICAL),
         LayerAllocation("campaign_memory", f"\n=== CAMPAIGN MEMORY (decisions, facts, role notes) ===\n{campaign_memory_ctx}" if campaign_memory_ctx else "", priority=P_IMPORTANT),
+        LayerAllocation("outcome_history", outcome_ctx if outcome_ctx else "", priority=P_IMPORTANT),
+        LayerAllocation("chronicle", f"\n=== CAMPAIGN CHRONICLE (complete history) ===\n{chronicle_ctx}" if chronicle_ctx else "", priority=P_IMPORTANT),
         LayerAllocation("business_context", f"\n=== BUSINESS CONTEXT ===\n{business_ctx}" if business_ctx else "", priority=P_IMPORTANT),
         LayerAllocation("guidelines", f"\n=== CAMPAIGN GUIDELINES ===\n{guidelines}" if guidelines else "", priority=P_IMPORTANT),
         LayerAllocation("checkpoint_history", checkpoint_ctx, priority=P_NICE_TO_HAVE),
@@ -1151,6 +1262,8 @@ async def stream_agent_response(
     thread = threading.Thread(target=_run_cli, daemon=True)
     thread.start()
 
+    detected_actions: list[dict] = []  # Track tool calls for outcome recording
+
     try:
         while True:
             try:
@@ -1159,11 +1272,32 @@ async def stream_agent_response(
                 continue
             if event is None:
                 break
+            # Detect trackable tool executions for outcome recording
+            if event.get("type") == "tool_call" and event.get("source") == "google-ads-mcp":
+                from app.services.outcome_tracker import detect_action_from_tool
+                action = detect_action_from_tool(event.get("name", ""), event.get("input", {}))
+                if action:
+                    detected_actions.append({"type": action[0], "detail": action[1], "input": event.get("input", {})})
             yield event
             if event.get("type") in ("done", "error"):
                 break
     except Exception as e:
         yield {"type": "error", "message": str(e)}
+
+    # ── Record detected actions as recommendations for outcome tracking ──
+    if detected_actions and account_id and campaign_id:
+        from app.services.outcome_tracker import record_recommendation
+        for action in detected_actions:
+            try:
+                await record_recommendation(
+                    account_id=account_id,
+                    campaign_id=campaign_id,
+                    action_type=action["type"],
+                    action_detail=action["detail"],
+                    conversation_id=conversation_id,
+                )
+            except Exception as e:
+                logger.warning("Failed to record recommendation: %s", e)
 
     # ── Auto-summarize for Layer 4 (if response was substantial) ──
     response_text = "".join(full_response_text)
@@ -1197,6 +1331,22 @@ async def stream_agent_response(
             await _save_session_summary(conversation_id, campaign_id, campaign_name, summary[:800])
         except Exception:
             pass
+
+    # ── Auto-update chronicle (long-term structured timeline) ──
+    if len(response_text) > 500 and account_id and campaign_id:
+        try:
+            from app.services.chronicle import update_chronicle
+            await update_chronicle(
+                account_id=account_id,
+                campaign_id=campaign_id,
+                campaign_name=campaign_name,
+                role_name=role_obj.name if role_obj else "Agent",
+                user_question=user_message,
+                agent_response=response_text,
+                tool_calls=[{"name": a["type"]} for a in detected_actions] if detected_actions else None,
+            )
+        except Exception as e:
+            logger.warning("Chronicle update failed: %s", e)
 
     # ── Auto-save to campaign memory (persistent across sessions) ──
     if len(response_text) > 300 and account_id and campaign_id:

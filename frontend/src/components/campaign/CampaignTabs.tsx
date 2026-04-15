@@ -5,6 +5,7 @@ import AdList from './AdList';
 import SearchTermManager from './SearchTermManager';
 import LandingPageAnalyzer from './LandingPageAnalyzer';
 import GuidelinesViewer from '@/components/guidelines/GuidelinesViewer';
+import MemoryExplorer from '@/components/memory/MemoryExplorer';
 import { formatBiddingStrategy } from '@/lib/formatters';
 import type { Campaign } from '@/types';
 
@@ -31,6 +32,7 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
           <TabsTrigger value="ads">Ads</TabsTrigger>
           <TabsTrigger value="landing-page">Landing Page</TabsTrigger>
           <TabsTrigger value="guidelines">Guidelines</TabsTrigger>
+          <TabsTrigger value="memory">Memory</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -55,6 +57,10 @@ export default function CampaignTabs({ campaign, accountId }: CampaignTabsProps)
 
         <TabsContent value="guidelines" className="mt-4">
           <GuidelinesViewer />
+        </TabsContent>
+
+        <TabsContent value="memory" className="mt-4">
+          <MemoryExplorer campaignId={campaign.id} />
         </TabsContent>
       </Tabs>
     </div>

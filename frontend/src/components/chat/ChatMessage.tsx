@@ -175,9 +175,14 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
           'rounded-lg px-4 py-3 text-sm leading-relaxed',
           isUser
             ? 'max-w-[85%] bg-primary text-primary-foreground'
-            : 'w-full bg-secondary/40 text-foreground'
+            : 'w-full bg-secondary/40 text-foreground',
+          message.isPending && 'opacity-60 animate-pulse'
         )}
       >
+        {/* Queued badge for pending messages */}
+        {message.isPending && isUser && (
+          <span className="text-[10px] font-medium opacity-70 block mb-1">Queued</span>
+        )}
         {/* Role badge for assistant messages */}
         {!isUser && roleName && (
           <div className="flex items-center gap-1.5 mb-2.5 -mt-0.5">

@@ -17,7 +17,7 @@ CHARS_PER_TOKEN = 4
 # Model context windows (input tokens)
 MODEL_CONTEXT_LIMITS = {
     "claude-sonnet-4-6": 200_000,
-    "claude-opus-4-6": 200_000,
+    "claude-opus-4-6": 1_000_000,
     "claude-haiku-4-5-20251001": 200_000,
 }
 
@@ -83,8 +83,16 @@ class BudgetResult:
 
     @property
     def usage_percent(self) -> int:
-        """Usage as integer percentage (0-100)."""
-        return int(self.usage_ratio * 100)
+        """Usage as integer percentage (0-100).
+
+        For large context models (1M), use a practical ceiling so the bar
+        actually shows meaningful progress. 100K is a practical limit for
+        a single conversation turn's context.
+        """
+        practical_ceiling = min(self.budget, 100_000)
+        if practical_ceiling <= 0:
+            return 0
+        return min(100, int((self.total_tokens / practical_ceiling) * 100))
 
 
 def allocate_budget(layers: list[LayerAllocation], budget: TokenBudget) -> BudgetResult:

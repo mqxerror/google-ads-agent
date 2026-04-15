@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft } from 'lucide-react';
+import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
@@ -16,13 +16,23 @@ export default function ChatPanel() {
   const { chatPanelWidth, setChatPanelWidth, selectedCampaignId } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isResponding, setIsResponding] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationIdRaw] = useState<string | null>(() => {
+    // Restore conversation from sessionStorage on mount
+    const saved = sessionStorage.getItem('activeConversationId');
+    return saved || null;
+  });
+  const setConversationId = useCallback((id: string | null) => {
+    if (id) sessionStorage.setItem('activeConversationId', id);
+    else sessionStorage.removeItem('activeConversationId');
+    setConversationIdRaw(id);
+  }, []);
   const [expanded, setExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMeta, setContextMeta] = useState<ContextMetaData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
   const ACCOUNT_ID = useClientAccountId();
 
@@ -62,12 +72,16 @@ export default function ChatPanel() {
     }
   }, []);
 
-  // Auto-load last conversation for current campaign
+  // Auto-load conversation: restore from session or pick the most recent
   useEffect(() => {
-    if (conversations.length > 0 && !conversationId) {
+    if (conversationId && messages.length === 0) {
+      // Restored from sessionStorage but messages not loaded yet
+      loadConversation(conversationId);
+    } else if (conversations.length > 0 && !conversationId) {
+      // No active conversation — load the most recent one
       loadConversation(conversations[0].id);
     }
-  }, [conversations, conversationId, loadConversation]);
+  }, [conversations, conversationId, messages.length, loadConversation]);
 
   // Reconnect to running agent after page refresh
   useEffect(() => {
@@ -132,13 +146,21 @@ export default function ChatPanel() {
     return () => { cancelled = true; };
   }, [conversationId]);
 
-  // Reset when campaign changes
+  // When campaign changes, clear messages but let auto-load pick the right conversation
   useEffect(() => {
-    setConversationId(null);
     setMessages([]);
     setShowHistory(false);
     setSearchQuery('');
-  }, [selectedCampaignId]);
+    setContextMeta(null); // Reset context badge for the new campaign
+    // Don't clear conversationId — let the auto-load effect below handle it
+    // Only clear if switching to a DIFFERENT campaign (not just refreshing)
+    const savedCampaign = sessionStorage.getItem('activeCampaignId');
+    if (selectedCampaignId !== savedCampaign) {
+      setConversationId(null);
+      if (selectedCampaignId) sessionStorage.setItem('activeCampaignId', selectedCampaignId);
+      else sessionStorage.removeItem('activeCampaignId');
+    }
+  }, [selectedCampaignId, setConversationId]);
 
   // Create new conversation
   const handleNewConversation = useCallback(async () => {
@@ -164,9 +186,56 @@ export default function ChatPanel() {
     refetchConversations();
   }, [conversationId, refetchConversations]);
 
+  // Export conversation as markdown
+  const handleExportChat = useCallback(() => {
+    if (messages.length === 0) return;
+    const title = campaign?.name || 'Chat';
+    const date = new Date().toISOString().slice(0, 10);
+    const lines = [
+      `# ${title}`,
+      `Exported: ${date}`,
+      `Messages: ${messages.length}`,
+      '',
+      '---',
+      '',
+    ];
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        lines.push(`## User`);
+      } else {
+        const role = msg.agentRoleName || 'Assistant';
+        lines.push(`## ${role}`);
+      }
+      lines.push('');
+      lines.push(msg.content);
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        lines.push('');
+        lines.push(`> ${msg.toolCalls.length} tool call(s): ${msg.toolCalls.map(t => t.name).join(', ')}`);
+      }
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9-_ ]/g, '')}_${date}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages, campaign?.name]);
+
   // Ensure conversation exists for sending
   const ensureConversation = useCallback(async (): Promise<string> => {
-    if (conversationId) return conversationId;
+    // Verify existing conversation still exists (may have been deleted)
+    if (conversationId) {
+      try {
+        const check = await fetch(`/api/conversations/${conversationId}/messages`);
+        if (check.ok) return conversationId;
+      } catch {}
+      // Conversation is gone — clear stale ID and create new
+      setConversationId(null);
+    }
     const conv = await createConversation({
       account_id: ACCOUNT_ID,
       campaign_id: selectedCampaignId || undefined,
@@ -176,7 +245,7 @@ export default function ChatPanel() {
     setConversationId(conv.id);
     refetchConversations();
     return conv.id;
-  }, [conversationId, ACCOUNT_ID, selectedCampaignId, campaign?.name, refetchConversations]);
+  }, [conversationId, ACCOUNT_ID, selectedCampaignId, campaign?.name, refetchConversations, setConversationId]);
 
   // Resize handling
   const handleMouseDown = useCallback(
@@ -201,23 +270,64 @@ export default function ChatPanel() {
     [chatPanelWidth, setChatPanelWidth]
   );
 
-  // Send message
+  // Message queue — allows sending while agent is working
+  const [messageQueue, setMessageQueue] = useState<Array<{text: string, model: ModelId, roleId?: string, attachments?: Attachment[]}>>([]);
+
+  // Drain queue when agent finishes
+  useEffect(() => {
+    if (!isResponding && messageQueue.length > 0) {
+      const next = messageQueue[0];
+      setMessageQueue((prev) => prev.slice(1));
+      // Remove pending flag from the queued message
+      setMessages((prev) => prev.map((m) => m.isPending ? { ...m, isPending: false } : m));
+      actualSend(next.text, next.model, next.roleId, next.attachments);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isResponding, messageQueue.length]);
+
+  // Send message (queues if agent is busy)
   const handleSend = useCallback(
+    (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
+      if (isResponding) {
+        // Queue the message — show it in chat with pending state
+        const queuedMsg: ChatMessage = {
+          id: `msg-${Date.now()}-q`,
+          role: 'user',
+          content: text,
+          createdAt: new Date().toISOString(),
+          isPending: true,
+        };
+        setMessages((prev) => [...prev, queuedMsg]);
+        setMessageQueue((prev) => [...prev, { text, model, roleId, attachments }]);
+        return;
+      }
+      actualSend(text, model, roleId, attachments);
+    },
+    [isResponding],
+  );
+
+  // Actual send (creates conversation, streams response)
+  const actualSend = useCallback(
     async (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
-      const userMsg: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        role: 'user',
-        content: text,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
+      // Add user message if not already shown (queued messages are already in chat)
+      setMessages((prev) => {
+        const alreadyShown = prev.some((m) => m.role === 'user' && m.content === text && !m.isPending);
+        if (alreadyShown) return prev;
+        // Check if there's a pending version to unflag
+        const hasPending = prev.some((m) => m.isPending && m.content === text);
+        if (hasPending) return prev.map((m) => m.isPending && m.content === text ? { ...m, isPending: false } : m);
+        return [...prev, { id: `msg-${Date.now()}`, role: 'user' as const, content: text, createdAt: new Date().toISOString() }];
+      });
       setIsResponding(true);
 
       try {
         const convId = await ensureConversation();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
         const res = await fetch(`/api/conversations/${convId}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             content: text,
             account_id: ACCOUNT_ID,
@@ -310,15 +420,24 @@ export default function ChatPanel() {
           }
         }
       } catch (err) {
-        setMessages((prev) => [...prev, {
-          id: `msg-${Date.now()}-err`, role: 'assistant',
-          content: `**Connection error:** ${err instanceof Error ? err.message : 'Unknown error'}`,
-          createdAt: new Date().toISOString(),
-        }]);
+        // AbortError is expected when user clicks Stop — don't show as error
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantMsgId
+              ? { ...m, content: assistantText + '\n\n> Agent stopped by user.' }
+              : m
+          ));
+        } else {
+          setMessages((prev) => [...prev, {
+            id: `msg-${Date.now()}-err`, role: 'assistant',
+            content: `**Connection error:** ${err instanceof Error ? err.message : 'Unknown error'}`,
+            createdAt: new Date().toISOString(),
+          }]);
+        }
       } finally {
+        abortControllerRef.current = null;
         setIsResponding(false);
         // Sweep: any tool calls still 'pending' when the stream ends are stuck/interrupted.
-        // Mark them as error so the user sees they didn't complete.
         setMessages((prev) => prev.map((m) => ({
           ...m,
           toolCalls: m.toolCalls?.map((tc) => tc.status === 'pending' ? { ...tc, status: 'error' as const } : tc),
@@ -332,16 +451,31 @@ export default function ChatPanel() {
   const handleSendRef = useRef(handleSend);
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
+  // Listen for 'chat:display' — switch to a specific conversation (no message sending)
   useEffect(() => {
-    const handler = (e: Event) => {
+    const displayHandler = (e: Event) => {
+      const { conversationId: convId } = (e as CustomEvent).detail || {};
+      if (convId) {
+        setConversationId(convId);
+        setMessages([]);
+        fetchMessages(convId).then(setMessages).catch(() => {});
+        refetchConversations();
+      }
+    };
+    // chat:send — send a message via the normal streaming path
+    const sendHandler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.text) {
         handleSendRef.current(detail.text, detail.model || 'opus', detail.roleId);
       }
     };
-    window.addEventListener('chat:send', handler);
-    return () => window.removeEventListener('chat:send', handler);
-  }, []);
+    window.addEventListener('chat:display', displayHandler);
+    window.addEventListener('chat:send', sendHandler);
+    return () => {
+      window.removeEventListener('chat:display', displayHandler);
+      window.removeEventListener('chat:send', sendHandler);
+    };
+  }, [setConversationId, refetchConversations]);
 
   const panelWidth = expanded ? Math.max(chatPanelWidth, 700) : chatPanelWidth;
 
@@ -380,9 +514,14 @@ export default function ChatPanel() {
               <Plus className="h-3.5 w-3.5" />
             </button>
             {conversationId && (
-              <button onClick={() => handleDeleteConversation(conversationId)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Delete conversation">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <>
+                <button onClick={handleExportChat} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Export chat as Markdown">
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={() => handleDeleteConversation(conversationId)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Delete conversation">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
             )}
             <button onClick={() => setExpanded(!expanded)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title={expanded ? 'Collapse' : 'Expand'}>
               {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -505,10 +644,22 @@ export default function ChatPanel() {
             messageCount: c.messageCount || 0,
           }))}
           onStop={async () => {
+            // 1. Abort the SSE fetch stream immediately
+            if (abortControllerRef.current) {
+              abortControllerRef.current.abort();
+              abortControllerRef.current = null;
+            }
+            // 2. Kill the backend subprocess
             if (conversationId) {
               try { await stopAgentTask(conversationId); } catch {}
-              setIsResponding(false);
             }
+            // 3. Reset UI state
+            setIsResponding(false);
+            // 4. Mark any pending tool calls as stopped
+            setMessages((prev) => prev.map((m) => ({
+              ...m,
+              toolCalls: m.toolCalls?.map((tc) => tc.status === 'pending' ? { ...tc, status: 'error' as const } : tc),
+            })));
           }}
         />
       </div>

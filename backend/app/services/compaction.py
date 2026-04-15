@@ -219,9 +219,9 @@ async def _generate_summary(messages: list[dict]) -> str | None:
 
         cmd = [
             node_path, str(cli_js),
-            "--print", "--output-format", "stream-json",
+            "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
-            "--model", "claude-haiku-4-5-20251001",
+            "--model", "claude-sonnet-4-6",
             "--permission-mode", "bypassPermissions",
         ]
 

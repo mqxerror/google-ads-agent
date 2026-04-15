@@ -165,7 +165,6 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed && attachments.length === 0) return;
-    if (disabled) return;
 
     // Check for /role_name at start of message → override role for this message
     const slashMatch = trimmed.match(/^\/(\w+)\s+(.*)/s);
@@ -185,7 +184,7 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, disabled, onSend, model, activeRole, roles, attachments]);
+  }, [value, onSend, model, activeRole, roles, attachments]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -549,7 +548,7 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
           variant="ghost"
           className="h-9 w-9 shrink-0 self-end"
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || uploading}
+          disabled={uploading}
           title="Attach file"
         >
           <Paperclip className="h-4 w-4" />
@@ -560,12 +559,11 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
           onChange={(e) => { setValue(e.target.value); handleInput(); }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          disabled={disabled}
-          placeholder="Ask about this campaign... (paste images with Cmd+V)"
+          placeholder={disabled ? "Type to queue next message..." : "Ask about this campaign... (paste images with Cmd+V)"}
           rows={1}
-          className="flex-1 resize-none bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          className="flex-1 resize-none bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         />
-        {disabled && onStop ? (
+        {disabled && onStop && (
           <Button
             size="icon"
             variant="destructive"
@@ -575,16 +573,16 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
           >
             <Square className="h-4 w-4 fill-current" />
           </Button>
-        ) : (
-          <Button
-            size="icon"
-            className="h-9 w-9 shrink-0"
-            disabled={disabled || (!value.trim() && attachments.length === 0)}
-            onClick={handleSend}
-          >
-            <SendHorizonal className="h-4 w-4" />
-          </Button>
         )}
+        <Button
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          disabled={!value.trim() && attachments.length === 0}
+          onClick={handleSend}
+          title={disabled ? "Queue message" : "Send message"}
+        >
+          <SendHorizonal className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

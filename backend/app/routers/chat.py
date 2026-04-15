@@ -209,6 +209,7 @@ async def send_message(
             async for event in stream_agent_response(
                 user_message=body.content,
                 account_id=account_id,
+                campaign_id=campaign_id,
                 campaign_name=campaign_name,
                 conversation_id=conv_id,
                 base_guidelines=base_guidelines,
@@ -294,6 +295,84 @@ async def stop_agent_task(conversation_id: str) -> dict:
     """Abort a running agent subprocess for this conversation."""
     stopped = stop_agent(conversation_id)
     return {"stopped": stopped}
+
+
+@router.get("/accounts/{account_id}/conversation-graph")
+async def get_conversation_graph(account_id: str) -> dict:
+    """Build a conversation graph: campaigns → conversations → decisions."""
+    db = await get_db()
+    try:
+        # Get all conversations for this account
+        cur = await db.execute(
+            """SELECT c.id, c.campaign_id, c.campaign_name, c.title, c.created_at, c.updated_at,
+                      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count
+               FROM conversations c WHERE c.account_id = ?
+               ORDER BY c.updated_at DESC LIMIT 50""",
+            (account_id,),
+        )
+        conversations = [dict(r) for r in await cur.fetchall()]
+
+        # Get decisions linked to conversations
+        cur = await db.execute(
+            """SELECT id, campaign_id, conversation_id, action, reason, outcome, role, created_at
+               FROM decision_log WHERE account_id = ?
+               ORDER BY created_at DESC LIMIT 100""",
+            (account_id,),
+        )
+        decisions = [dict(r) for r in await cur.fetchall()]
+
+        # Get distinct roles used
+        cur = await db.execute(
+            """SELECT DISTINCT agent_role, agent_role_name FROM messages
+               WHERE conversation_id IN (SELECT id FROM conversations WHERE account_id = ?)
+               AND agent_role IS NOT NULL AND agent_role != ''""",
+            (account_id,),
+        )
+        roles_used = [{"id": r["agent_role"], "name": r["agent_role_name"]} for r in await cur.fetchall()]
+
+        # Get recommendations with outcomes
+        cur = await db.execute(
+            """SELECT id, campaign_id, conversation_id, action_type, action_detail, outcome, status, executed_at
+               FROM recommendations WHERE account_id = ?
+               ORDER BY executed_at DESC LIMIT 50""",
+            (account_id,),
+        )
+        recommendations = [dict(r) for r in await cur.fetchall()]
+
+        # Group by campaign
+        campaigns: dict[str | None, dict] = {}
+        for conv in conversations:
+            camp_id = conv["campaign_id"]
+            if camp_id not in campaigns:
+                campaigns[camp_id] = {
+                    "campaign_id": camp_id,
+                    "campaign_name": conv["campaign_name"] or "General",
+                    "conversations": [],
+                    "decision_count": 0,
+                }
+            campaigns[camp_id]["conversations"].append({
+                "id": conv["id"],
+                "title": conv["title"],
+                "created_at": conv["created_at"],
+                "updated_at": conv["updated_at"],
+                "message_count": conv["message_count"],
+                "decisions": [d for d in decisions if d.get("conversation_id") == conv["id"]],
+                "recommendations": [r for r in recommendations if r.get("conversation_id") == conv["id"]],
+            })
+            campaigns[camp_id]["decision_count"] += len([d for d in decisions if d.get("conversation_id") == conv["id"]])
+
+        return {
+            "campaigns": list(campaigns.values()),
+            "stats": {
+                "total_conversations": len(conversations),
+                "total_decisions": len(decisions),
+                "total_recommendations": len(recommendations),
+                "roles_used": roles_used,
+                "campaigns_count": len([c for c in campaigns if c is not None]),
+            },
+        }
+    finally:
+        await db.close()
 
 
 @router.get("/conversations/{conversation_id}/context-usage")

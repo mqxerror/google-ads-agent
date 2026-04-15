@@ -7,9 +7,11 @@ import { formatMicros, formatNumber, formatBiddingStrategy } from '@/lib/formatt
 import CampaignTabs from '@/components/campaign/CampaignTabs';
 import CampaignBuilder from '@/components/campaign/CampaignBuilder';
 import CampaignActivityFeed from '@/components/dashboard/CampaignActivityFeed';
+import OutcomeDashboard from '@/components/dashboard/OutcomeDashboard';
+import ConversationGraph from '@/components/dashboard/ConversationGraph';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2, Rocket } from 'lucide-react';
+import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2, Rocket, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Campaign } from '@/types';
 
@@ -18,6 +20,7 @@ function AccountOverview({ onOpenBuilder }: { onOpenBuilder?: () => void }) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [campaignFilter, setCampaignFilter] = useState<'active' | 'paused' | 'all'>('active');
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ['campaigns', clientAccountId],
@@ -88,34 +91,74 @@ function AccountOverview({ onOpenBuilder }: { onOpenBuilder?: () => void }) {
         </div>
       </div>
 
-      {/* Bulk action bar */}
-      {selected.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 bg-secondary/50 rounded-lg px-4 py-2">
-          <span className="text-xs font-medium">{selected.size} selected</span>
-          <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => handleBulkAction('PAUSED')} disabled={bulkLoading}>
-            {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3" />}
-            Pause Selected
-          </Button>
-          <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => handleBulkAction('ENABLED')} disabled={bulkLoading}>
-            {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-            Enable Selected
-          </Button>
-          <button className="text-xs text-muted-foreground hover:text-foreground ml-auto" onClick={() => setSelected(new Set())}>
-            Clear
-          </button>
+      {/* Agent Performance + Conversation Map — above campaigns */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <OutcomeDashboard />
         </div>
-      )}
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-semibold">Conversation Map</h3>
+          </div>
+          <ConversationGraph />
+        </div>
+      </div>
 
-      <h3 className="text-sm font-medium text-muted-foreground mb-3">{campaigns.length} Campaigns</h3>
+      {/* Campaign filter + bulk actions */}
+      <div className="flex items-center gap-3 mb-3">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+        {(['active', 'paused', 'all'] as const).map((f) => {
+          const count = f === 'active' ? campaigns.filter(c => c.status === 'ENABLED').length
+            : f === 'paused' ? campaigns.filter(c => c.status === 'PAUSED').length
+            : campaigns.length;
+          return (
+            <button
+              key={f}
+              onClick={() => setCampaignFilter(f)}
+              className={cn(
+                'text-xs px-2.5 py-1 rounded-full transition-colors',
+                campaignFilter === f
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {f === 'active' ? 'Active' : f === 'paused' ? 'Paused' : 'All'} ({count})
+            </button>
+          );
+        })}
+
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs font-medium">{selected.size} selected</span>
+            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => handleBulkAction('PAUSED')} disabled={bulkLoading}>
+              {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3" />}
+              Pause
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => handleBulkAction('ENABLED')} disabled={bulkLoading}>
+              {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              Enable
+            </Button>
+            <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setSelected(new Set())}>Clear</button>
+          </div>
+        )}
+      </div>
+
+      {/* Filtered campaign list */}
       <div className="space-y-2">
-        {campaigns.map((c) => (
-          <CampaignRow
-            key={c.id}
-            campaign={c}
-            isSelected={selected.has(c.id)}
-            onToggleSelect={() => toggleSelect(c.id)}
-          />
-        ))}
+        {campaigns
+          .filter((c) => {
+            if (campaignFilter === 'active') return c.status === 'ENABLED';
+            if (campaignFilter === 'paused') return c.status === 'PAUSED';
+            return true;
+          })
+          .map((c) => (
+            <CampaignRow
+              key={c.id}
+              campaign={c}
+              isSelected={selected.has(c.id)}
+              onToggleSelect={() => toggleSelect(c.id)}
+            />
+          ))}
       </div>
 
       {/* Campaign Activity Feed */}

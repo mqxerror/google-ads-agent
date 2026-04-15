@@ -173,16 +173,17 @@ export default function CampaignActivityFeed() {
                     </span>
                   </div>
                 </div>
-                <button
+                <span
+                  role="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedCampaign(campaign.campaign_id);
                   }}
-                  className="p-1.5 rounded hover:bg-primary/10 transition-colors shrink-0"
+                  className="p-1.5 rounded hover:bg-primary/10 transition-colors shrink-0 cursor-pointer"
                   title="Open campaign"
                 >
                   <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+                </span>
               </button>
 
               {/* Expanded activity timeline */}

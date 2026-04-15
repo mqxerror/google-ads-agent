@@ -113,19 +113,66 @@ def load_memory_index(account_id: str, campaign_id: str) -> str:
     return ""
 
 
-def load_decisions(account_id: str, campaign_id: str, limit: int = 20) -> str:
-    """Load the most recent decisions from the decision log."""
+def load_decisions(account_id: str, campaign_id: str, limit: int | None = None) -> str:
+    """Load ALL decisions with tiered compression.
+
+    Recent 20: full table rows (detailed)
+    Older: compressed by month ("March 2026 (8 decisions): key actions...")
+    """
     d = _campaign_dir(account_id, campaign_id)
     decisions_file = d / "decisions.md"
     if not decisions_file.exists():
         return ""
     content = decisions_file.read_text(encoding="utf-8")
     lines = content.strip().split("\n")
-    # Keep header (first 5 lines) + last N decision rows
     header = lines[:5]
     data_lines = [l for l in lines[5:] if l.strip().startswith("|")]
-    recent = data_lines[-limit:] if len(data_lines) > limit else data_lines
-    return "\n".join(header + recent)
+
+    if not data_lines:
+        return "\n".join(header)
+
+    # If limit is set (legacy callers), use the old behavior
+    if limit is not None:
+        recent = data_lines[-limit:] if len(data_lines) > limit else data_lines
+        return "\n".join(header + recent)
+
+    # Tiered: recent 20 detailed, older compressed by month
+    recent_count = 20
+    if len(data_lines) <= recent_count:
+        return "\n".join(header + data_lines)
+
+    recent = data_lines[-recent_count:]
+    older = data_lines[:-recent_count]
+
+    # Compress older decisions by month
+    months: dict[str, list[str]] = {}
+    for row in older:
+        cells = row.split("|")
+        if len(cells) >= 3:
+            date_str = cells[1].strip()
+            # Extract month-year (e.g., "2026-04" from "2026-04-13 15:30")
+            month_key = date_str[:7] if len(date_str) >= 7 else "Unknown"
+            action = cells[2].strip() if len(cells) > 2 else ""
+            if month_key not in months:
+                months[month_key] = []
+            months[month_key].append(action)
+
+    compressed_parts = ["\n## Historical Decisions (compressed)"]
+    for month_key in sorted(months.keys()):
+        actions = months[month_key]
+        # Summarize: take first 4 unique actions
+        unique_actions = list(dict.fromkeys(actions))[:4]
+        summary = ", ".join(unique_actions)
+        try:
+            from datetime import datetime as dt
+            month_label = dt.strptime(month_key, "%Y-%m").strftime("%B %Y")
+        except (ValueError, TypeError):
+            month_label = month_key
+        compressed_parts.append(f"- **{month_label}** ({len(actions)} decisions): {summary}")
+
+    compressed_parts.append("\n## Recent Decisions (last 20)")
+
+    return "\n".join(header + compressed_parts + recent)
 
 
 def load_pinned_facts(account_id: str, campaign_id: str) -> str:
@@ -382,11 +429,19 @@ def build_campaign_context(
     if decisions and decisions.strip().count("|") > 10:  # More than just the header
         parts.append(decisions)
 
-    # Role-specific notes
-    if active_role:
-        role_notes = load_role_notes(account_id, campaign_id, active_role)
-        if role_notes:
-            parts.append(role_notes)
+    # ALL role notes — every role sees every other role's findings
+    # This is critical for cross-role knowledge sharing
+    role_dir = _campaign_dir(account_id, campaign_id) / "role_notes"
+    if role_dir.exists():
+        for role_file in sorted(role_dir.glob("*.md")):
+            role_id = role_file.stem
+            notes = role_file.read_text(encoding="utf-8")
+            if notes and len(notes) > 50:
+                if role_id == active_role:
+                    parts.append(f"=== YOUR PREVIOUS FINDINGS — CONTINUE FROM HERE ===\n{notes}")
+                else:
+                    label = role_id.replace('_', ' ').upper()
+                    parts.append(f"=== FINDINGS FROM {label} ===\n{notes}")
 
     # Account-wide insights
     account_mem = load_account_memory(account_id)

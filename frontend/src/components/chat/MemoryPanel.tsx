@@ -117,9 +117,21 @@ export default function MemoryPanel({ campaignId, campaignName }: MemoryPanelPro
           ) : (
             <div className="space-y-0.5">
               {factLines.map((fact, i) => (
-                <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                <div key={i} className="flex items-start gap-1.5 text-[11px] group">
                   <Pin className="h-2.5 w-2.5 mt-0.5 text-blue-400 shrink-0" />
-                  <span>{fact}</span>
+                  <span className="flex-1">{fact}</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await fetch(`/api/accounts/${accountId}/campaigns/${campaignId}/memory/pinned-facts/${i}`, { method: 'DELETE' });
+                        loadMemory();
+                      } catch {}
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
+                    title="Remove pinned fact"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
                 </div>
               ))}
             </div>

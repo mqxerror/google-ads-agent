@@ -101,7 +101,7 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
 
           {/* Details dropdown */}
           {showDetails && (
-            <div className="absolute top-full left-0 mt-1 z-50 w-72 bg-popover border border-border rounded-lg shadow-lg p-3 space-y-2">
+            <div className="absolute top-full left-0 mt-1 z-[999] w-72 bg-popover border border-border rounded-lg shadow-xl p-3 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Context usage</span>
                 <span className="font-medium">

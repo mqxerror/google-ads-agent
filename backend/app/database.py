@@ -401,7 +401,91 @@ async def init_db() -> None:
         version = await _get_schema_version(db)
         if version < 2:
             await _migrate_v1_to_v2(db)
-        else:
-            logger.info("Database schema is V2 (up to date).")
+
+        # V3: Context management tables (idempotent)
+        # V4: Outcome tracking tables
+        if version < 4:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS recommendations (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT NOT NULL,
+                    conversation_id TEXT,
+                    action_type TEXT NOT NULL,
+                    action_detail TEXT NOT NULL,
+                    baseline_metrics_json TEXT,
+                    status TEXT DEFAULT 'executed',
+                    outcome TEXT,
+                    outcome_delta_json TEXT,
+                    measured_at TEXT,
+                    executed_at TEXT DEFAULT (datetime('now')),
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_rec_campaign ON recommendations(account_id, campaign_id, status);
+                CREATE INDEX IF NOT EXISTS idx_rec_status ON recommendations(status, executed_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (4)")
+            await db.commit()
+            logger.info("V4 migration complete (recommendations table).")
+
+        if version < 3:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS conversation_checkpoints (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    checkpoint_number INTEGER NOT NULL,
+                    summary TEXT NOT NULL,
+                    messages_compressed INTEGER DEFAULT 0,
+                    tokens_saved INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+                    UNIQUE(conversation_id, checkpoint_number)
+                );
+                CREATE INDEX IF NOT EXISTS idx_checkpoints_conv
+                    ON conversation_checkpoints(conversation_id, checkpoint_number);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (3)")
+            await db.commit()
+            logger.info("V3 migration complete (conversation_checkpoints).")
+
+        # V5: Skill evolution tables
+        if version < 5:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS skill_versions (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    role_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    score REAL,
+                    success_rate REAL,
+                    techniques_count INTEGER,
+                    optimization_notes TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    UNIQUE(account_id, role_id, version)
+                );
+                CREATE TABLE IF NOT EXISTS skill_optimizations (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    role_id TEXT NOT NULL,
+                    from_version INTEGER,
+                    to_version INTEGER,
+                    changes_summary TEXT,
+                    score_before REAL,
+                    score_after REAL,
+                    status TEXT DEFAULT 'applied',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_skill_versions_role
+                    ON skill_versions(account_id, role_id, version);
+                CREATE INDEX IF NOT EXISTS idx_skill_optimizations_role
+                    ON skill_optimizations(account_id, role_id, created_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (5)")
+            await db.commit()
+            logger.info("V5 migration complete (skill evolution tables).")
+
+        if version >= 5:
+            logger.info("Database schema is V5 (up to date).")
     finally:
         await db.close()

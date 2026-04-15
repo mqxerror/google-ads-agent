@@ -10,6 +10,7 @@ import CommandPalette from '@/components/CommandPalette';
 import SetupWizard from '@/components/setup/SetupWizard';
 import AgencyDashboard from '@/components/dashboard/AgencyDashboard';
 import SettingsPage from '@/components/settings/SettingsPage';
+import AgentIntelligence from '@/pages/AgentIntelligence';
 import { useAppStore } from '@/stores/appStore';
 import { fetchAccountsV2 } from '@/lib/api';
 
@@ -25,6 +26,7 @@ const queryClient = new QueryClient({
 function MainLayout() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showIntelligence, setShowIntelligence] = useState(false);
   const {
     selectedAccountId,
     showDashboard,
@@ -42,16 +44,27 @@ function MainLayout() {
         // No accounts — show setup
         window.location.assign('/setup');
       } else if (accounts.length === 1) {
-        // Single account — select it directly
-        switchAccount(accounts[0].id);
+        // Single account — always ensure it's selected
+        const current = useAppStore.getState().selectedAccountId;
+        if (current !== accounts[0].id) switchAccount(accounts[0].id);
       } else {
-        // Multiple accounts — show dashboard
-        setShowDashboard(true);
+        // Multiple accounts — show dashboard if no account selected
+        const current = useAppStore.getState().selectedAccountId;
+        if (!current) setShowDashboard(true);
       }
     }).catch(() => {
       // API unavailable — show setup
     });
   }, [setConnectedAccounts, switchAccount, setShowDashboard]);
+
+  // Close intelligence/settings when user selects a campaign from sidebar
+  const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
+  useEffect(() => {
+    if (selectedCampaignId) {
+      setShowIntelligence(false);
+      setShowSettings(false);
+    }
+  }, [selectedCampaignId]);
 
   const showingDashboard = showDashboard || (!selectedAccountId && connectedAccounts.length > 1);
 
@@ -60,16 +73,35 @@ function MainLayout() {
       <Header
         onOpenCommandPalette={() => setCommandOpen(true)}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenIntelligence={() => {
+          const next = !showIntelligence;
+          setShowIntelligence(next);
+          setShowSettings(false);
+          // When opening intelligence, go to home (no campaign selected)
+          if (next) {
+            useAppStore.getState().setSelectedCampaign(null);
+            useAppStore.getState().setShowDashboard(false);
+          }
+        }}
+        intelligenceActive={showIntelligence}
       />
-      {showSettings ? (
-        <SettingsPage onClose={() => setShowSettings(false)} />
-      ) : showingDashboard ? (
+      {showingDashboard ? (
         <AgencyDashboard />
       ) : (
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
-          <ContentArea />
-          <ChatPanel />
+          {showIntelligence ? (
+            <div className="flex-1 overflow-y-auto">
+              <AgentIntelligence onClose={() => setShowIntelligence(false)} />
+            </div>
+          ) : showSettings ? (
+            <SettingsPage onClose={() => setShowSettings(false)} />
+          ) : (
+            <>
+              <ContentArea />
+              <ChatPanel />
+            </>
+          )}
         </div>
       )}
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />

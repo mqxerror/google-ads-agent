@@ -247,6 +247,26 @@ async def add_pinned_fact(account_id: str, campaign_id: str, body: PinnedFactEnt
     return {"status": "pinned"}
 
 
+@router.delete("/accounts/{account_id}/campaigns/{campaign_id}/memory/pinned-facts/{fact_index}")
+async def delete_pinned_fact(account_id: str, campaign_id: str, fact_index: int):
+    """Delete a pinned fact by its index (0-based)."""
+    from app.config import settings
+    path = settings.MEMORY_DIR / account_id / campaign_id / "pinned_facts.md"
+    if not path.exists():
+        return {"status": "not_found"}
+    content = path.read_text(encoding="utf-8")
+    lines = content.split("\n")
+    # Find fact lines (start with "- **")
+    fact_lines = [(i, l) for i, l in enumerate(lines) if l.strip().startswith("- **")]
+    if fact_index < 0 or fact_index >= len(fact_lines):
+        return {"status": "invalid_index"}
+    # Remove the line
+    line_num = fact_lines[fact_index][0]
+    lines.pop(line_num)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return {"status": "deleted", "remaining": len(fact_lines) - 1}
+
+
 @router.put("/accounts/{account_id}/campaigns/{campaign_id}/memory/profile")
 async def update_campaign_profile(account_id: str, campaign_id: str, body: CampaignProfileUpdate):
     campaign_memory.update_profile(account_id, campaign_id, campaign_name=body.campaign_name, goals=body.goals, constraints=body.constraints, phase=body.phase)

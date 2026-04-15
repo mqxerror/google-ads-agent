@@ -298,6 +298,23 @@ async def _sync_loop():
             for account_id in account_ids:
                 try:
                     await sync_account(account_id)
+                    # Measure outcomes for any pending recommendations
+                    try:
+                        from app.services.outcome_tracker import measure_pending_outcomes
+                        measured = await measure_pending_outcomes(account_id)
+                        if measured:
+                            logger.info("Measured %d outcomes for %s", measured, account_id)
+                    except Exception as oe:
+                        logger.warning("Outcome measurement failed for %s: %s", account_id, oe)
+                    # Optimize role skills based on new outcome data
+                    try:
+                        from app.services.skill_optimizer import optimize_all_roles
+                        opt_results = await optimize_all_roles(account_id)
+                        optimized = [r for r in opt_results if r.get("status") == "optimized"]
+                        if optimized:
+                            logger.info("Optimized %d role skills for %s", len(optimized), account_id)
+                    except Exception as se:
+                        logger.warning("Skill optimization failed for %s: %s", account_id, se)
                 except Exception as e:
                     logger.error("Background sync failed for %s: %s", account_id, e)
 

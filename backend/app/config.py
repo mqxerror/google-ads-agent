@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     GTM_MCP_ENABLED: bool = False
     GTM_MCP_COMMAND: str = ""  # Path to compiled binary, e.g. /usr/local/bin/google-tag-manager-mcp
 
+    # Microsoft Clarity MCP (optional — heatmaps, session recordings, behavioral analytics)
+    # Uses @microsoft/clarity-mcp-server (official, npm)
+    # Setup: get API token from Clarity → Settings → Data Export → Generate
+    CLARITY_MCP_ENABLED: bool = False
+    CLARITY_API_TOKEN: str = ""
+
     # Agent auto-continuation — prevents stopping mid-task
     AGENT_MAX_TURNS_PER_SEGMENT: int = 200  # turns per CLI invocation (high = harness mode)
     AGENT_MAX_CONTINUATIONS: int = 5        # auto-resume cycles if 200 isn't enough (up to 1000 total)

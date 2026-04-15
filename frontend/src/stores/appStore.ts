@@ -26,11 +26,12 @@ interface AppState {
 
 const savedDarkMode = localStorage.getItem('darkMode');
 const initialDarkMode = savedDarkMode !== null ? savedDarkMode === 'true' : true;
+const savedAccountId = localStorage.getItem('selectedAccountId');
 // Apply on load before React renders
 if (!initialDarkMode) document.documentElement.classList.add('light');
 
 export const useAppStore = create<AppState>((set) => ({
-  selectedAccountId: null,
+  selectedAccountId: savedAccountId || null,
   selectedCampaignId: null,
   sidebarCollapsed: false,
   chatPanelWidth: 400,
@@ -38,7 +39,10 @@ export const useAppStore = create<AppState>((set) => ({
   connectedAccounts: [],
   showDashboard: false,
 
-  setSelectedAccount: (id) => set({ selectedAccountId: id }),
+  setSelectedAccount: (id) => {
+    if (id) localStorage.setItem('selectedAccountId', id);
+    set({ selectedAccountId: id });
+  },
   setSelectedCampaign: (id) => set({ selectedCampaignId: id }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setChatPanelWidth: (width) => set({ chatPanelWidth: width }),
@@ -50,10 +54,13 @@ export const useAppStore = create<AppState>((set) => ({
       return { darkMode: newDarkMode };
     }),
   setConnectedAccounts: (accounts) => set({ connectedAccounts: accounts }),
-  switchAccount: (id) => set({
-    selectedAccountId: id,
-    selectedCampaignId: null,
-    showDashboard: false,
-  }),
+  switchAccount: (id) => {
+    localStorage.setItem('selectedAccountId', id);
+    set({
+      selectedAccountId: id,
+      selectedCampaignId: null,
+      showDashboard: false,
+    });
+  },
   setShowDashboard: (show) => set({ showDashboard: show }),
 }))

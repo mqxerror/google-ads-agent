@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home } from 'lucide-react';
+import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
+import { cn } from '@/lib/utils';
 import { fetchAccountsV2, removeAccount } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,9 +16,11 @@ import {
 interface HeaderProps {
   onOpenCommandPalette: () => void;
   onOpenSettings?: () => void;
+  onOpenIntelligence?: () => void;
+  intelligenceActive?: boolean;
 }
 
-export default function Header({ onOpenCommandPalette, onOpenSettings }: HeaderProps) {
+export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenIntelligence, intelligenceActive }: HeaderProps) {
   const {
     selectedAccountId,
     selectedCampaignId,
@@ -138,6 +141,11 @@ export default function Header({ onOpenCommandPalette, onOpenSettings }: HeaderP
           <Command className="h-3 w-3" />
           <span>K</span>
         </Button>
+        {onOpenIntelligence && (
+          <Button variant="ghost" size="icon" className={cn("h-8 w-8", intelligenceActive && "bg-primary/10")} onClick={onOpenIntelligence} title={intelligenceActive ? "Back to campaigns" : "Agent Intelligence"}>
+            <Brain className={cn("h-4 w-4", intelligenceActive ? "text-primary" : "text-muted-foreground")} />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleDarkMode}>
           {darkMode ? <Sun className="h-4 w-4 text-muted-foreground" /> : <Moon className="h-4 w-4 text-muted-foreground" />}
         </Button>
