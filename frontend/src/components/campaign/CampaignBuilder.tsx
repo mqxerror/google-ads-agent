@@ -200,10 +200,13 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       let convId = buildConversationId;
 
       if (isFirstStage || !convId) {
-        // Create conversation directly — no React state race
+        // Create conversation with temp campaign ID so role_notes save to the right folder
         const { createConversation } = await import('@/lib/api');
+        const tempCampaignId = loadSaved('build_campaign_id', `build-${sessionId?.slice(0, 8) || Date.now()}`);
         const conv = await createConversation({
           account_id: accountId,
+          campaign_id: tempCampaignId,
+          campaign_name: `Build: ${url || 'New Campaign'}`,
           title: `Campaign Build: ${url || 'New Campaign'}`,
         });
         convId = conv.id;

@@ -38,6 +38,7 @@ class BuildSession(BaseModel):
     current_stage: int = 0
     stages: list[dict] = Field(default_factory=list)
     status: str = "pending"  # pending, running, paused, completed, failed
+    temp_campaign_id: str = ""  # Temp folder ID for storing role_notes during build
 
 
 # In-memory store (simple for v1 — no persistence needed since pipelines are short-lived)
@@ -240,13 +241,25 @@ def _format_attachments(attachments: list[dict]) -> str:
 
 @router.post("/campaigns/build")
 async def create_build_session(body: BuildSessionInput):
-    """Create a new campaign build session and return the pipeline stages."""
+    """Create a new campaign build session and return the pipeline stages.
+
+    Creates a temp campaign folder (build-{session_id}) for memory/role_notes
+    so pipeline status can be tracked via files. After the Director creates
+    the real campaign, the folder gets renamed to the real campaign ID.
+    """
     session_id = str(uuid.uuid4())
+
+    # Create temp memory folder for this build
+    temp_campaign_id = f"build-{session_id[:8]}"
+    temp_dir = settings.MEMORY_DIR / body.account_id / temp_campaign_id
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    (temp_dir / "role_notes").mkdir(exist_ok=True)
     session = BuildSession(
         id=session_id,
         account_id=body.account_id,
         created_at=datetime.now().isoformat(),
         input=body,
+        temp_campaign_id=temp_campaign_id,
         stages=[
             {
                 "stage": s["stage"],
@@ -344,11 +357,33 @@ async def get_pipeline_status_from_memory(account_id: str, campaign_id: str):
         elif first_incomplete is None:
             first_incomplete = stage_num
 
+    # Also check in-memory session status (for builds that haven't been saved to files yet)
+    session_stages = {}
+    for sid, session in _sessions.items():
+        if session.account_id == account_id and (
+            session.temp_campaign_id == campaign_id or campaign_id.startswith("build-")
+        ):
+            for s in session.stages:
+                if s.get("status") == "completed":
+                    session_stages[s["stage"]] = True
+
+    for stage_num in session_stages:
+        if stage_num not in completed_stages:
+            completed_stages.append(stage_num)
+
+    completed_stages.sort()
+    first_incomplete = None
+    for stage_num, _ in STAGE_ROLE_MAP:
+        if stage_num not in completed_stages:
+            first_incomplete = stage_num
+            break
+
     return {
         "completed_stages": completed_stages,
         "next_stage": first_incomplete or (len(STAGE_ROLE_MAP) + 1),
         "total_stages": len(STAGE_ROLE_MAP),
         "all_done": len(completed_stages) == len(STAGE_ROLE_MAP),
+        "temp_campaign_id": campaign_id if campaign_id.startswith("build-") else None,
         "stages": [
             {
                 "stage": stage_num,
@@ -361,3 +396,30 @@ async def get_pipeline_status_from_memory(account_id: str, campaign_id: str):
             for stage_num, role_id in STAGE_ROLE_MAP
         ],
     }
+
+
+@router.post("/campaigns/build/{session_id}/promote/{real_campaign_id}")
+async def promote_build(session_id: str, real_campaign_id: str):
+    """Rename temp build folder to the real campaign ID after creation."""
+    import shutil
+    session = _sessions.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+
+    temp_dir = settings.MEMORY_DIR / session.account_id / session.temp_campaign_id
+    real_dir = settings.MEMORY_DIR / session.account_id / real_campaign_id
+
+    if temp_dir.exists() and not real_dir.exists():
+        shutil.move(str(temp_dir), str(real_dir))
+        return {"status": "promoted", "from": session.temp_campaign_id, "to": real_campaign_id}
+    elif real_dir.exists():
+        # Real dir already exists — merge role_notes
+        src_notes = temp_dir / "role_notes"
+        dst_notes = real_dir / "role_notes"
+        dst_notes.mkdir(exist_ok=True)
+        if src_notes.exists():
+            for f in src_notes.iterdir():
+                shutil.copy2(str(f), str(dst_notes / f.name))
+        shutil.rmtree(str(temp_dir), ignore_errors=True)
+        return {"status": "merged", "into": real_campaign_id}
+    return {"status": "no_temp_dir"}
