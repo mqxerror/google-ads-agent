@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import accounts, activity, campaign_builder, campaigns, chat, guidelines, landing_page, memory, operations, outcomes, search_terms, settings as settings_router, setup, skills, uploads
+from app.routers import accounts, activity, campaign_builder, campaigns, chat, guidelines, landing_page, memory, operations, outcomes, reports, search_terms, settings as settings_router, setup, skills, uploads
 from app.services.sync_engine import start_background_sync, stop_background_sync
 
 
@@ -48,6 +48,7 @@ app.include_router(landing_page.router)
 app.include_router(memory.router)
 app.include_router(operations.router)
 app.include_router(outcomes.router)
+app.include_router(reports.router)
 app.include_router(search_terms.router)
 app.include_router(skills.router)
 app.include_router(settings_router.router)

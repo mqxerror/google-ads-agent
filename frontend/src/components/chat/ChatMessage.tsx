@@ -4,6 +4,9 @@ import remarkGfm from 'remark-gfm';
 import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
+import AgentAvatar from './AgentAvatar';
+import { getAgentProfile } from '@/lib/agentProfiles';
+import { getToolDescription, getSourceIcon } from '@/lib/toolDescriptions';
 import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
 
 interface ChatMessageProps {
@@ -183,16 +186,25 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
         {message.isPending && isUser && (
           <span className="text-[10px] font-medium opacity-70 block mb-1">Queued</span>
         )}
-        {/* Role badge for assistant messages */}
-        {!isUser && roleName && (
-          <div className="flex items-center gap-1.5 mb-2.5 -mt-0.5">
-            <span className={cn(
-              'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold shadow-sm',
-              ROLE_COLORS[roleId || ''] || 'bg-primary/20 text-foreground border border-primary/30'
-            )}>
-              <span className="text-sm">{ROLE_ICONS[roleAvatar || ''] || '🤖'}</span>
-              {roleName}
-            </span>
+        {/* Agent identity header for assistant messages */}
+        {!isUser && (
+          <div className="flex items-center gap-2 mb-2.5 -mt-0.5">
+            <AgentAvatar roleId={roleId} size="sm" showStatus isWorking={message.isPending} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold" style={{ color: getAgentProfile(roleId).color }}>
+                  {getAgentProfile(roleId).name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {roleName || getAgentProfile(roleId).title}
+                </span>
+              </div>
+              {message.createdAt && (
+                <span className="text-[9px] text-muted-foreground/60">
+                  {formatRelativeTime(message.createdAt)}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -223,8 +235,47 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
           </div>
         )}
 
+        {/* Live activity — show what's happening RIGHT NOW */}
+        {hasToolCalls && !toolCalls.every(tc => tc.status !== 'pending') && (() => {
+          const toolCalls = message.toolCalls!;
+          const pending = toolCalls.filter(tc => tc.status === 'pending');
+          const completed = toolCalls.filter(tc => tc.status !== 'pending');
+          const latestPending = pending[pending.length - 1];
+          return (
+            <div className="mt-2 bg-primary/5 border border-primary/20 rounded-lg p-2.5 space-y-1">
+              {latestPending && (
+                <div className="flex items-center gap-2 text-xs font-medium">
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  <span>{getToolDescription(latestPending.name)}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                <span>{getSourceIcon(latestPending?.source || '')} {latestPending?.source || 'agent'}</span>
+                <span>✅ {completed.length} done</span>
+                <span>⏳ {pending.length} running</span>
+              </div>
+            </div>
+          );
+        })()}
         {hasToolCalls && <ToolCallsSummary toolCalls={message.toolCalls!} />}
       </div>
     </div>
   );
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDays = Math.floor(diffHr / 24);
+    return `${diffDays}d ago`;
+  } catch {
+    return '';
+  }
 }
