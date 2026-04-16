@@ -4,6 +4,7 @@ Last updated: 2026-04-15
 ## Timeline
 
 ### April 2026
+- **Apr 15** — [Agency Director] Stage 7 Pre-Launch QA for Greece Golden Visa Turkey campaign: `lang="tr"` attribute confirmed fixed, all 3 RSAs approved, but critical blocker found — zero Google tracking scripts (GTM/gtag) loading on the landing page, blocking launch clearance.
 - **Apr 15** — [GTM Specialist] Stage 6 GTM Specialist run for campaign 23758877756 (Turkey CP): created conversion action "Greece GV Turkey CP" (ID 7576883475), discovered critical gap — no conversion event fires on form submission, React/Next.js form missing dataLayer.push and inline gtag calls despite GTM-K6864NBH loading correctly.
 - **Apr 15** — [PPC Strategist] Built Greece Golden Visa - Turkey campaign (ID 23758877756, $60/day, Maximize Clicks): 3 ad groups, 15 Phrase match keywords, 3 RSAs, and 24+ campaign-level negative keywords added targeting Turkey with Turkish + English languages.
 - **Apr 15** — [Creative Director] Creative Director completed Stage 4 for Greece Golden Visa Turkey campaign: proposed $60/day budget, Max Clicks bidding (max CPC $5.00) with switch to Max Conversions after 15+ conversions, Turkish-language copy focused on emotional security/Plan B messaging, final URL goldenvisas.mercan.com/tr/greece-golden-visa across all ad groups.
