@@ -43,6 +43,10 @@ async def sync_account(account_id: str, days: int | None = None) -> dict:
             campaigns = await _ads_svc.get_campaigns(account_id, date_from, date_to)
         except Exception as e:
             logger.error("Sync failed to fetch campaigns for %s: %s", account_id, e)
+            # Open circuit breaker so the API endpoint doesn't also hang
+            import time
+            from app.services.cache import CacheService
+            CacheService._circuit_open_until = time.time() + 300  # 5 min cooldown
             await _update_sync_status(db, account_id, "error", str(e), 0, 0)
             return {"status": "error", "error": str(e)}
 

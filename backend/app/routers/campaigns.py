@@ -56,11 +56,30 @@ async def list_campaigns(
     date_to: str | None = Query(None),
 ):
     key = f"{account_id}:campaigns:{date_from}:{date_to}"
-    return await _cache.get_or_fetch(
-        key,
-        lambda: _ads_svc.get_campaigns(account_id, date_from, date_to),
-        ttl=_TTL_CAMPAIGNS,
-    )
+    try:
+        return await _cache.get_or_fetch(
+            key,
+            lambda: _ads_svc.get_campaigns(account_id, date_from, date_to),
+            ttl=_TTL_CAMPAIGNS,
+        )
+    except Exception:
+        # Last resort: return stale cache directly from DB
+        from app.database import get_db
+        import json
+        db = await get_db()
+        try:
+            cur = await db.execute("SELECT data FROM cache WHERE key = ?", (key,))
+            row = await cur.fetchone()
+            if row:
+                return json.loads(row["data"])
+            # Try the no-date key as fallback
+            cur = await db.execute("SELECT data FROM cache WHERE key LIKE ? ORDER BY fetched_at DESC LIMIT 1", (f"{account_id}:campaigns:%",))
+            row = await cur.fetchone()
+            if row:
+                return json.loads(row["data"])
+        finally:
+            await db.close()
+        return []
 
 
 @router.get(

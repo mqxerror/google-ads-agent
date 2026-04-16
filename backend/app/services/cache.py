@@ -11,7 +11,13 @@ from app.database import get_db
 
 
 class CacheService:
-    """Simple JSON cache stored in the SQLite ``cache`` table."""
+    """Simple JSON cache stored in the SQLite ``cache`` table.
+
+    Includes a circuit breaker: after an API failure, skip live fetches
+    for 60 seconds and serve stale cache immediately.
+    """
+
+    _circuit_open_until: float = 0  # timestamp when circuit breaker closes
 
     def __init__(self, default_ttl: int | None = None):
         self.default_ttl = default_ttl or settings.CACHE_TTL_SECONDS
@@ -38,11 +44,18 @@ class CacheService:
                 if now - fetched_at < ttl:
                     return json.loads(row["data"])
 
+            # Circuit breaker: if API recently failed, skip live fetch
+            if now < CacheService._circuit_open_until:
+                if row is not None:
+                    return json.loads(row["data"])
+                return []  # No cache and circuit open — return empty
+
             # Cache miss or stale -- fetch fresh data
             try:
                 data = await fetch_fn()
             except Exception:
-                # API failed — return stale cache if we have any
+                # API failed — open circuit breaker for 60 seconds
+                CacheService._circuit_open_until = now + 60
                 if row is not None:
                     return json.loads(row["data"])
                 raise
