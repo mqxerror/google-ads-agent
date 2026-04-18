@@ -84,13 +84,14 @@ export default function MemoryPanel({ campaignId, campaignName }: MemoryPanelPro
         {expandedPinned ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         <Pin className="h-3 w-3" />
         Pinned Facts ({factLines.length})
-        <button
+        <span
+          role="button"
           onClick={(e) => { e.stopPropagation(); setShowAddFact(!showAddFact); setExpandedPinned(true); }}
-          className="ml-auto p-0.5 hover:bg-secondary rounded"
+          className="ml-auto p-0.5 hover:bg-secondary rounded cursor-pointer"
           title="Add pinned fact"
         >
           <Plus className="h-3 w-3" />
-        </button>
+        </span>
       </button>
 
       {expandedPinned && (

@@ -236,7 +236,7 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
         )}
 
         {/* Live activity — show what's happening RIGHT NOW */}
-        {hasToolCalls && !toolCalls.every(tc => tc.status !== 'pending') && (() => {
+        {hasToolCalls && message.toolCalls!.some(tc => tc.status === 'pending') && (() => {
           const toolCalls = message.toolCalls!;
           const pending = toolCalls.filter(tc => tc.status === 'pending');
           const completed = toolCalls.filter(tc => tc.status !== 'pending');
