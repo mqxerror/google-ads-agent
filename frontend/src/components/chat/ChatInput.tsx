@@ -57,6 +57,8 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
   const [model, setModel] = useState<ModelId>('opus');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
+  const [teamRoles, setTeamRoles] = useState<Set<string>>(new Set());
   const [templateCategory, setTemplateCategory] = useState<string>('analyze');
   const [roles, setRoles] = useState<AgencyRole[]>([]);
   const [activeRole, setActiveRole] = useState<string | null>(null);
@@ -178,13 +180,39 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
       }
     }
 
-    onSend(messageText, model, messageRole, attachments);
+    // Team Session mode: wrap the message with multi-persona instructions
+    if (showTeam && teamRoles.size > 0) {
+      const selectedRoles = roles.filter(r => teamRoles.has(r.id));
+      const roleNames = selectedRoles.map(r => `${r.name} (${r.id})`).join(', ');
+      const teamPrompt = `TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that specialist]
+---END ROLE---
+
+Selected team: ${roleNames}
+
+Each specialist should:
+1. State their perspective based on their expertise
+2. Reference and build on what previous specialists said
+3. Be specific with numbers, metrics, and actionable recommendations
+4. Disagree if they have a different view — don't just agree
+
+After ALL specialists respond, as the Agency Director, provide a CONSENSUS summary with the recommended action plan.
+
+The question/topic: ${messageText}`;
+      onSend(teamPrompt, model, 'director', attachments);
+    } else {
+      onSend(messageText, model, messageRole, attachments);
+    }
+
     setValue('');
     setAttachments([]);
+    setShowTeam(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, onSend, model, activeRole, roles, attachments]);
+  }, [value, onSend, model, activeRole, roles, attachments, showTeam, teamRoles]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -433,6 +461,47 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
         </div>
       )}
 
+      {/* Team Session role picker */}
+      {showTeam && roles.length > 0 && (
+        <div className="bg-card border border-purple-500/30 rounded-lg shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-purple-500/10">
+            <span className="text-[10px] font-medium text-purple-400">Team Session — Pick specialists to discuss</span>
+            <button onClick={() => setShowTeam(false)} className="p-0.5 text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="p-2 grid grid-cols-3 gap-1">
+            {roles.filter(r => r.id !== 'director').map((role) => (
+              <button
+                key={role.id}
+                onClick={() => {
+                  setTeamRoles(prev => {
+                    const next = new Set(prev);
+                    if (next.has(role.id)) next.delete(role.id);
+                    else next.add(role.id);
+                    return next;
+                  });
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left transition-colors text-[10px]',
+                  teamRoles.has(role.id)
+                    ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300'
+                    : 'hover:bg-secondary/60 text-muted-foreground'
+                )}
+              >
+                <span>{ROLE_ICONS[role.avatar] || '👤'}</span>
+                <span className="truncate">{role.name}</span>
+              </button>
+            ))}
+          </div>
+          {teamRoles.size > 0 && (
+            <div className="px-3 py-1.5 border-t border-border bg-secondary/20 text-[10px] text-muted-foreground">
+              {teamRoles.size} specialist{teamRoles.size !== 1 ? 's' : ''} selected + Director (always included). Type your question and send.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Model selector + template button */}
       <div className="flex items-center gap-1">
         {MODELS.map((m) => {
@@ -475,7 +544,7 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
             </button>
           </div>
           <button
-            onClick={() => { setShowTemplates(!showTemplates); setShowRoles(false); }}
+            onClick={() => { setShowTemplates(!showTemplates); setShowRoles(false); setShowTeam(false); }}
             className={cn(
               'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
               showTemplates
@@ -486,6 +555,19 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
           >
             <LayoutTemplate className="h-3 w-3" />
             Templates
+          </button>
+          <button
+            onClick={() => { setShowTeam(!showTeam); setShowTemplates(false); setShowRoles(false); }}
+            className={cn(
+              'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+              showTeam
+                ? 'bg-purple-500/20 text-purple-400 font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+            )}
+            title="Team session — multiple specialists discuss together"
+          >
+            <Users className="h-3 w-3" />
+            Team
           </button>
           <span className="text-[10px] text-muted-foreground">{currentModel.desc}</span>
         </span>

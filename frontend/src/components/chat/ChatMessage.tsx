@@ -211,28 +211,7 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
         {isUser ? (
           <div className="whitespace-pre-wrap">{message.content}</div>
         ) : (
-          <div className="prose prose-sm prose-invert max-w-none
-            [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
-            [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2
-            [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
-            [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-muted-foreground
-            [&_p]:my-1.5 [&_p]:text-sm
-            [&_ul]:my-1.5 [&_ul]:pl-4 [&_ul]:text-sm
-            [&_ol]:my-1.5 [&_ol]:pl-4 [&_ol]:text-sm
-            [&_li]:my-0.5
-            [&_strong]:text-foreground [&_strong]:font-semibold
-            [&_hr]:my-3 [&_hr]:border-border
-            [&_table]:text-xs [&_table]:w-full [&_table]:my-2
-            [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-medium [&_th]:border-b [&_th]:border-border [&_th]:text-muted-foreground
-            [&_td]:px-2 [&_td]:py-1 [&_td]:border-b [&_td]:border-border/50
-            [&_code]:text-xs [&_code]:bg-background/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded
-            [&_pre]:bg-background/50 [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:my-2 [&_pre]:overflow-x-auto
-            [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground
-          ">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
+          <TeamOrRegularContent content={message.content} />
         )}
 
         {/* Live activity — show what's happening RIGHT NOW */}
@@ -259,6 +238,94 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
         })()}
         {hasToolCalls && <ToolCallsSummary toolCalls={message.toolCalls!} />}
       </div>
+    </div>
+  );
+}
+
+const PROSE_CLASSES = `prose prose-sm prose-invert max-w-none
+  [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
+  [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2
+  [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
+  [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-muted-foreground
+  [&_p]:my-1.5 [&_p]:text-sm
+  [&_ul]:my-1.5 [&_ul]:pl-4 [&_ul]:text-sm
+  [&_ol]:my-1.5 [&_ol]:pl-4 [&_ol]:text-sm
+  [&_li]:my-0.5
+  [&_strong]:text-foreground [&_strong]:font-semibold
+  [&_hr]:my-3 [&_hr]:border-border
+  [&_table]:text-xs [&_table]:w-full [&_table]:my-2
+  [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-medium [&_th]:border-b [&_th]:border-border [&_th]:text-muted-foreground
+  [&_td]:px-2 [&_td]:py-1 [&_td]:border-b [&_td]:border-border/50
+  [&_code]:text-xs [&_code]:bg-background/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded
+  [&_pre]:bg-background/50 [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:my-2 [&_pre]:overflow-x-auto
+  [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground`;
+
+function TeamOrRegularContent({ content }: { content: string }) {
+  // Check if this is a team session response with ---ROLE: markers
+  const rolePattern = /---ROLE:\s*(\w+)---\n([\s\S]*?)(?=---END ROLE---|---ROLE:|$)/g;
+  const matches = [...content.matchAll(rolePattern)];
+
+  if (matches.length >= 2) {
+    // Team session — render each role as a separate card
+    // Extract any content before the first role marker (preamble)
+    const firstMarkerIdx = content.indexOf('---ROLE:');
+    const preamble = firstMarkerIdx > 0 ? content.slice(0, firstMarkerIdx).trim() : '';
+    // Extract any content after the last ---END ROLE--- (consensus)
+    const lastEndIdx = content.lastIndexOf('---END ROLE---');
+    const epilogue = lastEndIdx > 0 ? content.slice(lastEndIdx + 14).trim() : '';
+
+    return (
+      <div className="space-y-3">
+        {preamble && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{preamble}</ReactMarkdown>
+          </div>
+        )}
+        {matches.map((match, i) => {
+          const roleId = match[1].trim();
+          const roleContent = match[2].replace(/---END ROLE---/g, '').trim();
+          const profile = getAgentProfile(roleId);
+          return (
+            <div
+              key={i}
+              className="border rounded-xl p-3 transition-colors"
+              style={{ borderColor: profile.borderColor + '40', backgroundColor: profile.bgColor + '10' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <AgentAvatar roleId={roleId} size="sm" />
+                <span className="text-xs font-semibold" style={{ color: profile.color }}>
+                  {profile.name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">{profile.title}</span>
+              </div>
+              <div className={PROSE_CLASSES}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{roleContent}</ReactMarkdown>
+              </div>
+            </div>
+          );
+        })}
+        {epilogue && (
+          <div className="border-t border-border pt-3 mt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <AgentAvatar roleId="director" size="sm" />
+              <span className="text-xs font-semibold" style={{ color: getAgentProfile('director').color }}>
+                {getAgentProfile('director').name}
+              </span>
+              <span className="text-[10px] text-muted-foreground">Consensus</span>
+            </div>
+            <div className={PROSE_CLASSES}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{epilogue}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular message — render as markdown
+  return (
+    <div className={PROSE_CLASSES}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
 }
