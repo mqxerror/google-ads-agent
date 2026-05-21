@@ -2,13 +2,19 @@
 
 import argparse
 import asyncio
+import os
+import re
 import signal
 import sys
+import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 from types import FrameType
 from typing import Any, AsyncGenerator, Optional, Set
 
 from fastmcp import Context, FastMCP
+from fastmcp.server.middleware import Middleware
 
 from google_ads.sdk_client import GoogleAdsSdkClient, get_sdk_client, set_sdk_client
 from google_ads.servers.account_budget_proposal_server import (
@@ -423,6 +429,109 @@ else:
 # Mount the selected servers
 for namespace, server in servers_to_mount:
     mcp.mount(server, namespace=namespace)
+
+
+# ── MCP error log — full stack traces for tool failures ──────────────
+# Tool-level exceptions only surface to the agent as a one-line
+# tool_result message (e.g. "'CallToolRequestParams' object has no
+# attribute 'params'") with no traceback. The agent then hallucinates
+# the cause and burns Opus tokens retrying. This appends the full
+# traceback to backend/data/mcp_errors.log so we can actually see WHERE
+# the failure came from on the next occurrence.
+
+_MCP_ERROR_LOG = Path(__file__).resolve().parent.parent / "data" / "mcp_errors.log"
+
+
+def _log_mcp_error(tool_name: str, exc: BaseException) -> None:
+    try:
+        _MCP_ERROR_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with _MCP_ERROR_LOG.open("a", encoding="utf-8") as f:
+            ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            f.write(
+                f"\n=== {ts}  tool={tool_name}  "
+                f"exc={type(exc).__name__}: {exc} ===\n"
+            )
+            f.write(traceback.format_exc())
+            f.write("\n")
+    except Exception:
+        # Never let logging itself break the request.
+        pass
+
+
+# ── Campaign scope-lock middleware ────────────────────────────────────
+# Prompts kept failing to keep the agent inside the right campaign — even
+# with a "HARD RULE — CAMPAIGN LOCK" header, the model would call a tool
+# for a *different* campaign when that one had richer data. This is the
+# physical enforcement: any tool call whose arguments name a campaign id
+# other than LANGAR_BOUND_CAMPAIGN_ID is rejected back to the LLM with a
+# clear correction. Resource-name paths (`customers/X/campaigns/Y/...`)
+# are parsed too. When the env var is empty the middleware is a no-op so
+# unbound/account-wide work still functions.
+
+_CAMPAIGN_KEY_RX = re.compile(r"campaign_id$|^campaign_id|_campaign_id$", re.I)
+_RESOURCE_CAMPAIGN_RX = re.compile(r"/campaigns/(\d+)")
+
+
+class CampaignScopeMiddleware(Middleware):
+    """Block any tool call that targets a campaign other than the bound one."""
+
+    def _collect_campaign_ids(self, value: Any, out: list[str]) -> None:
+        if isinstance(value, dict):
+            for k, v in value.items():
+                if isinstance(k, str) and _CAMPAIGN_KEY_RX.search(k) and v not in (None, ""):
+                    out.append(str(v))
+                elif isinstance(k, str) and k in ("resource_name", "resource_names"):
+                    vals = v if isinstance(v, list) else [v]
+                    for rn in vals:
+                        if isinstance(rn, str):
+                            m = _RESOURCE_CAMPAIGN_RX.search(rn)
+                            if m:
+                                out.append(m.group(1))
+                else:
+                    self._collect_campaign_ids(v, out)
+        elif isinstance(value, list):
+            for item in value:
+                self._collect_campaign_ids(item, out)
+
+    async def on_call_tool(self, context, call_next):
+        bound = (os.environ.get("LANGAR_BOUND_CAMPAIGN_ID") or "").strip()
+        tool_name = (
+            getattr(context.message, "name", None)
+            or getattr(getattr(context.message, "params", None), "name", "unknown")
+        )
+        # Scope check
+        if bound:
+            args = getattr(context.message, "arguments", None) or getattr(getattr(context.message, "params", None), "arguments", None) or {}
+            found: list[str] = []
+            self._collect_campaign_ids(args, found)
+            mismatches = {cid for cid in found if cid and cid != bound}
+            if mismatches:
+                bound_name = os.environ.get("LANGAR_BOUND_CAMPAIGN_NAME", "")
+                label = f' ("{bound_name}")' if bound_name else ""
+                # Raise: FastMCP converts this into a tool error result that the
+                # LLM sees and can react to (re-call with the correct id).
+                raise ValueError(
+                    f"CAMPAIGN_SCOPE_VIOLATION: tool '{tool_name}' was called with "
+                    f"campaign id(s) {sorted(mismatches)} but this conversation is "
+                    f"locked to campaign {bound}{label}. Re-issue the call using "
+                    f"campaign_id={bound} (and resource paths under "
+                    f"customers/.../campaigns/{bound}/...). If the user truly wants "
+                    f"a different campaign, ask them to switch in the sidebar — "
+                    f"do not silently substitute."
+                )
+        # Run the tool, but capture any exception's full traceback into
+        # data/mcp_errors.log before re-raising. This makes the otherwise-
+        # invisible MCP stack traces inspectable on the next failure.
+        try:
+            return await call_next(context)
+        except Exception as exc:
+            # Don't pollute the log with our own scope violations.
+            if not (isinstance(exc, ValueError) and str(exc).startswith("CAMPAIGN_SCOPE_VIOLATION:")):
+                _log_mcp_error(tool_name, exc)
+            raise
+
+
+mcp.add_middleware(CampaignScopeMiddleware())
 
 
 @mcp.tool
