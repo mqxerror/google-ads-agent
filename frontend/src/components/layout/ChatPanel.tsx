@@ -821,14 +821,13 @@ export default function ChatPanel() {
           </div>
         </div>
 
-        {/* Memory Panel — hidden in full-screen so the chat dominates the view */}
+        {/* Memory Panel — hidden in full-screen so the chat dominates the view.
+            Reads the conversation's actual campaign (effectiveCampaignId), not
+            the sidebar's, so the pinned facts shown here are exactly the ones
+            the agent loaded. Previously this keyed off selectedCampaignId, so
+            it would happily show Panama's pinned facts while the agent was
+            operating on MapleRoots. */}
         {!fullScreen && (
-          {/* MemoryPanel (pinned facts, decisions, role notes) reads the
-              same campaign the agent loads — the conversation's binding.
-              Previously it keyed off selectedCampaignId, so it would happily
-              show Panama's pinned facts while the agent was operating on
-              MapleRoots; the user would then see the facts being "ignored"
-              when in fact they were never sent to the agent at all. */}
           <MemoryPanel
             campaignId={effectiveCampaignId}
             campaignName={effectiveCampaignName}
