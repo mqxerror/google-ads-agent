@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronRight,
   ChevronDown,
@@ -9,10 +9,11 @@ import {
   Building2,
   Users,
   Briefcase,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
-import { fetchCampaigns, fetchAccounts, fetchCampaignGoals } from '@/lib/api';
+import { fetchCampaigns, fetchAccounts, fetchCampaignGoals, fetchCampaignsSyncStatus, forceSyncCampaigns } from '@/lib/api';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -175,14 +176,58 @@ function AccountNode({
 
 type StatusFilter = 'ALL' | 'ENABLED' | 'PAUSED';
 
+// SQLite datetime('now') returns "YYYY-MM-DD HH:MM:SS" in UTC — coerce to
+// ISO so Date.parse handles it consistently across browsers.
+function timeAgo(sqliteUtc: string): string {
+  const isoish = sqliteUtc.includes('T') ? sqliteUtc : sqliteUtc.replace(' ', 'T') + 'Z';
+  const t = new Date(isoish).getTime();
+  if (Number.isNaN(t)) return '?';
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, selectedAccountId, setSelectedAccount, connectedAccounts } = useAppStore();
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ENABLED');
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   // Determine which client account to query for campaigns
   const mccAccountId = selectedAccountId || connectedAccounts[0]?.id || '';
   const clientAccountId = useClientAccountId();
+
+  // V11 — surface the single-source-of-truth's freshness directly to the
+  // user. The previous design had an invisible 5-min TTL; this makes the
+  // staleness window honest.
+  const { data: syncStatus, refetch: refetchSyncStatus } = useQuery({
+    queryKey: ['campaigns-sync-status', clientAccountId],
+    queryFn: () => fetchCampaignsSyncStatus(clientAccountId),
+    enabled: !!clientAccountId,
+    refetchInterval: 30_000, // tick the "X ago" label every 30s
+    staleTime: 10_000,
+  });
+
+  const handleRefresh = async () => {
+    if (!clientAccountId || refreshing) return;
+    setRefreshing(true);
+    try {
+      await forceSyncCampaigns(clientAccountId);
+      // Invalidate so both the campaign list AND the sync status refetch.
+      await queryClient.invalidateQueries({ queryKey: ['campaigns', clientAccountId] });
+      await refetchSyncStatus();
+    } catch {
+      // Silent — sidebar continues to show stale data with the old timestamp.
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Fetch account hierarchy for the tree display
   const { data: hierarchy } = useQuery({
@@ -338,6 +383,35 @@ export default function Sidebar() {
               <span className="ml-1 opacity-60">{count}</span>
             </button>
           ))}
+        </div>
+        {/* V11 — single source of truth freshness signal. Replaces the old
+            invisible 5-min cache TTL: the user can SEE how fresh the data
+            is and force a refresh on demand. */}
+        <div className="flex items-center justify-between text-[9px] text-muted-foreground px-1">
+          <span
+            title={syncStatus?.last_synced_at || 'never synced'}
+            className={cn(
+              // After 2× the staleness threshold without a successful sync,
+              // dim further so the user notices the data is genuinely old.
+              syncStatus?.last_synced_at &&
+                Date.now() - new Date(syncStatus.last_synced_at.replace(' ', 'T') + 'Z').getTime() >
+                  (syncStatus.stale_after_seconds || 300) * 2_000
+                ? 'text-amber-500/70'
+                : ''
+            )}
+          >
+            {syncStatus?.last_synced_at
+              ? `synced ${timeAgo(syncStatus.last_synced_at)}`
+              : 'sync pending…'}
+          </span>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || !clientAccountId}
+            className="p-1 rounded hover:bg-secondary/50 disabled:opacity-40 transition-colors"
+            title="Refresh campaign list (live Google Ads API call)"
+          >
+            <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+          </button>
         </div>
       </div>
 

@@ -203,6 +203,22 @@ export function fetchCampaignTargeting(
   return request(`/accounts/${accountId}/campaigns/${campaignId}/targeting`);
 }
 
+// ── Campaigns sync (V11 single-source-of-truth — see campaigns_repo.py) ──
+
+export interface CampaignsSyncStatus {
+  account_id: string;
+  last_synced_at: string | null;
+  stale_after_seconds: number;
+}
+
+export function fetchCampaignsSyncStatus(accountId: string): Promise<CampaignsSyncStatus> {
+  return request<CampaignsSyncStatus>(`/accounts/${accountId}/campaigns-sync-status`);
+}
+
+export function forceSyncCampaigns(accountId: string): Promise<{ account_id: string; synced: number; last_synced_at: string | null }> {
+  return request(`/accounts/${accountId}/sync/campaigns`, { method: 'POST' });
+}
+
 // ── Operations (direct campaign actions) ────────────────────────
 
 export function updateCampaignStatus(customerId: string, campaignId: string, status: 'ENABLED' | 'PAUSED'): Promise<{ status: string }> {
