@@ -77,6 +77,7 @@ from google_ads.servers.campaign_customizer_server import (
 from google_ads.servers.campaign_draft_server import campaign_draft_server
 from google_ads.servers.campaign_label_server import campaign_label_server
 from google_ads.servers.campaign_server import campaign_server
+from google_ads.servers.pmax_server import pmax_server
 from google_ads.servers.campaign_shared_set_server import (
     campaign_shared_set_server,
 )
@@ -283,6 +284,7 @@ SERVER_GROUPS = {
     "core": [
         ("customer", customer_service_server),
         ("campaign", campaign_server),
+        ("pmax", pmax_server),
         ("budget", budget_server),
         ("ad_group", ad_group_server),
         ("keyword", keyword_server),

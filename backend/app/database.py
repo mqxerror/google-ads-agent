@@ -671,7 +671,43 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V11 migration complete (campaigns table — single source of truth).")
 
-        if version >= 11:
-            logger.info("Database schema is V11 (up to date).")
+        # V12: `asset_groups` table — single source of truth for PMax
+        # asset groups, mirror of V11's `campaigns` table. Tracks the
+        # creative bundle we sent to Google so the wizard / agent can
+        # show, edit, and reason about it without re-fetching from the
+        # API every read. JSON columns hold the structured copy + asset
+        # references because the shape is wide and nested; we don't
+        # query inside them, so flattening would be premature.
+        if version < 12:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS asset_groups (
+                    asset_group_id TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT NOT NULL,
+                    name TEXT,
+                    status TEXT,
+                    final_urls TEXT,          -- JSON list[str]
+                    business_name TEXT,
+                    headlines TEXT,           -- JSON list[str]
+                    long_headlines TEXT,      -- JSON list[str]
+                    descriptions TEXT,        -- JSON list[str]
+                    asset_refs TEXT,          -- JSON {logos, landscape, square, portrait, videos}
+                    signals TEXT,             -- JSON list[dict] (audience signals)
+                    last_synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (account_id, asset_group_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_asset_groups_campaign
+                    ON asset_groups(account_id, campaign_id);
+                CREATE INDEX IF NOT EXISTS idx_asset_groups_synced
+                    ON asset_groups(account_id, last_synced_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (12)")
+            await db.commit()
+            logger.info("V12 migration complete (asset_groups table — PMax single source of truth).")
+
+        if version >= 12:
+            logger.info("Database schema is V12 (up to date).")
     finally:
         await db.close()
