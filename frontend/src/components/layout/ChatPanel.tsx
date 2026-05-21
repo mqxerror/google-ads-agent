@@ -40,6 +40,48 @@ export default function ChatPanel() {
   const campaigns = queryClient.getQueryData<Campaign[]>(['campaigns', ACCOUNT_ID]) ?? [];
   const campaign = campaigns.find((c) => c.id === selectedCampaignId);
 
+  // The CONVERSATION's actual campaign binding (authoritative — server-resolved).
+  // The chat panel previously displayed selectedCampaignId in the badge and the
+  // pinned-facts panel, while the agent loaded context for the conversation's
+  // own campaign_id. When those disagreed (e.g. user clicks Panama while the
+  // active thread is bound to MapleRoots), the badge + facts lied about the
+  // agent's actual scope. Tracking the conv's real campaign here lets the
+  // whole panel speak with one voice — the conversation's voice.
+  const [activeConvCampaign, setActiveConvCampaign] = useState<{ id: string | null; name: string | null } | null>(null);
+
+  // Look the conversation up whenever conversationId changes so badge / memory
+  // panel / input all reflect what the agent will ACTUALLY operate on.
+  useEffect(() => {
+    if (!conversationId) {
+      setActiveConvCampaign(null);
+      return;
+    }
+    let cancelled = false;
+    fetchConversation(conversationId).then((c) => {
+      if (cancelled) return;
+      setActiveConvCampaign(c ? { id: c.campaignId ?? null, name: c.campaignName ?? null } : null);
+    });
+    return () => { cancelled = true; };
+  }, [conversationId]);
+
+  // Effective scope for the whole panel = the conversation's campaign if we
+  // have one, else the sidebar selection. Conversation wins because that's
+  // what the agent reads.
+  const effectiveCampaignId = activeConvCampaign?.id ?? selectedCampaignId;
+  const effectiveCampaignName =
+    activeConvCampaign?.name ?? campaign?.name ?? null;
+
+  // Sidebar disagrees with the conversation — the user is asking for a
+  // different campaign than the active thread is bound to. A NULL sidebar
+  // (Account Overview / dashboard / Builder running campaign-less) is NOT a
+  // mismatch — it means "no filter," so honor the conversation's own
+  // binding. Same rule as ensureConversation below, so the two stay aligned
+  // and Builder's chat:display handoff isn't yanked away.
+  const campaignMismatch =
+    !!activeConvCampaign &&
+    selectedCampaignId !== null &&
+    (activeConvCampaign.id ?? null) !== selectedCampaignId;
+
   // Fetch conversation history for current context
   const { data: conversations = [], refetch: refetchConversations } = useQuery({
     queryKey: ['conversations', ACCOUNT_ID, selectedCampaignId],
@@ -174,11 +216,30 @@ export default function ChatPanel() {
     setShowHistory(false);
     setSearchQuery('');
     setContextMeta(null); // Reset context badge for the new campaign
-    if (prev !== undefined && prev !== null && prev !== selectedCampaignId) {
+    // Any genuine change in the sidebar's selected campaign clears the active
+    // conversation. The conversation's campaign is immutable on the backend
+    // (see chat.py), so we never carry a thread across a real campaign change
+    // — the next send opens a fresh thread bound to the new selection.
+    if (prev !== undefined && prev !== selectedCampaignId) {
       setConversationId(null);
       setMessages([]);
+      setActiveConvCampaign(null);
     }
   }, [selectedCampaignId, setConversationId]);
+
+  // Refresh edge case: a conversationId restored from sessionStorage points
+  // at a thread bound to a campaign different from the user's
+  // localStorage-restored selectedCampaignId. The campaign-switch effect
+  // above doesn't fire (selectedCampaignId never changed within this
+  // session), so drop the foreign thread here once we've resolved its real
+  // campaign. Guarded on !isResponding so we never yank a thread mid-stream.
+  useEffect(() => {
+    if (campaignMismatch && !isResponding) {
+      setConversationId(null);
+      setMessages([]);
+      setActiveConvCampaign(null);
+    }
+  }, [campaignMismatch, isResponding, setConversationId]);
 
   // Create new conversation
   const handleNewConversation = useCallback(async () => {
@@ -189,6 +250,10 @@ export default function ChatPanel() {
       title: campaign ? `${campaign.name} chat` : 'New chat',
     });
     setConversationId(conv.id);
+    // Set the conversation's actual binding up-front so the badge / pinned
+    // facts / input don't briefly flash the sidebar's campaign before the
+    // fetchConversation effect resolves.
+    setActiveConvCampaign({ id: conv.campaignId ?? null, name: conv.campaignName ?? null });
     setMessages([]);
     setShowHistory(false);
     refetchConversations();
@@ -271,6 +336,9 @@ export default function ChatPanel() {
       title: campaign ? `${campaign.name} chat` : 'New chat',
     });
     setConversationId(conv.id);
+    // Pre-populate the conv's binding so the badge / pinned facts / input
+    // reflect it immediately without waiting for the fetchConversation effect.
+    setActiveConvCampaign({ id: conv.campaignId ?? null, name: conv.campaignName ?? null });
     refetchConversations();
     return conv.id;
   }, [conversationId, ACCOUNT_ID, selectedCampaignId, campaign?.name, refetchConversations, setConversationId]);
@@ -609,7 +677,11 @@ export default function ChatPanel() {
                 <PanelRightClose className="h-3.5 w-3.5" />
               </button>
             )}
-            <ContextBadge campaignName={campaign?.name ?? null} guidelinesLoaded={true} contextMeta={contextMeta} />
+            {/* Badge reflects the CONVERSATION's actual binding, not the
+                sidebar. If they disagree the campaign-switch / mismatch
+                effects already drop the foreign thread; while that resolves
+                the badge speaks for the agent, not the sidebar. */}
+            <ContextBadge campaignName={effectiveCampaignName} guidelinesLoaded={true} contextMeta={contextMeta} />
             {conversations.length > 0 && (
               <button
                 onClick={() => setShowHistory(!showHistory)}
@@ -751,9 +823,15 @@ export default function ChatPanel() {
 
         {/* Memory Panel — hidden in full-screen so the chat dominates the view */}
         {!fullScreen && (
+          {/* MemoryPanel (pinned facts, decisions, role notes) reads the
+              same campaign the agent loads — the conversation's binding.
+              Previously it keyed off selectedCampaignId, so it would happily
+              show Panama's pinned facts while the agent was operating on
+              MapleRoots; the user would then see the facts being "ignored"
+              when in fact they were never sent to the agent at all. */}
           <MemoryPanel
-            campaignId={selectedCampaignId}
-            campaignName={campaign?.name}
+            campaignId={effectiveCampaignId}
+            campaignName={effectiveCampaignName}
           />
         )}
 
@@ -762,7 +840,7 @@ export default function ChatPanel() {
         <ChatInput
           onSend={handleSend}
           disabled={isResponding}
-          campaignName={campaign?.name}
+          campaignName={effectiveCampaignName}
           conversationId={conversationId}
           onEnsureConversation={ensureConversation}
           onVideoReady={(url, script, thumbnail) => {
