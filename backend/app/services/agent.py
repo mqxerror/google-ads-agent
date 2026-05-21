@@ -25,6 +25,7 @@ from app.services.token_counter import (
 )
 from app.services.message_selector import select_relevant_messages, format_selected_messages
 from app.services.campaign_memory import build_campaign_context
+from app.services import campaigns_repo
 from app.services.compaction import (
     get_compaction_status, compact_conversation, load_checkpoint_context,
     WARN_THRESHOLD, COMPACT_THRESHOLD,
@@ -621,14 +622,22 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
             except Exception as e:
                 parts.append(f"\nSearch terms: could not fetch ({e})")
 
-        # Account-wide ENABLED campaigns summary
-        campaigns = await _ads_svc.get_campaigns(account_id, (today - timedelta(days=6)).isoformat(), today.isoformat())
-        enabled = [c for c in campaigns if c.status == "ENABLED"]
-        parts.append(f"\nAll ENABLED campaigns (last 7 days):")
-        for c in enabled:
-            budget = c.budget_micros / 1_000_000
-            cost = c.metrics.cost_micros / 1_000_000
-            parts.append(f"  - {c.name}: ${budget}/d, {c.bidding_strategy}, {c.metrics.clicks} clicks, ${cost:.2f}, {c.metrics.conversions} conv")
+        # Account-wide ENABLED campaigns summary — reads from the V11
+        # single-source-of-truth `campaigns` table via campaigns_repo so the
+        # agent's view matches the sidebar's exactly (no stale-by-5-min drift).
+        # Metrics aren't included here — this list is for "what's running right
+        # now"; per-campaign metrics already appear elsewhere in the context.
+        try:
+            enabled = await campaigns_repo.list_campaigns(account_id, status="ENABLED")
+            parts.append(f"\nAll ENABLED campaigns (currently {len(enabled)}):")
+            for c in enabled:
+                budget = (c.get("budget_micros") or 0) / 1_000_000
+                parts.append(
+                    f"  - {c.get('name')}: ${budget}/d, "
+                    f"{c.get('bidding_strategy') or '—'}"
+                )
+        except Exception as e:
+            parts.append(f"\nAll ENABLED campaigns: could not load ({e})")
 
     except Exception as e:
         parts.append(f"Error: {e}")
@@ -742,13 +751,15 @@ async def stream_agent_response(
         pass
 
     # Use passed-in campaign_id directly (from conversation record)
-    # Only fall back to name lookup if no ID was provided
+    # Only fall back to name lookup if no ID was provided. Reads from the
+    # V11 campaigns table — same source as the sidebar — so a "campaign
+    # named X" lookup can't disagree with the UI.
     if not campaign_id and campaign_name:
         try:
-            campaigns = await _ads_svc.get_campaigns(api_account_id)
-            match = next((c for c in campaigns if c.name == campaign_name), None)
+            campaigns = await campaigns_repo.list_campaigns(api_account_id)
+            match = next((c for c in campaigns if c.get("name") == campaign_name), None)
             if match:
-                campaign_id = match.id
+                campaign_id = str(match.get("campaign_id"))
         except Exception:
             pass
 
