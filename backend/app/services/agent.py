@@ -335,19 +335,36 @@ def _load_campaign_guidelines(campaign_name: str | None, account_id: str | None 
 
 # ── Layer 3: Recent Conversation (sliding window) ────────────────
 
-async def _get_recent_messages(conversation_id: str, limit: int = 30) -> list[dict]:
+async def _get_recent_messages(
+    conversation_id: str,
+    limit: int = 30,
+    campaign_id: str | None = None,
+) -> list[dict]:
     """Get the last N messages with role attribution (Layer 3).
+
+    When campaign_id is supplied, only messages tagged with that campaign (or
+    pre-migration untagged rows) are returned. This prevents cross-campaign
+    context from leaking when the user switches campaigns on the same
+    conversation.
 
     Returns full content (no truncation) — the message selector handles
     relevance-based filtering and the token budget enforces size limits.
     """
     db = await get_db()
     try:
-        cur = await db.execute(
-            "SELECT role, content, created_at, agent_role, agent_role_name FROM messages WHERE conversation_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
-            (conversation_id, limit),
-        )
+        if campaign_id:
+            cur = await db.execute(
+                "SELECT role, content, created_at, agent_role, agent_role_name FROM messages "
+                "WHERE conversation_id = ? AND (campaign_id = ? OR campaign_id IS NULL) "
+                "ORDER BY created_at DESC LIMIT ?",
+                (conversation_id, campaign_id, limit),
+            )
+        else:
+            cur = await db.execute(
+                "SELECT role, content, created_at, agent_role, agent_role_name FROM messages WHERE conversation_id = ? "
+                "ORDER BY created_at DESC LIMIT ?",
+                (conversation_id, limit),
+            )
         rows = await cur.fetchall()
         result = []
         for r in reversed(rows):
@@ -441,13 +458,78 @@ async def _save_session_summary(
         await db.close()
 
 
+# ── Resumable session (recover work after a cost-cap / max-turn stop) ──
+
+# Stops where the task is unfinished but the Claude session can be resumed.
+_RESUMABLE_STOPS = {"cost_cap", "max_continuations", "user_stopped"}
+
+
+async def _take_resume_session(conversation_id: str | None) -> str | None:
+    """Read and CLEAR the stored resume session id for a conversation.
+
+    Consume-once: returning it also nulls it so a later unrelated message in
+    the same conversation doesn't keep resuming a huge stale session. If the
+    resumed run stops again unfinished, it's re-saved by _save_resume_session.
+    """
+    if not conversation_id:
+        return None
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT resume_session_id FROM conversations WHERE id = ?",
+            (conversation_id,),
+        )
+        row = await cur.fetchone()
+        sid = row["resume_session_id"] if row else None
+        if sid:
+            await db.execute(
+                "UPDATE conversations SET resume_session_id = NULL WHERE id = ?",
+                (conversation_id,),
+            )
+            await db.commit()
+        return sid
+    except Exception:
+        return None
+    finally:
+        await db.close()
+
+
+async def _save_resume_session(conversation_id: str | None, session_id: str | None) -> None:
+    """Persist the Claude session id so the next message can --resume it."""
+    if not conversation_id or not session_id:
+        return
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE conversations SET resume_session_id = ? WHERE id = ?",
+            (session_id, conversation_id),
+        )
+        await db.commit()
+    except Exception:
+        pass
+    finally:
+        await db.close()
+
+
 # ── Layer 5: Campaign Data (local-first, API fallback) ──────────
 
 async def _get_campaign_data(account_id: str | None, campaign_id: str | None) -> str:
     """Get campaign data — reads from local metrics store first (milliseconds),
-    falls back to live API only if no local data exists."""
+    falls back to live API only if no local data exists.
+
+    All numeric values are in the account's billing currency (USD for the
+    Mercan account). Every block is prefixed with a Currency: header so each
+    role sees the unit inline and doesn't reach for outside £/€ benchmarks.
+    """
     if not account_id:
         return "No account selected."
+
+    # Currency anchor for everything below. The account is billed in USD,
+    # so cost_micros / budget_micros are already USD. Surface that explicitly.
+    currency_header = (
+        "Currency: USD (account billing currency — every $ figure below is in USD).\n"
+        "If a recommendation needs to compare against UK/EU CPC norms, convert those to USD first.\n\n"
+    )
 
     # Try local metrics store first (fast — no API calls)
     from app.services.metrics_store import MetricsStore
@@ -457,10 +539,10 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
     if has_local:
         local_data = await metrics_store.format_for_agent(account_id, campaign_id, None)
         if local_data and "No local metrics" not in local_data:
-            return local_data + "\n\n(Data from local store. Use API endpoints for real-time data if needed.)"
+            return currency_header + local_data + "\n\n(Data from local store. Use API endpoints for real-time data if needed.)"
 
     # Fallback: fetch from API (slow but always fresh)
-    parts = []
+    parts = [currency_header.rstrip()]
     today = date.today()
 
     try:
@@ -489,9 +571,20 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
             # Ad groups and keywords
             try:
                 adgroups = await _ads_svc.get_adgroups(account_id, campaign_id)
-                parts.append(f"\nAd Groups ({len(adgroups)}):")
+                parts.append(f"\nAd Groups ({len(adgroups)}) — id | name | status | clicks | conv:")
                 for ag in adgroups:
-                    parts.append(f"  - {ag.name}: {ag.status}, Clicks: {ag.metrics.clicks}, Conv: {ag.metrics.conversions}")
+                    parts.append(f"  - {ag.id} | {ag.name} | {ag.status} | {ag.metrics.clicks} clicks | {ag.metrics.conversions} conv")
+            except Exception:
+                pass
+
+            # Ads + final/landing URLs so URL-change requests don't trigger
+            # tool spelunking (and the page_size tool errors that follow).
+            try:
+                ads = await _ads_svc.get_ads(account_id, campaign_id)
+                parts.append(f"\nAds ({len(ads)}) — ad ID | ad group | status | final URL:")
+                for ad in ads:
+                    url = ad.final_urls[0] if ad.final_urls else "(no final URL)"
+                    parts.append(f"  - {ad.id} | {ad.ad_group_name} | {ad.status} | {url}")
             except Exception:
                 pass
 
@@ -673,7 +766,7 @@ async def stream_agent_response(
     # Layer 3: Recent conversation (load more, select smartly)
     all_recent_msgs = []
     if conversation_id:
-        all_recent_msgs = await _get_recent_messages(conversation_id, limit=30)
+        all_recent_msgs = await _get_recent_messages(conversation_id, limit=30, campaign_id=campaign_id)
 
     # Layer 4: Past session summaries
     summaries = await _get_session_summaries(campaign_id, limit=5)
@@ -728,10 +821,44 @@ async def stream_agent_response(
         f"You are an expert Google Ads campaign manager and senior PPC strategist. Today is {today.isoformat()}.",
         "You have deep knowledge of digital marketing, campaign optimization, and Google Ads best practices.",
         "Always use specific numbers. Compare day-by-day when asked. Give actionable recommendations.",
-        "When the user refers to 'this campaign', they mean the selected campaign shown in the context.",
         "Think like a senior paid media strategist: consider campaign goals, phases, audience intent, and budget efficiency.",
         "",
     ]
+
+    # Campaign identity — stated as a plain fact so the agent NEVER burns tool
+    # calls rediscovering the campaign it is already scoped to. This is the fix
+    # for the agent searching all campaigns to "find the relevant campaign"
+    # when the user is already inside it.
+    if campaign_id:
+        system_parts.insert(3, (
+            "=== CAMPAIGN YOU ARE WORKING ON (already resolved — do NOT search for it) ===\n"
+            f"Campaign name: {campaign_name or '(name not provided — use the ID)'}\n"
+            f"Campaign ID: {campaign_id}\n"
+            f"Customer/account ID: {api_account_id}\n"
+            "'This campaign' = exactly this campaign ID. Its ad groups, ads (with "
+            "final URLs), keywords, targeting and metrics are ALL provided below "
+            "in LIVE CAMPAIGN DATA. Do NOT call search/list/GAQL tools to find "
+            "this campaign or its ad groups/ads/URLs — read them from context. "
+            "Use tools only to WRITE changes, or to fetch something genuinely "
+            "absent from the context provided.\n"
+            "HARD RULE — CAMPAIGN LOCK: Operate ONLY on this campaign ID. NEVER "
+            "analyze, report on, clean up, or modify a different campaign — not "
+            "even if another campaign has more data, more search terms, or seems "
+            "more relevant to the request. If THIS campaign has little or no data "
+            "for what's asked (e.g. a brand-new campaign with no search terms or "
+            "metrics yet), say that plainly and STOP — ask the user whether they "
+            "meant a different campaign. Do NOT silently substitute another "
+            "campaign's data or pivot to the campaign that happens to have data."
+        ))
+    else:
+        system_parts.insert(3, (
+            "=== NO CAMPAIGN SELECTED ===\n"
+            "No specific campaign is in scope for this conversation. If the user "
+            "says 'this campaign', 'rerun it', or asks for any campaign-specific "
+            "analysis or change, do NOT guess and do NOT pick the campaign with "
+            "the most data — ask them which campaign they mean (by name or ID) "
+            "before doing any analysis, cleanup, or modifications."
+        ))
 
     # Layer 0: Marketing Intelligence (injected first for maximum influence)
     if marketing_intel:
@@ -1060,7 +1187,7 @@ async def stream_agent_response(
             "This data includes daily metrics, ad groups, keywords, search terms, and targeting.\n"
             "Use this data directly for analysis. Do NOT re-fetch it via API calls.\n\n"
             f"{live_data}"
-        ), priority=P_NICE_TO_HAVE),
+        ), priority=P_IMPORTANT),
         LayerAllocation("recent_messages", (
             f"=== RECENT CONVERSATION (smart-selected for relevance) ===\n{selected_messages_text}"
             if selected_messages_text else ""
@@ -1114,6 +1241,12 @@ async def stream_agent_response(
     await load_settings_overrides()
     mcp_config_path = _get_mcp_config_path()
 
+    # If a prior turn stopped unfinished (cost cap / max continuations / user
+    # stop), resume that exact Claude session instead of cold-starting — the
+    # session already holds the full work context (e.g. an hour of GTM browser
+    # state), so we only feed the new instruction. Consume-once (cleared on read).
+    resume_sid = await _take_resume_session(conversation_id)
+
     # Pipe via stdin to avoid Windows command line length limits
     # High max-turns for harness mode — agent runs until done, not until an arbitrary limit.
     # Browser automation can easily need 100+ turns. Safety caps in _run_cli prevent runaway costs.
@@ -1131,6 +1264,24 @@ async def stream_agent_response(
     # Remove nesting detection vars so CLI can launch from within a Claude Code session
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_CODE_SESSION", None)
+    # Scope-lock the Google Ads MCP server to this conversation's campaign.
+    # The MCP middleware (google_ads/mcp_main.py · CampaignScopeMiddleware)
+    # rejects any tool call whose arguments name a different campaign id —
+    # physical enforcement, not just a prompt rule.
+    #
+    # Skipped when no campaign is bound (account-level / "create me a new
+    # campaign" chats need full tool surface) AND when the bound id is a
+    # `build-*` temp namespace (Campaign Builder conversations legitimately
+    # create the real numeric campaign id mid-flow, so locking the build id
+    # would block the very tool calls that promote the build to live).
+    is_build_namespace = isinstance(campaign_id, str) and campaign_id.startswith("build-")
+    if campaign_id and not is_build_namespace:
+        env["LANGAR_BOUND_CAMPAIGN_ID"] = str(campaign_id)
+        if campaign_name:
+            env["LANGAR_BOUND_CAMPAIGN_NAME"] = str(campaign_name)
+    else:
+        env.pop("LANGAR_BOUND_CAMPAIGN_ID", None)
+        env.pop("LANGAR_BOUND_CAMPAIGN_NAME", None)
 
     result_queue: queue.Queue[dict | None] = queue.Queue()
     full_response_text: list[str] = []
@@ -1174,7 +1325,20 @@ async def stream_agent_response(
 
         while True:
             # Build command — first run uses original cmd, subsequent runs use --resume
-            if is_first_run:
+            if is_first_run and resume_sid:
+                # Resuming a stopped session: the Claude session already has the
+                # full system prompt + work context, so we --resume it and feed
+                # only the new instruction (not the rebuilt combined_prompt).
+                run_cmd = [
+                    _NODE_PATH, str(_CLI_JS),
+                    "--print", "--verbose", "--output-format", "stream-json",
+                    "--resume", resume_sid,
+                    "--max-turns", max_turns,
+                    "--model", model_id,
+                    "--permission-mode", "bypassPermissions",
+                    "--mcp-config", str(mcp_config_path),
+                ]
+            elif is_first_run:
                 run_cmd = list(cmd)
             else:
                 run_cmd = [
@@ -1197,7 +1361,12 @@ async def stream_agent_response(
                     _running_procs[conversation_id] = proc
 
                 if is_first_run:
-                    proc.stdin.write(combined_prompt.encode("utf-8"))
+                    # On a resume, the session already has the context — only
+                    # send the new instruction. Otherwise send the full prompt.
+                    first_input = user_message if resume_sid else combined_prompt
+                    if resume_sid:
+                        result_queue.put({"type": "resumed", "session_id": resume_sid})
+                    proc.stdin.write(first_input.encode("utf-8"))
                     is_first_run = False
                 else:
                     # Emit continuation indicator to frontend
@@ -1238,7 +1407,7 @@ async def stream_agent_response(
                 if proc.returncode != 0 and segment_subtype is None:
                     # User stopped or unexpected error (no result event received)
                     if conversation_id and conversation_id not in _running_procs:
-                        result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": "user_stopped"})
+                        result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": "user_stopped", "resume_session_id": segment_session_id or current_session_id})
                     else:
                         err = proc.stderr.read().decode("utf-8", errors="replace").strip()
                         logger.error("CLI error (rc=%d): %s", proc.returncode, err[:500])
@@ -1267,7 +1436,14 @@ async def stream_agent_response(
                         stop_reason = "max_continuations"
                     elif accumulated_cost >= settings.AGENT_MAX_TOTAL_COST_USD:
                         stop_reason = "cost_cap"
-                result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": stop_reason})
+                # Carry the session id only when the stop is resumable so the
+                # consumer persists it; a natural finish leaves it None and
+                # clears any prior saved id.
+                resumable_sid = (
+                    (segment_session_id or current_session_id)
+                    if stop_reason in _RESUMABLE_STOPS else None
+                )
+                result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": stop_reason, "resume_session_id": resumable_sid})
                 break
 
             # --- Auto-continue ---
@@ -1299,6 +1475,16 @@ async def stream_agent_response(
                 action = detect_action_from_tool(event.get("name", ""), event.get("input", {}))
                 if action:
                     detected_actions.append({"type": action[0], "detail": action[1], "input": event.get("input", {})})
+            # Persist (or clear) the resumable session id so the next message
+            # in this conversation can --resume an unfinished task. A natural
+            # finish sends resume_session_id=None which clears any prior id.
+            if event.get("type") == "done" and conversation_id:
+                if event.get("stop_reason") in _RESUMABLE_STOPS and event.get("resume_session_id"):
+                    await _save_resume_session(conversation_id, event["resume_session_id"])
+                    logger.info(
+                        "Saved resumable session for %s (stop=%s) — next message will --resume",
+                        conversation_id, event.get("stop_reason"),
+                    )
             yield event
             if event.get("type") in ("done", "error"):
                 break

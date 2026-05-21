@@ -224,8 +224,9 @@ class MetricsStore:
                     ttl=300,
                 )
                 if adgroups:
-                    parts.append(f"\n=== AD GROUPS ({len(adgroups)}) ===")
+                    parts.append(f"\n=== AD GROUPS ({len(adgroups)}) — id | name | status | clicks | cost | conv ===")
                     for ag in adgroups:
+                        agid = ag.id if hasattr(ag, 'id') else ag.get('id', '')
                         name = ag.name if hasattr(ag, 'name') else ag.get('name', '')
                         status = ag.status if hasattr(ag, 'status') else ag.get('status', '')
                         m = ag.metrics if hasattr(ag, 'metrics') else ag.get('metrics', {})
@@ -233,7 +234,28 @@ class MetricsStore:
                         conv = m.conversions if hasattr(m, 'conversions') else m.get('conversions', 0)
                         cost_m = m.cost_micros if hasattr(m, 'cost_micros') else m.get('cost_micros', 0)
                         cost = cost_m / 1_000_000
-                        parts.append(f"  - {name}: {status}, {clicks} clicks, ${cost:.2f}, {conv:.0f} conv")
+                        parts.append(f"  - {agid} | {name} | {status} | {clicks} clicks | ${cost:.2f} | {conv:.0f} conv")
+            except Exception:
+                pass
+
+            # Ads + their final/landing URLs (from cache). Without this the
+            # agent has to spelunk via tools to answer "update the landing
+            # page" — the reported "looks dumb" behaviour.
+            try:
+                ads = await _cache.get_or_fetch(
+                    f"{account_id}:{campaign_id}:ads",
+                    lambda: ads_svc.get_ads(account_id, campaign_id),
+                    ttl=300,
+                )
+                if ads:
+                    parts.append(f"\n=== ADS ({len(ads)}) — ad ID | ad group | status | final URL ===")
+                    for ad in ads:
+                        adid = ad.id if hasattr(ad, 'id') else ad.get('id', '')
+                        agn = ad.ad_group_name if hasattr(ad, 'ad_group_name') else ad.get('ad_group_name', '')
+                        status = ad.status if hasattr(ad, 'status') else ad.get('status', '')
+                        urls = ad.final_urls if hasattr(ad, 'final_urls') else ad.get('final_urls', [])
+                        url = urls[0] if urls else "(no final URL)"
+                        parts.append(f"  - {adid} | {agn} | {status} | {url}")
             except Exception:
                 pass
 

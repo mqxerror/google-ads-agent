@@ -286,6 +286,23 @@ export function fetchConversations(accountId?: string, campaignId?: string): Pro
   );
 }
 
+/** Authoritative single-conversation lookup. Resolves null if it no longer
+ *  exists. Used to verify a thread's campaign binding before reusing it. */
+export function fetchConversation(id: string): Promise<Conversation | null> {
+  return request<any>(`/conversations/${id}`)
+    .then((c) => ({
+      id: c.id,
+      accountId: c.account_id || '',
+      campaignId: c.campaign_id ?? null,
+      campaignName: c.campaign_name ?? null,
+      title: c.title,
+      createdAt: c.created_at || '',
+      updatedAt: c.updated_at || '',
+      messageCount: c.message_count || 0,
+    }))
+    .catch(() => null);
+}
+
 export function createConversation(data: { account_id?: string; campaign_id?: string; campaign_name?: string; title?: string }): Promise<Conversation> {
   return request<any>('/conversations', { method: 'POST', body: JSON.stringify(data) }).then((c) => ({
     id: c.id,

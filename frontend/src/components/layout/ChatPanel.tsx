@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft, Download } from 'lucide-react';
+import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft, ChevronRight, Download, Expand, Shrink, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { fetchConversations, createConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask } from '@/lib/api';
+import { fetchConversations, createConversation, fetchConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask } from '@/lib/api';
 import ContextBadge, { type ContextMetaData } from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
 import ChatInput, { type ModelId, type Attachment } from '@/components/chat/ChatInput';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import type { ChatMessage, ToolCall, Campaign, Conversation, ConversationSearchResult } from '@/types';
 
 export default function ChatPanel() {
-  const { chatPanelWidth, setChatPanelWidth, selectedCampaignId } = useAppStore();
+  const { chatPanelWidth, setChatPanelWidth, selectedCampaignId, chatPanelCollapsed, toggleChatPanel } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isResponding, setIsResponding] = useState(false);
   const [conversationId, setConversationIdRaw] = useState<string | null>(() => {
@@ -27,6 +27,7 @@ export default function ChatPanel() {
     setConversationIdRaw(id);
   }, []);
   const [expanded, setExpanded] = useState(false);
+  const [fullScreen, setFullScreen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMeta, setContextMeta] = useState<ContextMetaData | null>(null);
@@ -72,16 +73,26 @@ export default function ChatPanel() {
     }
   }, []);
 
-  // Auto-load conversation: restore from session or pick the most recent
+  // Auto-load conversation: restore from session or pick the most recent.
+  // `conversations` is already scoped to the selected campaign server-side, so
+  // a restored conversationId that isn't in it belongs to a DIFFERENT campaign
+  // (e.g. refresh after a campaign switch, or a Builder handoff thread). Drop
+  // it so the wrong campaign's history isn't shown. Gated on messages.length
+  // === 0 so an in-flight send (optimistic messages present, fresh conv not
+  // yet in the refetched list) is never cleared mid-stream.
   useEffect(() => {
     if (conversationId && messages.length === 0) {
-      // Restored from sessionStorage but messages not loaded yet
-      loadConversation(conversationId);
+      const inThisCampaign = conversations.some((c) => c.id === conversationId);
+      if (!inThisCampaign && conversations.length > 0) {
+        setConversationId(null); // foreign thread → fall through to picking one below
+      } else {
+        loadConversation(conversationId);
+      }
     } else if (conversations.length > 0 && !conversationId) {
-      // No active conversation — load the most recent one
+      // No active conversation — load the most recent one for this campaign
       loadConversation(conversations[0].id);
     }
-  }, [conversations, conversationId, messages.length, loadConversation]);
+  }, [conversations, conversationId, messages.length, loadConversation, setConversationId]);
 
   // Reconnect to running agent after page refresh
   useEffect(() => {
@@ -146,19 +157,26 @@ export default function ChatPanel() {
     return () => { cancelled = true; };
   }, [conversationId]);
 
-  // When campaign changes, clear messages but let auto-load pick the right conversation
+  // Deterministic campaign-switch reset. The old guard compared against a
+  // sessionStorage value it mutated itself, which the Campaign Builder's
+  // out-of-band conversation handoff defeated — so a thread bound to one
+  // campaign survived a switch and the agent kept talking about the old
+  // campaign. Track the previous campaign in a ref instead: on a genuine
+  // switch (we had a campaign and it changed), drop the conversation so the
+  // next send opens a fresh thread for the new campaign. The first run
+  // (mount / initial null→campaign hydration) only records the baseline so a
+  // refresh-restored conversation isn't nuked; ensureConversation still
+  // verifies its campaign binding before reusing it.
+  const prevCampaignRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    setMessages([]);
+    const prev = prevCampaignRef.current;
+    prevCampaignRef.current = selectedCampaignId;
     setShowHistory(false);
     setSearchQuery('');
     setContextMeta(null); // Reset context badge for the new campaign
-    // Don't clear conversationId — let the auto-load effect below handle it
-    // Only clear if switching to a DIFFERENT campaign (not just refreshing)
-    const savedCampaign = sessionStorage.getItem('activeCampaignId');
-    if (selectedCampaignId !== savedCampaign) {
+    if (prev !== undefined && prev !== null && prev !== selectedCampaignId) {
       setConversationId(null);
-      if (selectedCampaignId) sessionStorage.setItem('activeCampaignId', selectedCampaignId);
-      else sessionStorage.removeItem('activeCampaignId');
+      setMessages([]);
     }
   }, [selectedCampaignId, setConversationId]);
 
@@ -227,13 +245,23 @@ export default function ChatPanel() {
 
   // Ensure conversation exists for sending
   const ensureConversation = useCallback(async (): Promise<string> => {
-    // Verify existing conversation still exists (may have been deleted)
+    // Reuse the active conversation when its campaign binding doesn't conflict
+    // with the sidebar selection. A conversation belongs to one campaign for
+    // life; reusing one from another campaign loads the wrong memory (the
+    // original bug). But "no campaign selected" (Account Overview / dashboard
+    // view) is NOT a conflict — it means no filter, so honor the loaded
+    // conversation's own binding. Without this, sending a message while on
+    // the overview spawned a fresh unbound thread that lost MapleRoots
+    // context and responded "no campaign selected."
     if (conversationId) {
-      try {
-        const check = await fetch(`/api/conversations/${conversationId}/messages`);
-        if (check.ok) return conversationId;
-      } catch {}
-      // Conversation is gone — clear stale ID and create new
+      const existing = await fetchConversation(conversationId);
+      const ok =
+        !!existing && (
+          selectedCampaignId == null ||
+          (existing.campaignId ?? null) === selectedCampaignId
+        );
+      if (ok) return conversationId;
+      // Missing, or bound to a *different* campaign than the one selected — start a fresh thread.
       setConversationId(null);
     }
     const conv = await createConversation({
@@ -332,6 +360,7 @@ export default function ChatPanel() {
             content: text,
             account_id: ACCOUNT_ID,
             campaign_id: selectedCampaignId,
+            campaign_name: campaign?.name,
             model,
             active_role: roleId || null,
             attachments: attachments || [],
@@ -384,6 +413,10 @@ export default function ChatPanel() {
                   toolCalls[tcIdx] = { ...toolCalls[tcIdx], output: typeof event.output === 'string' ? { result: event.output } : event.output || {}, status: event.status === 'error' ? 'error' : 'success' };
                   setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, toolCalls: [...toolCalls] } : m));
                 }
+              } else if (event.type === 'resumed') {
+                // Picked up a previously stopped session — full prior context restored
+                assistantText += `> ↩︎ *Resumed the previous session — continuing the task with full context.*\n\n`;
+                setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText, toolCalls: [...toolCalls] } : m));
               } else if (event.type === 'continuation') {
                 // Agent auto-continuing after max-turns — show subtle indicator
                 assistantText += `\n\n---\n*Continuing... (${event.accumulated_turns} turns)*\n\n`;
@@ -394,14 +427,19 @@ export default function ChatPanel() {
                 const turns = event.turns || 0;
                 const cost = event.cost ? `$${Number(event.cost).toFixed(2)}` : '';
                 let stopNote = '';
+                // These stops save the Claude session — sending any message
+                // resumes the exact task with full context (no redo).
+                const resumable = event.resume_session_id
+                  ? ' Session saved — send **"continue"** to resume exactly where it left off (no work lost).'
+                  : '';
                 if (reason === 'cost_cap') {
-                  stopNote = `\n\n> Agent stopped — cost safety limit reached (${cost}).`;
+                  stopNote = `\n\n> Agent paused — cost safety cap reached (${cost}).${resumable}`;
                 } else if (reason === 'max_continuations') {
-                  stopNote = `\n\n> Agent stopped — turn limit reached (${turns} turns). Send "continue" to keep going.`;
+                  stopNote = `\n\n> Agent paused — turn limit reached (${turns} turns).${resumable || ' Send "continue" to keep going.'}`;
                 } else if (reason === 'user_stopped') {
-                  stopNote = '\n\n> Agent stopped by user.';
+                  stopNote = `\n\n> Agent stopped by user.${resumable}`;
                 } else if (reason && reason !== 'natural') {
-                  stopNote = `\n\n> Agent stopped (${reason}, ${turns} turns, ${cost}).`;
+                  stopNote = `\n\n> Agent stopped (${reason}, ${turns} turns, ${cost}).${resumable}`;
                 }
                 if (stopNote) {
                   assistantText += stopNote;
@@ -503,26 +541,74 @@ export default function ChatPanel() {
     };
   }, [setConversationId, refetchConversations]);
 
+  // Esc exits full-screen so the user always has an out
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFullScreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullScreen]);
+
   const panelWidth = expanded ? Math.max(chatPanelWidth, 700) : chatPanelWidth;
+
+  // Collapsed mode — render a thin reopener strip on the right edge so the user
+  // can still get the chat back with one click. Persists across sessions via
+  // appStore (localStorage). Full-screen overrides this — if you went full-
+  // screen and then collapsed, exiting full-screen returns you to collapsed.
+  if (chatPanelCollapsed && !fullScreen) {
+    return (
+      <div className="w-8 bg-sidebar border-l border-border flex flex-col items-center py-2 shrink-0">
+        <button
+          onClick={toggleChatPanel}
+          className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded transition-colors"
+          title="Show chat panel"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="mt-2 text-[9px] text-muted-foreground writing-mode-vertical opacity-60 select-none"
+             style={{ writingMode: 'vertical-rl' as never }}>
+          Chat
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      className="bg-sidebar border-l border-border flex shrink-0 overflow-hidden transition-[width] duration-200"
-      style={{ width: `${panelWidth}px`, maxWidth: '70vw' }}
+      className={cn(
+        'bg-sidebar border-l border-border flex shrink-0 overflow-hidden',
+        fullScreen
+          ? 'fixed inset-0 z-50 border-l-0 transition-none'
+          : 'relative transition-[width] duration-200'
+      )}
+      style={fullScreen ? undefined : { width: `${panelWidth}px`, maxWidth: '70vw' }}
     >
-      {/* Resize handle */}
-      <div
-        onMouseDown={handleMouseDown}
-        className={cn('w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors flex items-center justify-center', resizingRef.current && 'bg-primary/30')}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 hover:opacity-100 transition-opacity" />
-      </div>
+      {/* Resize handle — hidden in full-screen since it has nothing to resize */}
+      {!fullScreen && (
+        <div
+          onMouseDown={handleMouseDown}
+          className={cn('w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors flex items-center justify-center', resizingRef.current && 'bg-primary/30')}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 hover:opacity-100 transition-opacity" />
+        </div>
+      )}
 
       {/* Chat content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="border-b border-border flex items-center justify-between pr-2">
           <div className="flex items-center gap-1">
+            {!fullScreen && (
+              <button
+                onClick={toggleChatPanel}
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                title="Hide chat panel"
+              >
+                <PanelRightClose className="h-3.5 w-3.5" />
+              </button>
+            )}
             <ContextBadge campaignName={campaign?.name ?? null} guidelinesLoaded={true} contextMeta={contextMeta} />
             {conversations.length > 0 && (
               <button
@@ -549,8 +635,20 @@ export default function ChatPanel() {
                 </button>
               </>
             )}
-            <button onClick={() => setExpanded(!expanded)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title={expanded ? 'Collapse' : 'Expand'}>
-              {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            {!fullScreen && (
+              <button onClick={() => setExpanded(!expanded)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title={expanded ? 'Shrink panel' : 'Widen panel'}>
+                {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <button
+              onClick={() => setFullScreen(v => !v)}
+              className={cn(
+                'p-1 transition-colors',
+                fullScreen ? 'text-primary hover:text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+              title={fullScreen ? 'Exit full screen (Esc)' : 'Full screen'}
+            >
+              {fullScreen ? <Shrink className="h-3.5 w-3.5" /> : <Expand className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
@@ -621,7 +719,7 @@ export default function ChatPanel() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          <div className="py-2">
+          <div className={cn('py-2', fullScreen && 'max-w-3xl mx-auto w-full')}>
             {messages.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Ask anything about your campaigns. The AI agent has access to all 87 Google Ads tools.
@@ -631,6 +729,7 @@ export default function ChatPanel() {
               <ChatMessageComponent
                 key={msg.id}
                 message={msg}
+                conversationId={conversationId ?? undefined}
                 onDelete={async (msgId) => {
                   if (!conversationId) return;
                   try {
@@ -650,19 +749,38 @@ export default function ChatPanel() {
           </div>
         </div>
 
-        {/* Memory Panel */}
-        <MemoryPanel
-          campaignId={selectedCampaignId}
-          campaignName={campaign?.name}
-        />
+        {/* Memory Panel — hidden in full-screen so the chat dominates the view */}
+        {!fullScreen && (
+          <MemoryPanel
+            campaignId={selectedCampaignId}
+            campaignName={campaign?.name}
+          />
+        )}
 
-        {/* Input */}
+        {/* Input — centered to a readable column in full-screen */}
+        <div className={cn(fullScreen && 'max-w-3xl mx-auto w-full')}>
         <ChatInput
           onSend={handleSend}
           disabled={isResponding}
           campaignName={campaign?.name}
           conversationId={conversationId}
           onEnsureConversation={ensureConversation}
+          onVideoReady={(url, script, thumbnail) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `msg-video-${Date.now()}`,
+                role: 'assistant',
+                content: script ? `Your video ad:\n\n_“${script}”_` : 'Your video ad is ready.',
+                createdAt: new Date().toISOString(),
+                videoUrl: url,
+                videoThumbnail: thumbnail,
+                agentRole: 'script_generator',
+                agentRoleName: 'Video Script Generator',
+                agentRoleAvatar: 'film',
+              },
+            ]);
+          }}
           conversations={conversations.map(c => ({
             id: c.id,
             title: c.title || 'Untitled',
@@ -688,6 +806,7 @@ export default function ChatPanel() {
             })));
           }}
         />
+        </div>
       </div>
     </div>
   );

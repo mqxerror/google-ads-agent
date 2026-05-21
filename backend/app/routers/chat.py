@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from collections import defaultdict
 
@@ -22,6 +23,8 @@ from app.services.agent import stream_agent_response, stop_agent
 from app.services.guidelines import GuidelinesService
 from app.services.roles import list_roles, classify_intent, get_role_detail, save_role_override, delete_role_override
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -157,11 +160,109 @@ async def send_message(
         )
         conv = await cur.fetchone()
         if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
+            # Auto-heal a dangling conversation id instead of dead-ending with a
+            # 404. This happens when the frontend (e.g. the campaign builder or a
+            # ChatPanel restored from localStorage) holds a conversation id that
+            # no longer exists server-side — a reset DB, a build started in a
+            # prior run, or a conversation row that was never persisted. The
+            # request body already carries enough context to recreate the row,
+            # so resuming the campaign "just works" rather than 404-looping.
+            if not body.account_id:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Conversation not found and no account_id provided to recreate it",
+                )
+            await db.execute(
+                "INSERT OR IGNORE INTO conversations "
+                "(id, account_id, campaign_id, campaign_name, title) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    conversation_id,
+                    body.account_id,
+                    body.campaign_id,
+                    body.campaign_name,
+                    "Resumed conversation",
+                ),
+            )
+            await db.commit()
+            cur = await db.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            )
+            conv = await cur.fetchone()
+            logger.warning(
+                "Recreated dangling conversation %s (account=%s campaign=%s)",
+                conversation_id, body.account_id, body.campaign_id,
+            )
 
+        # A conversation is bound to ONE campaign for its lifetime. The binding
+        # may only be set/changed while the conversation is still empty (its very
+        # first message). Once it has history, the conversation's own campaign is
+        # authoritative and is NEVER silently rebound to whatever the client sent
+        # — doing that corrupts the thread and leaks one campaign's name + memory
+        # into another (the "agent still talks about the old campaign" bug, and
+        # the mislabeled "Greece chat bound to Panama" rows in the DB).
+        cur = await db.execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+        msg_count = (await cur.fetchone())["n"]
+
+        if msg_count == 0 and body.campaign_id and body.campaign_id != conv["campaign_id"]:
+            # First message — bind the conversation to the selected campaign.
+            await db.execute(
+                "UPDATE conversations SET campaign_id = ?, campaign_name = COALESCE(?, campaign_name) "
+                "WHERE id = ?",
+                (body.campaign_id, body.campaign_name, conversation_id),
+            )
+            cur = await db.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            )
+            conv = await cur.fetchone()
+        elif not conv["campaign_id"] and body.campaign_id:
+            # Conversation has history but was never bound to a campaign (e.g. the
+            # user started typing before selecting a campaign, then selected one).
+            # Promote it now — null→campaign is always safe; only set→different
+            # is forbidden (handled by the next branch). Without this an
+            # unbound thread stays orphaned forever and the agent never loads
+            # the campaign's chronicle/decisions/role-notes — the "agent forgot
+            # after a day" symptom.
+            await db.execute(
+                "UPDATE conversations SET campaign_id = ?, campaign_name = COALESCE(?, campaign_name) "
+                "WHERE id = ?",
+                (body.campaign_id, body.campaign_name, conversation_id),
+            )
+            cur = await db.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            )
+            conv = await cur.fetchone()
+            logger.info(
+                "Promoted unbound conversation %s to campaign %s (%s)",
+                conversation_id, body.campaign_id, conv["campaign_name"],
+            )
+        elif (
+            msg_count > 0
+            and body.campaign_id
+            and conv["campaign_id"]
+            and body.campaign_id != conv["campaign_id"]
+        ):
+            # Stale / cross-campaign client. The conversation's own campaign wins
+            # — the frontend should have opened a fresh conversation for the
+            # other campaign. Log loudly so any remaining client bug is visible.
+            logger.warning(
+                "Rejected cross-campaign reuse on conversation %s: client sent "
+                "campaign=%s but conversation is bound to %s (%s). Using the "
+                "conversation's own campaign so the thread stays consistent.",
+                conversation_id, body.campaign_id, conv["campaign_id"],
+                conv["campaign_name"],
+            )
+
+        # Tag the user message with the conversation's authoritative campaign so
+        # the thread (and _get_recent_messages) stays internally consistent.
+        message_campaign_id = conv["campaign_id"]
         await db.execute(
-            "INSERT INTO messages (id, conversation_id, role, content) VALUES (?, ?, ?, ?)",
-            (user_msg_id, conversation_id, "user", body.content),
+            "INSERT INTO messages (id, conversation_id, role, content, campaign_id) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_msg_id, conversation_id, "user", body.content, message_campaign_id),
         )
         await db.execute(
             "UPDATE conversations SET updated_at = datetime('now') WHERE id = ?",
@@ -172,9 +273,11 @@ async def send_message(
         await db.close()
 
     # Load guidelines for context injection
+    # Conversation is authoritative for campaign (see binding rule above) so the
+    # agent's campaign context always matches the thread it is replying in.
     account_id = body.account_id or conv["account_id"]
-    campaign_id = body.campaign_id or conv["campaign_id"]
-    campaign_name = conv["campaign_name"]
+    campaign_id = conv["campaign_id"] or body.campaign_id
+    campaign_name = conv["campaign_name"] or body.campaign_name
 
     base_guidelines = None
     campaign_guidelines_text = None
@@ -234,12 +337,12 @@ async def send_message(
                 db2 = await get_db()
                 try:
                     await db2.execute(
-                        "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name, campaign_id) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             assistant_msg_id, conv_id, "assistant", full_text,
                             json.dumps(tool_calls_json) if tool_calls_json else None,
-                            agent_role_id, agent_role_name,
+                            agent_role_id, agent_role_name, campaign_id,
                         ),
                     )
                     await db2.commit()
@@ -295,6 +398,48 @@ async def stop_agent_task(conversation_id: str) -> dict:
     """Abort a running agent subprocess for this conversation."""
     stopped = stop_agent(conversation_id)
     return {"stopped": stopped}
+
+
+# ── Claude Code handoff ─────────────────────────────────────────────
+
+
+@router.post("/conversations/{conversation_id}/handoff")
+async def handoff_to_claude_code(conversation_id: str, body: dict | None = None) -> dict:
+    """Flag a conversation as awaiting Claude Code (the user's terminal
+    session). Claude Code polls list_conversations(awaits_claude_code=true)
+    via MCP, reads the thread, executes the work, and posts results back.
+
+    Body: { "note": "optional context for Claude Code" }
+    """
+    from datetime import datetime, timezone
+
+    note = (body or {}).get("note") if isinstance(body, dict) else None
+    now = datetime.now(timezone.utc).isoformat()
+    db = await get_db()
+    cur = await db.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,))
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    await db.execute(
+        "UPDATE conversations SET awaits_claude_code = 1, handoff_note = ?, updated_at = ? "
+        "WHERE id = ?",
+        (note, now, conversation_id),
+    )
+    await db.commit()
+    return {"ok": True, "conversation_id": conversation_id, "handoff_note": note}
+
+
+@router.delete("/conversations/{conversation_id}/handoff")
+async def clear_handoff(conversation_id: str) -> dict:
+    """Clear a handoff flag (the chat UI can call this if the user changes
+    their mind before Claude Code picks it up)."""
+    db = await get_db()
+    await db.execute(
+        "UPDATE conversations SET awaits_claude_code = 0, handoff_note = NULL WHERE id = ?",
+        (conversation_id,),
+    )
+    await db.commit()
+    return {"ok": True, "conversation_id": conversation_id}
 
 
 @router.get("/accounts/{account_id}/conversation-graph")
@@ -497,6 +642,36 @@ async def search_conversations(
     except Exception as e:
         # FTS5 might not have data yet
         return []
+    finally:
+        await db.close()
+
+
+# ── Single conversation lookup ─────────────────────────────────────
+# Declared AFTER /conversations/search so the static route wins (FastAPI
+# matches in declaration order; this {conversation_id} param would otherwise
+# capture "search"). The frontend uses this to verify a conversation's
+# campaign binding before reusing it for a send.
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
+async def get_conversation(conversation_id: str) -> ConversationResponse:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+        )
+        row = await cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return ConversationResponse(
+            id=row["id"],
+            account_id=row["account_id"],
+            campaign_id=row["campaign_id"],
+            campaign_name=row["campaign_name"],
+            title=row["title"],
+            created_at=row["created_at"] or "",
+            updated_at=row["updated_at"] or "",
+        )
     finally:
         await db.close()
 
