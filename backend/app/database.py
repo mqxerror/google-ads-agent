@@ -485,7 +485,193 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V5 migration complete (skill evolution tables).")
 
-        if version >= 5:
-            logger.info("Database schema is V5 (up to date).")
+        # V7: Media library for the Studio page — rendered videos + uploaded images/files
+        # that can be attached to PMax/Video campaign creative.
+        if version < 7:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS ad_assets (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT,
+                    campaign_id TEXT,
+                    type TEXT NOT NULL,            -- video | image | audio | other
+                    filename TEXT NOT NULL,
+                    url TEXT NOT NULL,             -- public URL the frontend can play/download
+                    width INTEGER,
+                    height INTEGER,
+                    duration REAL,                 -- seconds, for video/audio
+                    size_bytes INTEGER,
+                    script TEXT,                   -- spoken text, for generated videos
+                    thumbnail_url TEXT,
+                    source TEXT NOT NULL,          -- generated | uploaded
+                    voice_id TEXT,
+                    avatar_id TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_ad_assets_account
+                    ON ad_assets(account_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_ad_assets_campaign
+                    ON ad_assets(campaign_id, created_at DESC);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (7)")
+            await db.commit()
+            logger.info("V7 migration complete (ad_assets table).")
+
+        # V6: Tag messages with campaign_id so switching campaigns mid-conversation
+        # doesn't bleed the previous campaign's Q&A into the new context.
+        if version < 6:
+            cursor = await db.execute("PRAGMA table_info(messages)")
+            cols = [row[1] for row in await cursor.fetchall()]
+            if "campaign_id" not in cols:
+                await db.execute("ALTER TABLE messages ADD COLUMN campaign_id TEXT")
+                await db.execute(
+                    "UPDATE messages SET campaign_id = "
+                    "(SELECT campaign_id FROM conversations WHERE conversations.id = messages.conversation_id) "
+                    "WHERE campaign_id IS NULL"
+                )
+                await db.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_conv_campaign "
+                    "ON messages(conversation_id, campaign_id)"
+                )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (6)")
+            await db.commit()
+            logger.info("V6 migration complete (messages.campaign_id).")
+
+        # V8: Guideline edit proposals (E7 — agent suggests, user reviews/applies).
+        if version < 8:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS guideline_proposals (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    filename TEXT NOT NULL,            -- e.g. "GREECE_CAMPAIGN_GUIDELINES.md"
+                    based_on_hash TEXT NOT NULL,       -- sha256 of source content used to generate
+                    based_on_content TEXT NOT NULL,    -- full source content (for diff rendering + apply guard)
+                    proposed_content TEXT NOT NULL,    -- full proposed file content
+                    rationale TEXT,                    -- why the model is suggesting this
+                    evidence_summary TEXT,             -- what sessions/corrections informed it
+                    status TEXT DEFAULT 'pending',     -- pending | applied | discarded | stale
+                    applied_at TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_proposals_file
+                    ON guideline_proposals(account_id, filename, status, created_at DESC);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (8)")
+            await db.commit()
+            logger.info("V8 migration complete (guideline_proposals table).")
+
+        # V9: Claude Code handoff flag on conversations.
+        # awaits_claude_code is set to 1 when the user clicks the
+        # "Send to Claude Code" button in the chat UI. Claude Code's
+        # MCP server polls list_conversations(awaits_claude_code=true)
+        # to pick up these threads.
+        if version < 9:
+            for ddl in (
+                "ALTER TABLE conversations ADD COLUMN awaits_claude_code INTEGER DEFAULT 0",
+                "ALTER TABLE conversations ADD COLUMN handoff_note TEXT",
+            ):
+                try:
+                    await db.execute(ddl)
+                except aiosqlite.OperationalError:
+                    # column already exists — migration is idempotent
+                    pass
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (9)")
+            await db.commit()
+            logger.info("V9 migration complete (Claude Code handoff columns).")
+
+        # V10: Resumable Claude session id on conversations.
+        # When the agent stops mid-task (cost cap, max continuations, user
+        # stop) the Claude CLI session id is saved here so the next message
+        # in the conversation can --resume it instead of cold-starting and
+        # losing the work. Cleared on natural completion / after it is used.
+        if version < 10:
+            try:
+                await db.execute(
+                    "ALTER TABLE conversations ADD COLUMN resume_session_id TEXT"
+                )
+            except aiosqlite.OperationalError:
+                pass  # column already exists — idempotent
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (10)")
+            await db.commit()
+            logger.info("V10 migration complete (resume_session_id column).")
+
+        # V11: first-class `campaigns` table — single source of truth.
+        # Until V11 the sidebar, agent, memory panel, and reports each
+        # invented their own read path (a JSON blob in `cache`, the live
+        # Google Ads API, `_ads_svc.get_campaigns` ad-hoc, `campaign_daily_metrics`
+        # rows whose `campaign_status` was always NULL). Anything that
+        # disagreed silently won — the same split-brain that bit the chat
+        # panel. From V11 onward every consumer reads here.
+        if version < 11:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS campaigns (
+                    campaign_id TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    name TEXT,
+                    status TEXT,
+                    channel TEXT,
+                    bidding_strategy TEXT,
+                    budget_micros INTEGER,
+                    location TEXT,
+                    language TEXT,
+                    last_synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (account_id, campaign_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_campaigns_account
+                    ON campaigns(account_id);
+                CREATE INDEX IF NOT EXISTS idx_campaigns_account_status
+                    ON campaigns(account_id, status);
+                CREATE INDEX IF NOT EXISTS idx_campaigns_synced
+                    ON campaigns(account_id, last_synced_at);
+            """)
+            # Best-effort backfill from the JSON blob in `cache` so the
+            # table is immediately useful for accounts that already have
+            # cached data. Sync worker (Story 2) will refresh on first
+            # access anyway, so a corrupt/missing blob is harmless.
+            try:
+                cur = await db.execute(
+                    "SELECT key, data FROM cache WHERE key LIKE '%:campaigns:%'"
+                )
+                rows = await cur.fetchall()
+                imported = 0
+                for row in rows:
+                    account_id = row["key"].split(":", 1)[0]
+                    try:
+                        import json as _json
+                        payload = _json.loads(row["data"])
+                    except Exception:
+                        continue
+                    if not isinstance(payload, list):
+                        continue
+                    for c in payload:
+                        if not isinstance(c, dict):
+                            continue
+                        cid = c.get("id") or c.get("campaign_id")
+                        if not cid:
+                            continue
+                        await db.execute(
+                            """INSERT OR IGNORE INTO campaigns
+                               (campaign_id, account_id, name, status, channel,
+                                bidding_strategy, budget_micros, last_synced_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                            (
+                                str(cid), account_id,
+                                c.get("name"), c.get("status"),
+                                c.get("channel") or c.get("advertising_channel_type"),
+                                c.get("bidding_strategy"),
+                                c.get("budget_micros"),
+                            ),
+                        )
+                        imported += 1
+                logger.info("V11 backfill: imported %d campaign rows from cache blob.", imported)
+            except Exception as e:
+                logger.warning("V11 backfill skipped: %s", e)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (11)")
+            await db.commit()
+            logger.info("V11 migration complete (campaigns table — single source of truth).")
+
+        if version >= 11:
+            logger.info("Database schema is V11 (up to date).")
     finally:
         await db.close()
