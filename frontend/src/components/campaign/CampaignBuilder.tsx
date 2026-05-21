@@ -4,11 +4,13 @@ import {
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
   Circle, Upload, X, LinkIcon, Globe, Languages, DollarSign,
   Sparkles, Rocket, Zap, Brain, RefreshCw,
+  Layers, Video,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+import PMaxWizard from './PMaxWizard';
 // chatApi used for atomic conversation creation in runStage and Research
 
 type ModelId = 'sonnet' | 'opus' | 'haiku';
@@ -37,10 +39,25 @@ const STAGE_COLORS = [
   'text-orange-500', 'text-cyan-500', 'text-gray-500',
 ];
 
-type WizardStep = 'input' | 'pipeline' | 'review';
+type WizardStep = 'type' | 'input' | 'pipeline' | 'review';
+type CampaignType = 'search' | 'pmax' | 'video';
 
 export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const accountId = useClientAccountId();
+
+  // Campaign type picker — defaults to 'search' so existing behaviour
+  // is preserved if the user picks Search; PMax routes to a different
+  // wizard, Video shows a coming-soon card.
+  const [campaignType, setCampaignType] = useState<CampaignType | null>(() => {
+    try { return (sessionStorage.getItem('campaign-builder-type') as CampaignType) || null; } catch { return null; }
+  });
+  const persistCampaignType = (t: CampaignType | null) => {
+    try {
+      if (t) sessionStorage.setItem('campaign-builder-type', t);
+      else sessionStorage.removeItem('campaign-builder-type');
+    } catch {}
+    setCampaignType(t);
+  };
 
   // Persist form inputs in sessionStorage so they survive errors/restarts
   const loadSaved = (key: string, fallback: string) => {
@@ -80,9 +97,31 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }>>([]);
   const [currentStage, setCurrentStage] = useState(1);
   const [pipelineRunning, setPipelineRunning] = useState(false);
-  const [buildConversationId, setBuildConversationId] = useState<string | null>(null);
+  // Persisted so navigating away from the builder and back resumes the SAME
+  // conversation thread instead of forking a new one (which desynced the chat
+  // panel from the pipeline and stranded the old thread).
+  const [buildConversationId, _setBuildConversationId] = useState<string | null>(
+    () => loadSaved('conv_id', '') || null,
+  );
+  const setBuildConversationId = useCallback((id: string | null) => {
+    _setBuildConversationId(id);
+    if (id) save('conv_id', id);
+    else { try { sessionStorage.removeItem('campaign-builder-conv_id'); } catch {} }
+  }, []);
+  // Re-entrancy guards: a triple-click must not spawn 3 builds / 3 stage runs.
+  const startingRef = useRef(false);
+  const stageInFlightRef = useRef(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [autoMode, setAutoMode] = useState(true); // true = run all stages non-stop
-  const [step, setStep] = useState<WizardStep>('input');
+  // Step state: `type` first (campaign-type picker), then forks to the
+  // existing Search input or to PMaxWizard. Resumes wherever the user
+  // left off if a previous session set a campaign type.
+  const [step, setStep] = useState<WizardStep>(() => {
+    try {
+      const savedType = sessionStorage.getItem('campaign-builder-type');
+      return savedType ? 'input' : 'type';
+    } catch { return 'type'; }
+  });
 
   // On mount: check backend for existing pipeline progress
   useEffect(() => {
@@ -129,30 +168,46 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
   // Start build
   const handleStartBuild = async () => {
-    const finalUrl = noLandingPage ? `NO_LANDING_PAGE: ${brief.slice(0, 50)}` : url;
-    const res = await fetch('/api/campaigns/build', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        account_id: accountId,
-        landing_page_url: finalUrl,
-        brief: noLandingPage
-          ? `${brief}\n\nIMPORTANT: The user does NOT have a landing page yet. As part of this campaign build, suggest a landing page structure, wireframe, and key sections that should be created BEFORE launching ads. The CRO Specialist should provide a landing page blueprint.`
-          : brief,
-        budget_daily: budget,
-        geo_targets: geoTargets.split(',').map(s => s.trim()),
-        languages: languages.split(',').map(s => s.trim()),
-        attachments: attachments.map(a => ({ filename: a.filename, path: a.path })),
-      }),
-    });
-    const session = await res.json();
-    setSessionId(session.id);
-    setStages(session.stages);
-    setCurrentStage(1);
-    setStep('pipeline');
+    // Re-entrancy guard: ignore rapid double/triple-clicks. The ref flips
+    // synchronously (before any await) so a burst of clicks in the same tick
+    // can't each pass the check and fire 3 POST /campaigns/build.
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setIsStarting(true);
+    try {
+      // Fresh build → drop any previous build's conversation thread.
+      setBuildConversationId(null);
+      const finalUrl = noLandingPage ? `NO_LANDING_PAGE: ${brief.slice(0, 50)}` : url;
+      const res = await fetch('/api/campaigns/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          landing_page_url: finalUrl,
+          brief: noLandingPage
+            ? `${brief}\n\nIMPORTANT: The user does NOT have a landing page yet. As part of this campaign build, suggest a landing page structure, wireframe, and key sections that should be created BEFORE launching ads. The CRO Specialist should provide a landing page blueprint.`
+            : brief,
+          budget_daily: budget,
+          geo_targets: geoTargets.split(',').map(s => s.trim()),
+          languages: languages.split(',').map(s => s.trim()),
+          attachments: attachments.map(a => ({ filename: a.filename, path: a.path })),
+        }),
+      });
+      if (!res.ok) throw new Error(`Build start failed: ${res.status}`);
+      const session = await res.json();
+      setSessionId(session.id);
+      setStages(session.stages);
+      setCurrentStage(1);
+      setStep('pipeline');
 
-    // Save campaign context so we can derive status on reload
-    save('build_campaign_id', session.input?.campaign_id || `build-${session.id.slice(0, 8)}`);
+      // Save campaign context so we can derive status on reload
+      save('build_campaign_id', session.input?.campaign_id || `build-${session.id.slice(0, 8)}`);
+    } catch (err) {
+      console.error('Start build failed:', err);
+    } finally {
+      startingRef.current = false;
+      setIsStarting(false);
+    }
   };
 
   // Refresh pipeline status from backend
@@ -171,9 +226,18 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }, [accountId]);
 
   // Run a pipeline stage — sends to chat, then user clicks "Run Next" for the next one
-  const runStage = useCallback(async (stageNum: number) => {
+  // `chain` controls auto-advance. A manual per-stage Run is a one-shot
+  // (chain=false) so firing any agent out of order doesn't drag the whole
+  // sequential pipeline behind it. The "Run all remaining" path passes
+  // chain=true to keep the in-order behaviour.
+  const runStage = useCallback(async (stageNum: number, chain: boolean = autoMode) => {
     const stage = stages.find(s => s.stage === stageNum);
     if (!stage) return;
+    // Re-entrancy guard: a manual click can land on top of the auto-advance
+    // setTimeout (or a triple-click on "Run"). Without this, two runStage calls
+    // fire concurrent POST /message for different stages on the same thread.
+    if (stageInFlightRef.current) return;
+    stageInFlightRef.current = true;
 
     setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'running' } : s));
     setCurrentStage(stageNum);
@@ -199,9 +263,12 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       const nextStage = stageNum + 1;
       setCurrentStage(nextStage);
 
-      if (autoMode) {
-        // Auto-advance: run next stage after a short delay
-        setTimeout(() => runStage(nextStage), 1500);
+      if (chain) {
+        // Auto-advance: run the next un-completed stage after a short delay.
+        // Skip stages already done so out-of-order progress isn't re-run.
+        const upcoming = stages.find(s => s.stage >= nextStage && s.status !== 'completed');
+        if (upcoming) setTimeout(() => runStage(upcoming.stage, true), 1500);
+        else { setPipelineRunning(false); setStep('review'); }
       } else {
         setPipelineRunning(false);
       }
@@ -215,11 +282,15 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
 
     // Atomic approach: create conversation + send message in one flow, no events
     try {
-      const isFirstStage = stageNum === 1;
       let convId = buildConversationId;
       const tempCampaignId = loadSaved('build_campaign_id', '');
 
-      if (isFirstStage || !convId) {
+      // Only create a conversation when we genuinely don't have one. A fresh
+      // build clears conv_id in handleStartBuild, so this no longer forks a new
+      // thread when re-running/retrying stage 1 on an in-progress build. If the
+      // persisted id is stale, the backend auto-heals it on POST rather than
+      // 404-ing, so reusing it is always safe.
+      if (!convId) {
         const { createConversation } = await import('@/lib/api');
         const conv = await createConversation({
           account_id: accountId,
@@ -250,11 +321,82 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
       window.dispatchEvent(new CustomEvent('chat:display', { detail: { conversationId: convId } }));
     } catch (err) {
       setPipelineRunning(false);
+      setStages(prev => prev.map(s => s.stage === stageNum ? { ...s, status: 'error' } : s));
       console.error('Builder send failed:', err);
+    } finally {
+      // Released once the network send settles — not on stage completion. The
+      // next stage's auto-advance runs well after this, so the guard is free.
+      stageInFlightRef.current = false;
     }
-  }, [stages, buildModel, refreshPipelineStatus, accountId, buildConversationId, url]);
+  }, [stages, buildModel, refreshPipelineStatus, accountId, buildConversationId, url, setBuildConversationId, sessionId, autoMode]);
 
   // ── INPUT STEP ─────────────────────────────────────────────
+  // Short-circuit to the PMax wizard when the user picked PMax. The
+  // existing Search wizard's state machine (input → pipeline → review)
+  // doesn't apply — PMax has its own asset-bundle flow.
+  if (campaignType === 'pmax') {
+    return (
+      <PMaxWizard
+        onClose={onClose}
+        onBackToTypePicker={() => {
+          persistCampaignType(null);
+          setStep('type');
+        }}
+      />
+    );
+  }
+
+  // Campaign-type picker — first step on a fresh session.
+  if (step === 'type') {
+    const TYPE_CARDS: { id: CampaignType; label: string; tagline: string; icon: typeof Search; available: boolean; note?: string }[] = [
+      { id: 'search', label: 'Search', tagline: 'Keyword-driven text ads on Google.com', icon: Search, available: true },
+      { id: 'pmax',   label: 'Performance Max', tagline: "Google's all-network campaign with auto-placed creative.", icon: Layers, available: true },
+      { id: 'video',  label: 'Video (YouTube)', tagline: 'YouTube + Discover video ads.', icon: Video, available: false, note: 'Coming soon — needs YouTube channel linked.' },
+    ];
+    return (
+      <div className="max-w-2xl mx-auto py-8 px-6">
+        <div className="flex items-center gap-3 mb-8">
+          <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-md">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Rocket className="h-6 w-6 text-primary" />
+              Campaign Builder
+            </h1>
+            <p className="text-sm text-muted-foreground">Pick a campaign type to start.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {TYPE_CARDS.map(({ id, label, tagline, icon: Icon, available, note }) => (
+            <button
+              key={id}
+              disabled={!available}
+              onClick={() => {
+                if (!available) return;
+                persistCampaignType(id);
+                setStep('input');
+              }}
+              className={cn(
+                'text-left border rounded-lg p-4 transition-all',
+                available
+                  ? 'border-border hover:border-primary hover:bg-secondary/50 cursor-pointer'
+                  : 'border-border/50 opacity-60 cursor-not-allowed'
+              )}
+            >
+              <Icon className="h-6 w-6 text-primary mb-2" />
+              <div className="font-semibold text-sm mb-1">{label}</div>
+              <p className="text-xs text-muted-foreground leading-snug">{tagline}</p>
+              {note && (
+                <p className="text-[10px] text-amber-500/80 mt-2">{note}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'input') {
     return (
       <div className="max-w-2xl mx-auto py-8 px-6">
@@ -493,10 +635,12 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             onClick={handleStartBuild}
             size="lg"
             className="flex-1 gap-2"
-            disabled={!noLandingPage && !url.trim()}
+            disabled={(!noLandingPage && !url.trim()) || isStarting}
           >
             <Sparkles className="h-4 w-4" />
-            {autoMode ? 'Start Building (Auto)' : 'Start Building (Manual)'}
+            {isStarting
+              ? 'Starting…'
+              : autoMode ? 'Start Building (Auto)' : 'Start Building (Manual)'}
           </Button>
           <Button
             variant="outline"
@@ -578,7 +722,9 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                   isDone && 'border-emerald-500/40 bg-emerald-500/5',
                   isRunning && 'border-primary/50 bg-primary/5 ring-2 ring-primary/20',
                   isActive && !isRunning && !isDone && 'border-border bg-secondary/30',
-                  !isActive && !isDone && !isRunning && 'border-border/50 opacity-50',
+                  // Every stage is independently runnable now — no dimming/lock
+                  // on non-active stages.
+                  !isActive && !isDone && !isRunning && 'border-border/60',
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -617,36 +763,45 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
                     )}
                   </div>
 
-                  {/* Run / Retry button */}
-                  {(isActive || stage.status === 'error') && !isDone && !isRunning && (
+                  {/* Every stage is independently runnable, in any order. A
+                      manual click is a one-shot (chain=false) so it doesn't
+                      drag the rest of the pipeline. Disabled only while ANY
+                      stage is mid-send (one conversation turn at a time). */}
+                  {!isRunning && (
                     <Button
                       size="sm"
-                      onClick={() => runStage(stage.stage)}
+                      variant={isDone ? 'outline' : 'default'}
+                      onClick={() => runStage(stage.stage, false)}
                       disabled={pipelineRunning}
                       className="gap-1"
                     >
                       <Play className="h-3 w-3" />
-                      {stage.status === 'error' ? 'Retry' : 'Run'}
+                      {stage.status === 'error' ? 'Retry' : isDone ? 'Re-run' : 'Run'}
                     </Button>
                   )}
-                  {/* Mark complete — when auto-detection fails */}
-                  {isRunning && (
+                  {/* Mark done — reconcile a stage whose status detection was
+                      wrong (e.g. work already done in a prior session) without
+                      having to re-run the agent. Available on any not-done
+                      stage, plus the running one (auto-detection fallback). */}
+                  {!isDone && (
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       onClick={async () => {
                         if (sessionId) {
-                          await fetch(`/api/campaigns/build/${sessionId}/stage/${stage.stage}/complete`, { method: 'POST' });
+                          await fetch(`/api/campaigns/build/${sessionId}/stage/${stage.stage}/complete`, { method: 'POST' }).catch(() => {});
                         }
                         setStages(prev => prev.map(s => s.stage === stage.stage ? { ...s, status: 'completed' } : s));
-                        setCurrentStage(stage.stage + 1);
-                        setPipelineRunning(false);
-                        if (stage.stage >= 7) setStep('review');
+                        if (isRunning) {
+                          setPipelineRunning(false);
+                          stageInFlightRef.current = false;
+                        }
                       }}
-                      className="gap-1"
+                      className="gap-1 text-muted-foreground"
+                      title="Mark this stage complete without running the agent"
                     >
                       <CheckCircle2 className="h-3 w-3" />
-                      Mark Done
+                      {isRunning ? 'Mark Done' : 'Skip'}
                     </Button>
                   )}
                 </div>
@@ -658,17 +813,20 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
         {/* Progress info */}
         <div className="mt-6 text-center space-y-3">
           <p className="text-xs text-muted-foreground">
-            {stages.filter(s => s.status === 'completed').length} of {stages.length} stages completed · Each role reads previous findings
+            {stages.filter(s => s.status === 'completed').length} of {stages.length} stages completed · Run any agent above in any order, or chain the rest:
           </p>
           <div className="flex gap-2 justify-center">
-          {currentStage > 0 && currentStage <= stages.length && !pipelineRunning && (
+          {stages.some(s => s.status !== 'completed') && !pipelineRunning && (
             <Button
               size="sm"
               className="gap-1"
-              onClick={() => runStage(currentStage)}
+              onClick={() => {
+                const next = stages.find(s => s.status !== 'completed');
+                if (next) runStage(next.stage, true);
+              }}
             >
               <Play className="h-3 w-3" />
-              Run Stage {currentStage}
+              Run all remaining (in order)
             </Button>
           )}
           <Button

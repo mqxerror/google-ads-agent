@@ -51,6 +51,22 @@ from google_ads.utils import format_customer_id, get_logger
 logger = get_logger(__name__)
 
 
+class ApiCtx:
+    """Minimal duck-typed substitute for `fastmcp.Context` so the FastAPI
+    route can drive the orchestrator without a real MCP session.
+
+    All the primitive services (BudgetService, CampaignService, etc.)
+    call `await ctx.log(level=..., message=...)` to surface progress;
+    redirect those into the standard Python logger so the user can see
+    them in the uvicorn output.
+    """
+    import logging as _logging
+
+    async def log(self, *, level: str = "info", message: str = "") -> None:
+        lvl = getattr(self._logging, level.upper(), self._logging.INFO)
+        logger.log(lvl, message)
+
+
 # Google's hard minimums for PMax. Bundle is rejected pre-flight if any
 # of these fail so we don't waste a round-trip on a doomed request.
 TEXT_RULES = {
