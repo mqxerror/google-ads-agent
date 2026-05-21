@@ -836,9 +836,13 @@ GEAR3_PATTERNS = [
 ROLE_SIGNALS: dict[str, list[str]] = {
     "ppc_strategist": [
         "bidding", "bid strategy", "bid", "budget", "cpa target", "roas",
-        "performance", "optimize", "campaign structure", "learning phase",
+        "optimize", "campaign structure", "learning phase",
         "impression share", "max conversions", "target cpa",
         "strategy", "bidding strategy", "spend", "allocat",
+        # NOTE: bare "performance" removed — too generic, was stealing
+        # PMax routing ("launch a performance max for greece" was hitting
+        # ppc_strategist instead of pmax_strategist on a tie). The other
+        # signals here are specific enough to identify true PPC work.
     ],
     "search_term_hunter": [
         "search term", "negative keyword", "query", "wasted spend",
@@ -885,9 +889,15 @@ ROLE_SIGNALS: dict[str, list[str]] = {
     "pmax_strategist": [
         # Direct asks
         "pmax", "performance max", "performance-max", "p-max",
-        # Building/creating-PMax intent
+        # Building/creating-PMax intent — multiple compound phrases so
+        # "launch a performance max for X" scores high enough to beat
+        # both growth_hacker ("launch") and ppc_strategist on a tie.
         "build me a pmax", "create a pmax", "build pmax", "create pmax",
         "launch pmax", "set up pmax", "new pmax", "make a pmax",
+        "build a performance max", "create a performance max",
+        "launch a performance max", "set up a performance max",
+        "launch performance max", "create performance max",
+        "performance max campaign", "performance max for",
         # Concept terms PMax owns
         "asset group", "audience signal", "asset group signals",
         "marketing image", "long headline",
