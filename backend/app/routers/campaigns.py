@@ -21,7 +21,8 @@ from app.models.schemas import (
 from app.services.google_ads import GoogleAdsService
 from app.services.cache import CacheService
 from app.services.metrics_store import MetricsStore
-from app.services import campaign_memory
+from app.services import campaign_memory, campaigns_repo
+from app.models.schemas import CampaignMetrics
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -55,31 +56,98 @@ async def list_campaigns(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
 ):
-    key = f"{account_id}:campaigns:{date_from}:{date_to}"
-    try:
-        return await _cache.get_or_fetch(
-            key,
-            lambda: _ads_svc.get_campaigns(account_id, date_from, date_to),
-            ttl=_TTL_CAMPAIGNS,
-        )
-    except Exception:
-        # Last resort: return stale cache directly from DB
-        from app.database import get_db
-        import json
+    """Single source of truth: metadata from the `campaigns` table
+    (auto-synced via `campaigns_repo`), metrics joined in from the
+    `campaign_daily_metrics` table for the requested date range.
+
+    The pre-V11 path went through a JSON blob in `cache`, which let the
+    sidebar drift up to 5 min and disagree silently with the agent's
+    view. That path is gone; everything reads here now.
+    """
+    rows = await campaigns_repo.list_campaigns(account_id)
+
+    # Aggregate metrics from campaign_daily_metrics for the date range.
+    # Per-campaign sums; if no rows exist for a campaign in the window
+    # the metrics simply come back as zeros and the response stays
+    # shape-compatible with what the sidebar / overview expect.
+    from app.database import get_db
+    metrics_map: dict[str, dict] = {}
+    if rows:
+        cids = [str(r["campaign_id"]) for r in rows]
+        placeholders = ",".join("?" for _ in cids)
+        params: list = [account_id, *cids]
+        where_date = ""
+        if date_from:
+            where_date += " AND date >= ?"
+            params.append(date_from)
+        if date_to:
+            where_date += " AND date <= ?"
+            params.append(date_to)
         db = await get_db()
         try:
-            cur = await db.execute("SELECT data FROM cache WHERE key = ?", (key,))
-            row = await cur.fetchone()
-            if row:
-                return json.loads(row["data"])
-            # Try the no-date key as fallback
-            cur = await db.execute("SELECT data FROM cache WHERE key LIKE ? ORDER BY fetched_at DESC LIMIT 1", (f"{account_id}:campaigns:%",))
-            row = await cur.fetchone()
-            if row:
-                return json.loads(row["data"])
+            cur = await db.execute(
+                f"""SELECT campaign_id,
+                          COALESCE(SUM(impressions), 0)   AS impressions,
+                          COALESCE(SUM(clicks), 0)        AS clicks,
+                          COALESCE(SUM(cost_micros), 0)   AS cost_micros,
+                          COALESCE(SUM(conversions), 0.0) AS conversions
+                   FROM campaign_daily_metrics
+                   WHERE account_id = ? AND campaign_id IN ({placeholders})
+                   {where_date}
+                   GROUP BY campaign_id""",
+                params,
+            )
+            for m in await cur.fetchall():
+                cid = str(m["campaign_id"])
+                imp = m["impressions"] or 0
+                clk = m["clicks"] or 0
+                metrics_map[cid] = {
+                    "impressions": imp,
+                    "clicks": clk,
+                    "cost_micros": m["cost_micros"] or 0,
+                    "conversions": float(m["conversions"] or 0),
+                    "ctr": (clk / imp * 100) if imp else 0.0,
+                    "avg_cpc_micros": int((m["cost_micros"] or 0) / clk) if clk else 0,
+                }
         finally:
             await db.close()
-        return []
+
+    out: list[CampaignResponse] = []
+    for r in rows:
+        cid = str(r["campaign_id"])
+        out.append(CampaignResponse(
+            id=cid,
+            name=r.get("name") or "",
+            status=r.get("status") or "ENABLED",
+            campaign_type=r.get("channel") or "SEARCH",
+            budget_micros=r.get("budget_micros") or 0,
+            bidding_strategy=r.get("bidding_strategy") or "",
+            metrics=CampaignMetrics(**metrics_map.get(cid, {})),
+        ))
+    return out
+
+
+@router.get("/accounts/{account_id}/campaigns-sync-status")
+async def campaigns_sync_status(account_id: str):
+    """Surface the campaigns table's last sync timestamp so the sidebar
+    can show 'last synced X ago' (Story 4 UX). No more invisible TTLs."""
+    return {
+        "account_id": account_id,
+        "last_synced_at": await campaigns_repo.last_synced_at(account_id),
+        "stale_after_seconds": campaigns_repo.STALE_AFTER_SECONDS,
+    }
+
+
+@router.post("/accounts/{account_id}/sync/campaigns")
+async def force_sync_campaigns(account_id: str):
+    """Explicit refresh — bypasses the staleness check. Wired to the
+    sidebar's refresh button so the user can always force a real read."""
+    n = await campaigns_repo.sync_campaigns(account_id)
+    return {
+        "account_id": account_id,
+        "synced": n,
+        "last_synced_at": await campaigns_repo.last_synced_at(account_id),
+    }
 
 
 @router.get(
