@@ -25,7 +25,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, Plus, X,
-  Upload, Image as ImageIcon, Youtube, Sparkles, Loader2, AlertCircle,
+  Upload, Image as ImageIcon, Video, Sparkles, Loader2, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -396,7 +396,7 @@ function StepVideos({ bundle, setField }: { bundle: PMaxBundle; setField: <K ext
       />
       {bundle.videoIds.filter(Boolean).map(id => (
         <div key={id} className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Youtube className="h-4 w-4 text-red-500" />
+          <Video className="h-4 w-4 text-red-500" />
           <a href={`https://youtube.com/watch?v=${id}`} target="_blank" rel="noreferrer" className="hover:underline">
             youtube.com/watch?v={id}
           </a>
