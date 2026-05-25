@@ -750,7 +750,40 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V13 migration complete (ad_assets extended with higgsfield columns).")
 
-        if version >= 13:
-            logger.info("Database schema is V13 (up to date).")
+        # V14: `soul_characters` table — per-account library of trained
+        # Higgsfield Soul references. Each row maps our internal id +
+        # account_id to a higgsfield soul_id (UUID returned by
+        # `higgsfield soul-id create`). status moves pending → training
+        # → ready | failed via a background `soul-id wait` task.
+        # reference_image_paths stores the local paths of the 5-20
+        # photos we uploaded for training (JSON list, used for the UI
+        # to show the training inputs).
+        if version < 14:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS soul_characters (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    soul_id TEXT UNIQUE,
+                    training_model TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    reference_image_paths TEXT,
+                    error_code TEXT,
+                    error_message TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    ready_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_soul_characters_account
+                    ON soul_characters(account_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_soul_characters_status
+                    ON soul_characters(status, created_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (14)")
+            await db.commit()
+            logger.info("V14 migration complete (soul_characters table — Soul library).")
+
+        if version >= 14:
+            logger.info("Database schema is V14 (up to date).")
     finally:
         await db.close()

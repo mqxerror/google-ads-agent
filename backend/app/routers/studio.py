@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -122,6 +122,21 @@ class CostEstimateRequest(BaseModel):
 class CostEstimateResponse(BaseModel):
     credits: int
     credits_exact: float
+
+
+class SoulCharacter(BaseModel):
+    id: str
+    account_id: str
+    name: str
+    soul_id: Optional[str] = None
+    training_model: str  # 'soul-2' | 'soul-cinematic'
+    status: str          # pending | training | ready | failed
+    reference_image_paths: Optional[list[str]] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: str
+    updated_at: str
+    ready_at: Optional[str] = None
 
 
 class BalanceResponse(BaseModel):
@@ -468,6 +483,285 @@ async def _run_image_job(
             higgsfield_job_id=hf_job_id,
         )
         logger.info("higgsfield job completed (asset=%s job=%s)", asset_id, hf_job_id)
+
+
+# ── Soul training ─────────────────────────────────────────────────────
+
+
+@router.post("/soul/train", response_model=SoulCharacter)
+async def train_soul(
+    name: str = Form(...),
+    account_id: str = Form(...),
+    training_model: str = Form(default="soul-2"),  # soul-2 | soul-cinematic
+    images: list[UploadFile] = File(...),
+) -> SoulCharacter:
+    """Train a new Soul character. Higgsfield needs 5-20 reference
+    photos of the subject (best: varied angles, lighting, expressions).
+    Training takes 5-15 minutes upstream; this endpoint returns
+    immediately with status=pending and the actual training runs in a
+    background task that updates the row when it settles.
+
+    The face-consistent generation is the differentiator: once a Soul
+    is trained, picking text2image_soul_v2 / soul_cinematic / soul_cast
+    + this soul_id produces images / videos where the person looks
+    recognizably the same across every render.
+    """
+    if not (5 <= len(images) <= 20):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Soul training needs 5-20 reference images; got {len(images)}",
+        )
+    if training_model not in ("soul-2", "soul-cinematic"):
+        raise HTTPException(
+            status_code=400,
+            detail="training_model must be 'soul-2' or 'soul-cinematic'",
+        )
+
+    # Save reference images locally so we can re-upload to higgsfield
+    # (CLI wants file paths) AND so the UI can show them later.
+    from app.routers.assets import ASSETS_DIR
+    soul_id_local = str(uuid.uuid4())
+    soul_dir = ASSETS_DIR / "souls" / soul_id_local
+    soul_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths: list[str] = []
+    for i, image in enumerate(images):
+        suffix = Path(image.filename or f"ref{i}.png").suffix or ".png"
+        if suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
+            suffix = ".png"
+        dest = soul_dir / f"ref{i:02d}{suffix}"
+        contents = await image.read()
+        dest.write_bytes(contents)
+        saved_paths.append(str(dest))
+
+    # Pre-create the soul_characters row so the UI sees pending state
+    # immediately. Background task does the heavy lifting.
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO soul_characters
+               (id, account_id, name, training_model, status,
+                reference_image_paths, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), datetime('now'))""",
+            (
+                soul_id_local, account_id, name, training_model,
+                json.dumps(saved_paths),
+            ),
+        )
+        await db.commit()
+        cur = await db.execute(
+            "SELECT * FROM soul_characters WHERE id = ?", (soul_id_local,),
+        )
+        row = await cur.fetchone()
+    finally:
+        await db.close()
+
+    task = asyncio.create_task(
+        _run_soul_training(
+            row_id=soul_id_local,
+            name=name,
+            training_model=training_model,
+            local_paths=saved_paths,
+        )
+    )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+
+    return _row_to_soul(dict(row))
+
+
+@router.get("/soul", response_model=list[SoulCharacter])
+async def list_souls(account_id: Optional[str] = None) -> list[SoulCharacter]:
+    """List trained / training Soul characters. Account-scoped: each
+    operator's account sees only their own. Sorted newest first so the
+    most recent training is at the top of the picker."""
+    db = await get_db()
+    try:
+        if account_id:
+            cur = await db.execute(
+                "SELECT * FROM soul_characters WHERE account_id = ? ORDER BY created_at DESC",
+                (account_id,),
+            )
+        else:
+            cur = await db.execute(
+                "SELECT * FROM soul_characters ORDER BY created_at DESC",
+            )
+        rows = await cur.fetchall()
+        return [_row_to_soul(dict(r)) for r in rows]
+    finally:
+        await db.close()
+
+
+@router.get("/soul/{soul_pk}", response_model=SoulCharacter)
+async def get_soul(soul_pk: str) -> SoulCharacter:
+    """Single Soul read by our internal id (not higgsfield's soul_id).
+    Used by the UI to refresh status after training submission."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM soul_characters WHERE id = ?", (soul_pk,),
+        )
+        row = await cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Soul not found")
+        return _row_to_soul(dict(row))
+    finally:
+        await db.close()
+
+
+def _row_to_soul(row: dict[str, Any]) -> SoulCharacter:
+    refs_raw = row.get("reference_image_paths") or "null"
+    try:
+        refs = json.loads(refs_raw)
+    except Exception:
+        refs = None
+    return SoulCharacter(
+        id=row["id"],
+        account_id=row["account_id"],
+        name=row["name"],
+        soul_id=row.get("soul_id"),
+        training_model=row["training_model"],
+        status=row["status"],
+        reference_image_paths=refs if isinstance(refs, list) else None,
+        error_code=row.get("error_code"),
+        error_message=row.get("error_message"),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        ready_at=row.get("ready_at"),
+    )
+
+
+async def _run_soul_training(
+    *,
+    row_id: str,
+    name: str,
+    training_model: str,
+    local_paths: list[str],
+) -> None:
+    """Background task: upload each reference image to higgsfield, fire
+    soul-id create, then wait for training to settle.
+
+    Updates the soul_characters row through states: pending → training
+    → ready (with the higgsfield soul_id) | failed. All exceptions
+    land in status=failed so the UI always sees a terminal state.
+    """
+    async with _GENERATION_SEMAPHORE:
+        await _update_soul_row(row_id, status="training")
+        client = HiggsfieldClient(timeout_s=120.0)
+
+        # Step 1: upload each reference image, collect upload IDs.
+        upload_ids: list[str] = []
+        for path in local_paths:
+            try:
+                env = await client.upload_media(file_path=path)
+                uid = str(env.get("id") or "").strip()
+                if not uid:
+                    raise HiggsfieldError(
+                        message=f"upload returned no id: {env!r}", code="shape",
+                    )
+                upload_ids.append(uid)
+            except HiggsfieldError as e:
+                await _update_soul_row(
+                    row_id, status="failed",
+                    error_code=e.code or "run",
+                    error_message=f"upload {Path(path).name}: {e.message}",
+                )
+                return
+            except Exception as e:
+                await _update_soul_row(
+                    row_id, status="failed",
+                    error_code="internal",
+                    error_message=f"upload {Path(path).name}: {str(e)[:300]}",
+                )
+                return
+
+        # Step 2: create the Soul reference.
+        try:
+            env = await client.soul_create(
+                name=name, upload_ids=upload_ids, model=training_model,
+            )
+            soul_id_remote = str(env.get("id") or env.get("soul_id") or "").strip()
+            if not soul_id_remote:
+                raise HiggsfieldError(
+                    message=f"soul-id create returned no id: {env!r}", code="shape",
+                )
+        except HiggsfieldError as e:
+            await _update_soul_row(
+                row_id, status="failed",
+                error_code=e.code or "run",
+                error_message=f"soul-id create: {e.message}",
+            )
+            return
+        except Exception as e:
+            await _update_soul_row(
+                row_id, status="failed",
+                error_code="internal",
+                error_message=f"soul-id create: {str(e)[:300]}",
+            )
+            return
+
+        await _update_soul_row(row_id, soul_id=soul_id_remote)
+
+        # Step 3: wait for training. Long-running upstream — give it
+        # 30 minutes ceiling. The CLI exits on terminal state.
+        try:
+            env = await client.soul_wait(soul_id=soul_id_remote, timeout_s=1800.0)
+            status = str(env.get("status") or "").lower()
+            if status in ("ready", "completed", "complete", "success", "done"):
+                await _update_soul_row(row_id, status="ready", ready_at_now=True)
+                logger.info("Soul training ready: %s (soul_id=%s)", row_id, soul_id_remote)
+            else:
+                await _update_soul_row(
+                    row_id, status="failed",
+                    error_code="training_failed",
+                    error_message=f"upstream status: {status or 'unknown'}",
+                )
+        except HiggsfieldError as e:
+            await _update_soul_row(
+                row_id, status="failed",
+                error_code=e.code or "run",
+                error_message=f"soul-id wait: {e.message}",
+            )
+        except Exception as e:
+            await _update_soul_row(
+                row_id, status="failed",
+                error_code="internal",
+                error_message=f"soul-id wait: {str(e)[:300]}",
+            )
+
+
+async def _update_soul_row(
+    row_id: str, *,
+    status: Optional[str] = None,
+    soul_id: Optional[str] = None,
+    error_code: Optional[str] = None,
+    error_message: Optional[str] = None,
+    ready_at_now: bool = False,
+) -> None:
+    sets: list[str] = ["updated_at = datetime('now')"]
+    params: list[Any] = []
+    if status is not None:
+        sets.append("status = ?"); params.append(status)
+    if soul_id is not None:
+        sets.append("soul_id = ?"); params.append(soul_id)
+    if error_code is not None:
+        sets.append("error_code = ?"); params.append(error_code)
+    if error_message is not None:
+        sets.append("error_message = ?"); params.append(error_message)
+    if ready_at_now:
+        sets.append("ready_at = datetime('now')")
+    params.append(row_id)
+    db = await get_db()
+    try:
+        await db.execute(
+            f"UPDATE soul_characters SET {', '.join(sets)} WHERE id = ?",
+            params,
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Video worker ──────────────────────────────────────────────────────
 
 
 async def _run_video_job(

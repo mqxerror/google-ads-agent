@@ -227,6 +227,142 @@ class HiggsfieldClient:
                 message=f"cost CLI returned non-JSON: {stdout[:120]!r}", code="shape",
             ) from e
 
+    async def upload_media(self, *, file_path: str) -> dict[str, Any]:
+        """Upload one local image / video to higgsfield, returning the
+        envelope (contains the `id` we then pass to soul-id create or
+        generate create --image). Used by the Soul-training flow to
+        turn local reference photos into upload IDs."""
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        argv = [bin_path, "--json", "upload", "create", file_path]
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=120.0,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message="upload timed out after 120s", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "upload failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            return json.loads(stdout.strip())
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"upload CLI returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+
+    async def soul_create(
+        self, *, name: str, upload_ids: list[str], model: str = "soul-2",
+    ) -> dict[str, Any]:
+        """Train a new Soul reference. Requires 5-20 upload IDs from
+        ``upload_media``. `model` ∈ {'soul-2', 'soul-cinematic'} —
+        Soul 2.0 is the general-purpose model; cinematic is tuned for
+        film-quality output. Returns the envelope (contains soul_id).
+        Training runs async upstream — call `soul_wait` to poll.
+        """
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        if not (5 <= len(upload_ids) <= 20):
+            raise HiggsfieldError(
+                message=f"Soul training needs 5-20 reference images; got {len(upload_ids)}",
+                code="cli",
+            )
+        if model not in ("soul-2", "soul-cinematic"):
+            raise HiggsfieldError(
+                message=f"Unknown Soul model {model!r}; expected 'soul-2' or 'soul-cinematic'",
+                code="cli",
+            )
+        # The CLI uses `--soul-2` / `--soul-cinematic` as model
+        # selectors (boolean flag), not `--model <name>`.
+        model_flag = f"--{model}"
+        argv = [bin_path, "--json", "soul-id", "create", "--name", name, model_flag]
+        for uid in upload_ids:
+            argv.extend(["--image", uid])
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=60.0,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message="soul-id create timed out after 60s (the CLI submit, not training)", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "soul-id create failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            return json.loads(stdout.strip())
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"soul-id create returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+
+    async def soul_wait(self, *, soul_id: str, timeout_s: float = 600.0) -> dict[str, Any]:
+        """Block until Soul training finishes. Higgsfield trains
+        Soul-2 in 5-15min typically; cinematic can be longer. Returns
+        the final envelope with status."""
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        argv = [bin_path, "--json", "soul-id", "wait", soul_id]
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=timeout_s,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message=f"soul-id wait timed out after {timeout_s:.0f}s — training may still complete; check `higgsfield soul-id get {soul_id}`",
+                code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "soul-id wait failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            return json.loads(stdout.strip())
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"soul-id wait returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+
+    async def soul_list(self, *, size: int = 100) -> list[dict[str, Any]]:
+        """List trained Soul references (machine-wide; Soul training
+        is account-level on the higgsfield side, machine-mapped via
+        the CLI's machine-wide auth)."""
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        argv = [bin_path, "--json", "soul-id", "list", "--size", str(size)]
+        stdout, stderr, code = await asyncio.wait_for(
+            _run_cli(argv), timeout=30.0,
+        )
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "soul-id list failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            parsed = json.loads(stdout.strip()) if stdout.strip() else []
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"soul-id list returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+        if isinstance(parsed, list):
+            return parsed
+        return [parsed] if isinstance(parsed, dict) else []
+
     async def get_balance(self) -> dict[str, Any]:
         """Read the operator's current Higgsfield credit balance via
         `higgsfield account balance --json`. Used by the Studio header

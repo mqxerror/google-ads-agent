@@ -299,6 +299,54 @@ export function studioBalance(): Promise<BalanceResponse> {
   return request<BalanceResponse>('/studio/balance');
 }
 
+export interface SoulCharacter {
+  id: string;
+  account_id: string;
+  name: string;
+  soul_id: string | null;
+  training_model: 'soul-2' | 'soul-cinematic' | string;
+  status: 'pending' | 'training' | 'ready' | 'failed' | string;
+  reference_image_paths: string[] | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  ready_at: string | null;
+}
+
+export function studioListSouls(accountId?: string): Promise<SoulCharacter[]> {
+  const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
+  return request<SoulCharacter[]>(`/studio/soul${qs}`);
+}
+
+export function studioGetSoul(soulPk: string): Promise<SoulCharacter> {
+  return request<SoulCharacter>(`/studio/soul/${soulPk}`);
+}
+
+/**
+ * Train a new Soul. FormData because we're uploading 5-20 reference
+ * images. The endpoint returns immediately with status=pending; poll
+ * studioGetSoul or refresh the list to watch the state machine.
+ */
+export async function studioTrainSoul(args: {
+  accountId: string;
+  name: string;
+  trainingModel: 'soul-2' | 'soul-cinematic';
+  images: File[];
+}): Promise<SoulCharacter> {
+  const fd = new FormData();
+  fd.append('name', args.name);
+  fd.append('account_id', args.accountId);
+  fd.append('training_model', args.trainingModel);
+  for (const f of args.images) fd.append('images', f);
+  const r = await fetch('/api/studio/soul/train', { method: 'POST', body: fd });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`Soul training failed (${r.status}): ${txt.slice(0, 300)}`);
+  }
+  return r.json();
+}
+
 export function studioGetJob(assetId: string): Promise<StudioJobStatus> {
   return request<StudioJobStatus>(`/studio/jobs/${assetId}`);
 }

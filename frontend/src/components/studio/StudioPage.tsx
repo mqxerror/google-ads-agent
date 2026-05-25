@@ -11,6 +11,7 @@ import { fetchCampaigns } from '@/lib/api';
 import VideoCreator from '@/components/chat/VideoCreator';
 import ScriptGenerator from './ScriptGenerator';
 import HiggsfieldGenerator from './HiggsfieldGenerator';
+import SoulCharactersPanel from './SoulCharactersPanel';
 
 interface AdAsset {
   id: string;
@@ -93,6 +94,7 @@ export default function StudioPage() {
   const [showCreator, setShowCreator] = useState(false);
   const [showScripter, setShowScripter] = useState(false);
   const [showHiggsfield, setShowHiggsfield] = useState(false);
+  const [showSouls, setShowSouls] = useState(false);
 
   // Lazy-load balance when the Higgsfield panel opens, then refresh
   // every 60s. Keeps a fresh number visible without polling when the
@@ -292,6 +294,19 @@ export default function StudioPage() {
             Generate (Higgsfield)
           </button>
           <button
+            onClick={() => setShowSouls(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors',
+              showSouls
+                ? 'bg-violet-500/25 border-violet-500/50 text-violet-300'
+                : 'bg-secondary hover:bg-secondary/80 border-border'
+            )}
+            title="Train + manage Soul characters (face-consistent generation)"
+          >
+            <Wand2 className="h-4 w-4" />
+            Souls
+          </button>
+          <button
             onClick={() => setShowCreator(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-sm border border-pink-500/40"
           >
@@ -336,6 +351,17 @@ export default function StudioPage() {
             onSettled={() => refresh()}
             caption="Image generation — Higgsfield CLI"
           />
+        </div>
+      )}
+
+      {/* Soul characters panel (V14 / S5) — train face-consistent
+          character references that the generator's Soul-aware models
+          (text2image_soul_v2 / soul_cinematic / soul_cast) reference
+          via --soul-id, producing recognizably the same person across
+          every render. */}
+      {showSouls && (
+        <div className="mb-4">
+          <SoulCharactersPanel accountId={accountId} />
         </div>
       )}
 

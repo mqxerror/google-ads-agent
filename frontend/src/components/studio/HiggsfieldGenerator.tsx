@@ -21,10 +21,21 @@ import {
   studioGenerateVideo,
   studioGetJob,
   studioCostEstimate,
+  studioListSouls,
   type StudioJobStatus,
   type HiggsfieldGenerateImageRequest,
   type HiggsfieldGenerateVideoRequest,
+  type SoulCharacter,
 } from '@/lib/api';
+
+// Models that accept --soul-id. When one of these is selected, the
+// generator surfaces a Soul picker pulling from the account's library.
+const SOUL_AWARE_MODELS = new Set([
+  'text2image_soul_v2',
+  'soul_cinematic',
+  'soul_location',
+  'soul_cast',
+]);
 
 // job_set_type identifiers from the official @higgsfield/cli npm
 // package — the value of the positional after `generate create`.
@@ -154,6 +165,21 @@ export default function HiggsfieldGenerator({
   const costAbortRef = useRef<AbortController | null>(null);
   const isKling = mode === 'video' && /^kling/.test(videoModel);
 
+  // Soul library + selection. Fetched lazily when a Soul-aware model
+  // is picked. Only `ready` Souls are pickable; pending/training/failed
+  // are shown but disabled.
+  const activeModelId = mode === 'video' ? videoModel : model;
+  const isSoulAware = SOUL_AWARE_MODELS.has(activeModelId);
+  const [souls, setSouls] = useState<SoulCharacter[]>([]);
+  const [selectedSoulId, setSelectedSoulId] = useState<string>('');
+
+  useEffect(() => {
+    if (!isSoulAware) return;
+    studioListSouls(accountId)
+      .then(setSouls)
+      .catch(() => setSouls([]));
+  }, [isSoulAware, accountId]);
+
   useEffect(() => {
     const trimmed = prompt.trim();
     if (!trimmed) {
@@ -229,6 +255,7 @@ export default function HiggsfieldGenerator({
           aspect_ratio: lockAspect ?? aspectRatio,
           duration_seconds: duration,
           mode: isKling ? klingMode : undefined,
+          soul_id: isSoulAware && selectedSoulId ? selectedSoulId : undefined,
           account_id: accountId,
           campaign_id: campaignId,
         };
@@ -252,6 +279,7 @@ export default function HiggsfieldGenerator({
           model,
           aspect_ratios: aspectsToRun.slice(),
           variants_per_aspect: variantsPerAspect,
+          soul_id: isSoulAware && selectedSoulId ? selectedSoulId : undefined,
           account_id: accountId,
           campaign_id: campaignId,
         };
@@ -429,6 +457,35 @@ export default function HiggsfieldGenerator({
             {ASPECT_RATIOS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </label>
+        {/* Soul picker — only shown when a Soul-aware model is
+            selected. Without a ready Soul the model will produce
+            random faces; with one it produces the same person
+            across every render. Falls back to "no Soul (random face)"
+            if the operator hasn't trained any yet. */}
+        {isSoulAware && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase font-mono text-muted-foreground">Soul</span>
+            <select
+              value={selectedSoulId}
+              onChange={(e) => setSelectedSoulId(e.target.value)}
+              disabled={busy}
+              className="h-7 rounded border border-border bg-background px-2 text-xs max-w-[200px]"
+              title="The trained character to render. Train new Souls in the Souls panel."
+            >
+              <option value="">No Soul (random face)</option>
+              {souls
+                .filter((s) => s.status === 'ready' && s.soul_id)
+                .map((s) => (
+                  <option key={s.id} value={s.soul_id ?? ''}>
+                    {s.name} · {s.training_model}
+                  </option>
+                ))}
+              {souls.filter((s) => s.status === 'ready').length === 0 && (
+                <option disabled value="">(no trained Souls yet)</option>
+              )}
+            </select>
+          </label>
+        )}
         {mode === 'image' && !lockAspect && (
           <label
             className="flex items-center gap-1 cursor-pointer select-none"
