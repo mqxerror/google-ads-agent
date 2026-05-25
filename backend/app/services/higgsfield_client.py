@@ -179,13 +179,84 @@ class HiggsfieldClient:
         ``submit_image`` (the URL key is still ``image_url`` — kept
         consistent so call-sites that don't care about media type can
         share code). Slice S4 wires the video model picker."""
-        # Video models accept the same flag surface as image (aspect,
-        # seed, soul). Higgsfield's CLI is uniform here; the only
-        # behavioural difference is run time, which the constructor's
-        # `timeout_s` controls — callers building this for video should
-        # pass `HiggsfieldClient(timeout_s=600)` so the asyncio timeout
-        # and the CLI's `--wait-timeout` both extend in lockstep.
         return await self.submit_image(model=model, prompt=prompt, **params)
+
+    async def estimate_cost(
+        self, *, model: str, prompt: str, **params: Any,
+    ) -> dict[str, Any]:
+        """Run `higgsfield --json generate cost <model> --prompt "..."`.
+        Returns the parsed `{credits, credits_exact}` envelope — the
+        UI displays this next to the Generate button so the operator
+        sees credit spend BEFORE clicking, not after.
+
+        Same param surface as submit_image so the cost reflects what
+        the actual submit will cost (aspect, duration, soul, etc.
+        affect price upstream).
+        """
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(
+                message="higgsfield CLI not on PATH",
+                code="cli",
+            )
+        argv = [bin_path, "--json", "generate", "cost", model, "--prompt", prompt]
+        if (a := params.get("aspect_ratio")):
+            argv.extend(["--aspect_ratio", str(a)])
+        if (d := params.get("duration")) is not None:
+            argv.extend(["--duration", str(d)])
+        if (sid := params.get("soul_id")):
+            argv.extend(["--soul-id", str(sid)])
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=30.0,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message="cost lookup timed out after 30s", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "cost lookup failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            return json.loads(stdout.strip())
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"cost CLI returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+
+    async def get_balance(self) -> dict[str, Any]:
+        """Read the operator's current Higgsfield credit balance via
+        `higgsfield account balance --json`. Used by the Studio header
+        to surface remaining credits."""
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(
+                message="higgsfield CLI not on PATH", code="cli",
+            )
+        argv = [bin_path, "--json", "account", "balance"]
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=15.0,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message="balance lookup timed out after 15s", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "balance lookup failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            return json.loads(stdout.strip())
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"balance CLI returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
 
 
 # ── CLI plumbing (module-level so tests can monkeypatch _run_cli) ─────
@@ -220,16 +291,24 @@ def _build_cli_argv(
         "--wait",
         "--wait-timeout", f"{int(timeout_s - 5)}s",
     ]
-    if (a := params.get("aspect_ratio")):
-        argv.extend(["--aspect_ratio", str(a)])
-    if (r := params.get("resolution")):
-        argv.extend(["--resolution", str(r)])
-    if (q := params.get("quality")):
-        argv.extend(["--quality", str(q)])
-    if (s := params.get("seed")) is not None:
-        argv.extend(["--seed", str(s)])
-    if (sid := params.get("soul_id")):
-        argv.extend(["--soul-id", str(sid)])
+    # Higgsfield CLI accepts arbitrary `--<param-name> <value>` for any
+    # model param (per `higgsfield generate create --help`). Pass
+    # everything through so we don't silently drop model-specific
+    # params like `duration` / `mode` / `model` (Veo's fast vs preview
+    # sub-variant) / `quality` / `sound`. Earlier hardcoded allow-list
+    # caused the "20s video came out 5s" bug — `duration` wasn't in it
+    # so Kling fell back to its default 5s.
+    #
+    # `soul_id` → `--soul-id` is the only key we rename (`_` to `-`)
+    # because that's how Higgsfield's CLI flag is spelled. Everything
+    # else passes through with its key unchanged.
+    for key, value in params.items():
+        if value is None or value == "":
+            continue
+        if key == "soul_id":
+            argv.extend(["--soul-id", str(value)])
+        else:
+            argv.extend([f"--{key}", str(value)])
     return argv
 
 

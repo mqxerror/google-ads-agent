@@ -20,6 +20,7 @@ import {
   studioGenerateImage,
   studioGenerateVideo,
   studioGetJob,
+  studioCostEstimate,
   type StudioJobStatus,
   type HiggsfieldGenerateImageRequest,
   type HiggsfieldGenerateVideoRequest,
@@ -29,27 +30,58 @@ import {
 // package — the value of the positional after `generate create`.
 // Refresh from `higgsfield --json model list --image` if Higgsfield
 // adds new models.
+// Image models from `higgsfield --json model list --image` (May 2026).
+// Refresh that command after Higgsfield ships new models.
 const IMAGE_MODELS: { id: string; label: string }[] = [
-  { id: 'nano_banana_2', label: 'Nano Banana Pro' },
-  { id: 'flux_2', label: 'FLUX.2' },
-  { id: 'text2image_soul_v2', label: 'Soul V2 (character-faithful)' },
-  { id: 'gpt_image_2', label: 'GPT Image 2' },
-  { id: 'grok_image', label: 'Grok Image' },
-  { id: 'kling_omni_image', label: 'Kling O1 Image' },
+  { id: 'nano_banana_2',          label: 'Nano Banana Pro (premium)' },
+  { id: 'nano_banana_flash',      label: 'Nano Banana 2 (mid-tier)' },
+  { id: 'nano_banana',            label: 'Nano Banana (budget)' },
+  { id: 'flux_2',                 label: 'FLUX.2' },
+  { id: 'flux_kontext',           label: 'FLUX Kontext' },
+  { id: 'text2image_soul_v2',     label: 'Soul V2 (face-consistent)' },
+  { id: 'soul_cinematic',         label: 'Soul Cinematic' },
+  { id: 'soul_location',          label: 'Soul Location' },
+  { id: 'gpt_image_2',            label: 'GPT Image 2' },
+  { id: 'imagegen_2_0',           label: 'GPT Image 2 (alt)' },
+  { id: 'openai_hazel',           label: 'OpenAI Hazel' },
+  { id: 'grok_image',             label: 'Grok Image' },
+  { id: 'kling_omni_image',       label: 'Kling O1 Image' },
+  { id: 'seedream_v4_5',          label: 'Seedream 4.5' },
+  { id: 'seedream_v5_lite',       label: 'Seedream V5 Lite (budget)' },
   { id: 'marketing_studio_image', label: 'Marketing Studio (text-in-image)' },
-  { id: 'image_auto', label: 'Auto (Higgsfield picks)' },
+  { id: 'ms_image',               label: 'MS Image' },
+  { id: 'cinematic_studio_2_5',   label: 'Cinematic Studio 2.5' },
+  { id: 'z_image',                label: 'Z Image' },
+  { id: 'image_auto',             label: 'Auto (Higgsfield picks)' },
 ];
 
-// Video models from Higgsfield's CLI (`higgsfield --json model list
-// --video`). veo3_1 is the default (Google's strongest video model).
-// Some models cap duration upstream (veo3_1 = 8s); the structured
-// `run` error path surfaces the rejection.
-const VIDEO_MODELS: { id: string; label: string; maxSeconds?: number }[] = [
-  { id: 'veo3_1', label: 'Veo 3.1 (Google)', maxSeconds: 8 },
-  { id: 'kling3_0', label: 'Kling 3.0', maxSeconds: 10 },
-  { id: 'seedance_2_0', label: 'Seedance 2.0', maxSeconds: 10 },
-  { id: 'video_auto', label: 'Auto (Higgsfield picks)' },
+// Video models from `higgsfield --json model list --video` (May 2026).
+// maxSeconds is the per-model upstream cap surfaced in the picker so
+// the operator doesn't burn a 20s render that returns 8s. Veo's cap is
+// strict enum (4/6/8); Kling caps at 15; the rest vary.
+const VIDEO_MODELS: { id: string; label: string; maxSeconds?: number; budgetTier?: 'budget' | 'premium' }[] = [
+  { id: 'veo3_1',                   label: 'Veo 3.1 (Google, premium)',    maxSeconds: 8, budgetTier: 'premium' },
+  { id: 'veo3_1_lite',              label: 'Veo 3.1 Lite (cheap)',         maxSeconds: 8, budgetTier: 'budget' },
+  { id: 'veo3',                     label: 'Veo 3 (Google, older)',        maxSeconds: 8 },
+  { id: 'kling3_0',                 label: 'Kling 3.0',                    maxSeconds: 15 },
+  { id: 'kling2_6',                 label: 'Kling 2.6 (cheap)',            maxSeconds: 10, budgetTier: 'budget' },
+  { id: 'seedance_2_0',             label: 'Seedance 2.0' },
+  { id: 'seedance1_5',              label: 'Seedance 1.5 Pro' },
+  { id: 'minimax_hailuo',           label: 'Minimax Hailuo' },
+  { id: 'grok_video',               label: 'Grok Video' },
+  { id: 'wan2_7',                   label: 'Wan 2.7' },
+  { id: 'wan2_6',                   label: 'Wan 2.6' },
+  { id: 'soul_cast',                label: 'Soul Cast (face-consistent)' },
+  { id: 'cinematic_studio_3_0',     label: 'Cinematic Studio 3.0' },
+  { id: 'cinematic_studio_video',   label: 'Cinematic Studio Video' },
+  { id: 'cinematic_studio_video_v2', label: 'Cinematic Studio Video V2' },
+  { id: 'marketing_studio_video',   label: 'Marketing Studio Video' },
+  { id: 'reframe',                  label: 'Reframe' },
 ];
+
+// Kling-only sub-quality modes (std/pro/4k). The user's "kling 720
+// cheap vs 4k default" question maps here.
+const KLING_MODES = ['std', 'pro', '4k'] as const;
 
 const ASPECT_RATIOS = ['1:1', '4:5', '9:16', '16:9'] as const;
 type AspectRatio = (typeof ASPECT_RATIOS)[number];
@@ -102,6 +134,10 @@ export default function HiggsfieldGenerator({
   // upstream rejection surfaces cleanly. Default 5s matches typical
   // ad-creative length.
   const [duration, setDuration] = useState<number>(5);
+  // Kling-specific mode (std / pro / 4k) — the cheap-vs-premium
+  // selector. Default `std` because that's the cheapest; 4k is
+  // multiples more expensive.
+  const [klingMode, setKlingMode] = useState<string>('std');
   // Multi-aspect mode: render the same prompt across all 4 aspects in
   // one Generate click. Disabled when a parent lockAspect is set
   // (PMaxWizard inline forces one aspect per slot). Image-only.
@@ -109,6 +145,53 @@ export default function HiggsfieldGenerator({
   const [busy, setBusy] = useState(false);
   const [variants, setVariants] = useState<VariantState[]>([]);
   const eventSourcesRef = useRef<EventSource[]>([]);
+
+  // Live cost estimate. Refreshed on model/prompt/duration/mode change
+  // (debounced 400ms so each keystroke doesn't shell out). null means
+  // "not estimated yet"; we show "—" in the UI while loading.
+  const [costCredits, setCostCredits] = useState<number | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+  const costAbortRef = useRef<AbortController | null>(null);
+  const isKling = mode === 'video' && /^kling/.test(videoModel);
+
+  useEffect(() => {
+    const trimmed = prompt.trim();
+    if (!trimmed) {
+      setCostCredits(null);
+      return;
+    }
+    // Debounce: only fire after 400ms of no keystrokes.
+    const handle = window.setTimeout(() => {
+      // Cancel any in-flight cost call.
+      costAbortRef.current?.abort();
+      const ac = new AbortController();
+      costAbortRef.current = ac;
+      setCostLoading(true);
+      const activeModel = mode === 'video' ? videoModel : model;
+      studioCostEstimate({
+        prompt: trimmed,
+        model: activeModel,
+        aspect_ratio: lockAspect ?? aspectRatio,
+        duration_seconds: mode === 'video' ? duration : undefined,
+        mode: isKling ? klingMode : undefined,
+      })
+        .then((r) => {
+          if (ac.signal.aborted) return;
+          setCostCredits(r.credits);
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          // Cost lookup failures shouldn't block Generate — just hide
+          // the badge. The actual submit will still work or surface a
+          // structured error.
+          setCostCredits(null);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setCostLoading(false);
+        });
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [prompt, model, videoModel, mode, aspectRatio, duration, klingMode, lockAspect, isKling]);
 
   // Keep aspect in sync if the parent changes lockAspect mid-mount
   // (PMaxWizard opens different slot modals with different aspects).
@@ -145,6 +228,7 @@ export default function HiggsfieldGenerator({
           model: videoModel,
           aspect_ratio: lockAspect ?? aspectRatio,
           duration_seconds: duration,
+          mode: isKling ? klingMode : undefined,
           account_id: accountId,
           campaign_id: campaignId,
         };
@@ -379,6 +463,22 @@ export default function HiggsfieldGenerator({
             </select>
           </label>
         )}
+        {mode === 'video' && isKling && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase font-mono text-muted-foreground">Quality</span>
+            <select
+              value={klingMode}
+              onChange={(e) => setKlingMode(e.target.value)}
+              disabled={busy}
+              className="h-7 rounded border border-border bg-background px-2 text-xs font-mono"
+              title="Kling render quality. std = cheapest (~720p-equivalent), pro = 1080p, 4k = highest. Cost scales accordingly."
+            >
+              {KLING_MODES.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {mode === 'video' && (
           <label className="flex items-center gap-1.5">
             <span className="text-[10px] uppercase font-mono text-muted-foreground">Duration</span>
@@ -390,11 +490,32 @@ export default function HiggsfieldGenerator({
               onChange={(e) => setDuration(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
               disabled={busy}
               className="h-7 w-16 text-xs font-mono"
-              title="Seconds. Some models cap (veo3_1 = 8s); upstream rejects higher values."
+              title="Seconds. Veo accepts only 4/6/8; Kling caps at 15. Upstream rejects out-of-range values."
             />
             <span className="text-[10px] text-muted-foreground">s</span>
           </label>
         )}
+        {/* Live cost badge — updates 400ms after the operator stops
+            typing. Shows "—" while loading; hides if cost lookup
+            failed. Lets the user pick budget models (e.g. Veo Lite,
+            Kling std) before burning credits. */}
+        <div
+          className={cn(
+            'flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded border',
+            costCredits !== null && costCredits > 50
+              ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5'
+              : costCredits !== null
+                ? 'border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/5'
+                : 'border-border text-muted-foreground'
+          )}
+          title={
+            costCredits !== null
+              ? `Estimated cost: ${costCredits} Higgsfield credits per generation. Pick a budget model (Veo Lite, Kling std) to lower this.`
+              : 'Cost will appear once you have a prompt + model selected.'
+          }
+        >
+          ≈ {costLoading ? '…' : costCredits ?? '—'} credits
+        </div>
         <Button
           onClick={submit}
           disabled={busy || !prompt.trim()}

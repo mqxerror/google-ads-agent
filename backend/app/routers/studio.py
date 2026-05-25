@@ -84,7 +84,22 @@ class GenerateVideoRequest(BaseModel):
     prompt: str = Field(min_length=1)
     model: str = "veo3_1"
     aspect_ratio: str = "16:9"
+    # Higgsfield's duration semantics differ per model: Veo accepts
+    # enum strings ("4","6","8"), Kling accepts an integer up to 15.
+    # Frontend sends an integer; we stringify in the worker because the
+    # CLI handles both forms. The legacy "duration_seconds" name is
+    # kept so the JS doesn't have to know about higgsfield's "duration"
+    # param name.
     duration_seconds: int | None = Field(default=None, ge=1, le=60)
+    # Kling's `mode` (std / pro / 4k) — the cheap/expensive selector
+    # the user asked for ("kling 720 cheap" vs default 4k).
+    mode: Optional[str] = None
+    # Veo's `quality` (basic / high / ultra) and `model` sub-variant
+    # (veo-3-1-fast / veo-3-1-preview).
+    quality: Optional[str] = None
+    submodel: Optional[str] = None
+    # Kling's `sound` (on / off).
+    sound: Optional[str] = None
     soul_id: Optional[str] = None
     account_id: Optional[str] = None
     campaign_id: Optional[str] = None
@@ -92,6 +107,34 @@ class GenerateVideoRequest(BaseModel):
 
 class GenerateVideoResponse(BaseModel):
     asset_id: str
+
+
+class CostEstimateRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    model: str
+    aspect_ratio: Optional[str] = None
+    duration_seconds: Optional[int] = None
+    mode: Optional[str] = None
+    quality: Optional[str] = None
+    soul_id: Optional[str] = None
+
+
+class CostEstimateResponse(BaseModel):
+    credits: int
+    credits_exact: float
+
+
+class BalanceResponse(BaseModel):
+    """Pass-through of higgsfield account balance. Shape mirrors CLI
+    output exactly — we surface whatever keys the CLI returns so a
+    future Higgsfield API change (e.g. adding a 'plan' field) flows
+    through to the UI without a code change."""
+
+    credits: Optional[int] = None
+    credits_exact: Optional[float] = None
+    plan: Optional[str] = None
+    # Extra fields land in `extras` rather than 500ing on shape drift.
+    extras: dict[str, Any] = Field(default_factory=dict)
 
 
 class JobStatusResponse(BaseModel):
@@ -181,6 +224,63 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
     return GenerateImageResponse(asset_ids=asset_ids)
 
 
+@router.post("/cost-estimate", response_model=CostEstimateResponse)
+async def cost_estimate(body: CostEstimateRequest) -> CostEstimateResponse:
+    """Live cost estimate. Wraps `higgsfield generate cost` so the UI
+    can show "≈ N credits" before the operator clicks Generate.
+
+    Cost is model-dependent (Veo 3.1 Lite = ~8c for 5s; Kling 3.0 4k
+    mode is multiples of Kling 3.0 std mode); some models charge per
+    second so duration matters.
+    """
+    client = HiggsfieldClient(timeout_s=30.0)
+    params: dict[str, Any] = {}
+    if body.aspect_ratio:
+        params["aspect_ratio"] = body.aspect_ratio
+    if body.duration_seconds is not None:
+        params["duration"] = body.duration_seconds
+    if body.mode:
+        params["mode"] = body.mode
+    if body.quality:
+        params["quality"] = body.quality
+    if body.soul_id:
+        params["soul_id"] = body.soul_id
+    try:
+        envelope = await client.estimate_cost(
+            model=body.model, prompt=body.prompt, **params,
+        )
+    except HiggsfieldError as e:
+        raise HTTPException(
+            status_code=400 if e.code in ("cli", "shape") else 502,
+            detail={"code": e.code, "message": e.message},
+        )
+    return CostEstimateResponse(
+        credits=int(envelope.get("credits", 0)),
+        credits_exact=float(envelope.get("credits_exact", 0)),
+    )
+
+
+@router.get("/balance", response_model=BalanceResponse)
+async def get_balance() -> BalanceResponse:
+    """Operator's current Higgsfield credit balance. Surfaced as a
+    badge in the Studio header so the user knows how much they have
+    to spend before triggering big video runs."""
+    client = HiggsfieldClient(timeout_s=15.0)
+    try:
+        envelope = await client.get_balance()
+    except HiggsfieldError as e:
+        raise HTTPException(
+            status_code=401 if e.code == "auth" else 502,
+            detail={"code": e.code, "message": e.message},
+        )
+    return BalanceResponse(
+        credits=envelope.get("credits"),
+        credits_exact=envelope.get("credits_exact"),
+        plan=envelope.get("plan"),
+        extras={k: v for k, v in envelope.items() if k not in ("credits", "credits_exact", "plan")},
+    )
+
+
 @router.post("/generate-video", response_model=GenerateVideoResponse)
 async def generate_video(body: GenerateVideoRequest) -> GenerateVideoResponse:
     """Kick off a single video generation. Videos take 5-10+ minutes
@@ -220,6 +320,10 @@ async def generate_video(body: GenerateVideoRequest) -> GenerateVideoResponse:
             aspect_ratio=body.aspect_ratio,
             soul_id=body.soul_id,
             duration_seconds=body.duration_seconds,
+            mode=body.mode,
+            quality=body.quality,
+            submodel=body.submodel,
+            sound=body.sound,
         )
     )
     _BACKGROUND_TASKS.add(task)
@@ -374,6 +478,10 @@ async def _run_video_job(
     aspect_ratio: str,
     soul_id: Optional[str],
     duration_seconds: Optional[int],
+    mode: Optional[str] = None,
+    quality: Optional[str] = None,
+    submodel: Optional[str] = None,
+    sound: Optional[str] = None,
 ) -> None:
     """Background task for video generation. Same shape as the image
     job, but with HiggsfieldClient(timeout_s=600) for the 5-10 min
@@ -390,11 +498,22 @@ async def _run_video_job(
         if soul_id:
             params["soul_id"] = soul_id
         if duration_seconds is not None:
-            # Higgsfield's CLI accepts --duration as a model-specific
-            # passthrough; some models cap (veo3_1 = 8s) and reject
-            # higher values upstream. The structured `run` error path
-            # already surfaces the rejection cleanly.
+            # Higgsfield's CLI accepts --duration; per-model upstream
+            # caps are enforced by Higgsfield (Veo enum 4/6/8; Kling ≤
+            # 15). The structured `run` error path surfaces the rejection.
             params["duration"] = duration_seconds
+        # Kling's `mode` — std/pro/4k. The user's "kling 720 cheap"
+        # request maps to mode=std (cheapest, lowest res).
+        if mode:
+            params["mode"] = mode
+        # Veo's `quality` (basic/high/ultra) and `model` sub-variant.
+        if quality:
+            params["quality"] = quality
+        if submodel:
+            params["model"] = submodel  # CLI param name is `model`
+        # Kling's audio toggle.
+        if sound:
+            params["sound"] = sound
         try:
             result = await client.submit_video(
                 model=model, prompt=prompt, **params,

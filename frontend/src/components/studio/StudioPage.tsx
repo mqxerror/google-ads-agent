@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { studioBalance } from '@/lib/api';
 import {
   Film, Upload, Trash2, Download, Sparkles, Search, Loader2, Image as ImageIcon, Music, FileQuestion, X, Target, Wand2, Lock,
 } from 'lucide-react';
@@ -81,12 +82,32 @@ export default function StudioPage() {
   const accountId = useClientAccountId();
   const queryClient = useQueryClient();
   const { setShowStudio } = useAppStore();
+  // Higgsfield credit balance — fetched lazily on first showHiggsfield
+  // toggle (no point loading on every Studio open if the user isn't
+  // generating). Refreshes every 60s while visible, and after each
+  // generation settles via the refresh() chain.
+  const [balanceCredits, setBalanceCredits] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('all');
   const [sourceFilter, setSourceFilter] = useState<Source>('all');
   const [q, setQ] = useState('');
   const [showCreator, setShowCreator] = useState(false);
   const [showScripter, setShowScripter] = useState(false);
   const [showHiggsfield, setShowHiggsfield] = useState(false);
+
+  // Lazy-load balance when the Higgsfield panel opens, then refresh
+  // every 60s. Keeps a fresh number visible without polling when the
+  // user isn't generating.
+  useEffect(() => {
+    if (!showHiggsfield) return;
+    let cancelled = false;
+    const load = () =>
+      studioBalance()
+        .then((b) => { if (!cancelled) setBalanceCredits(b.credits); })
+        .catch(() => { if (!cancelled) setBalanceCredits(null); });
+    load();
+    const interval = window.setInterval(load, 60_000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [showHiggsfield]);
   const [preview, setPreview] = useState<AdAsset | null>(null);
   const [uploading, setUploading] = useState(false);
   const [campaignScope, setCampaignScope] = useState<string | null>(null);
@@ -204,6 +225,27 @@ export default function StudioPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Higgsfield credit balance — visible only after the user
+              has opened the Higgsfield panel (so we don't shell out
+              `higgsfield account balance` on every Studio open).
+              Tooltip shows the operator the upstream plan. */}
+          {showHiggsfield && (
+            <div
+              className={cn(
+                'text-[10px] font-mono px-2 py-1 rounded border',
+                balanceCredits === null
+                  ? 'border-border text-muted-foreground'
+                  : balanceCredits < 50
+                    ? 'border-red-500/40 text-red-600 dark:text-red-400 bg-red-500/5'
+                    : balanceCredits < 200
+                      ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5'
+                      : 'border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/5'
+              )}
+              title="Your Higgsfield credit balance. Refreshes every 60s."
+            >
+              {balanceCredits ?? '—'} credits
+            </div>
+          )}
           <button
             onClick={() => setShowStudio(false)}
             className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"

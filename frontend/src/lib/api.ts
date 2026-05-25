@@ -256,6 +256,10 @@ export interface HiggsfieldGenerateVideoRequest {
   model: string;
   aspect_ratio: string;
   duration_seconds?: number;
+  mode?: string;          // Kling: std / pro / 4k
+  quality?: string;       // Veo: basic / high / ultra
+  submodel?: string;      // Veo: veo-3-1-fast / veo-3-1-preview
+  sound?: string;         // Kling: on / off
   soul_id?: string;
   account_id?: string;
   campaign_id?: string;
@@ -263,6 +267,36 @@ export interface HiggsfieldGenerateVideoRequest {
 
 export function studioGenerateVideo(body: HiggsfieldGenerateVideoRequest): Promise<{ asset_id: string }> {
   return request('/studio/generate-video', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export interface CostEstimateRequest {
+  prompt: string;
+  model: string;
+  aspect_ratio?: string;
+  duration_seconds?: number;
+  mode?: string;
+  quality?: string;
+  soul_id?: string;
+}
+
+export interface CostEstimateResponse {
+  credits: number;
+  credits_exact: number;
+}
+
+export function studioCostEstimate(body: CostEstimateRequest): Promise<CostEstimateResponse> {
+  return request('/studio/cost-estimate', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export interface BalanceResponse {
+  credits: number | null;
+  credits_exact: number | null;
+  plan: string | null;
+  extras: Record<string, unknown>;
+}
+
+export function studioBalance(): Promise<BalanceResponse> {
+  return request<BalanceResponse>('/studio/balance');
 }
 
 export function studioGetJob(assetId: string): Promise<StudioJobStatus> {
