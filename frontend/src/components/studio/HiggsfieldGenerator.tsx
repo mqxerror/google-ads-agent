@@ -12,15 +12,17 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader2, AlertCircle, Check, ImageIcon } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Check, ImageIcon, Video as VideoIcon, Image as ImageGlyph } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   studioGenerateImage,
+  studioGenerateVideo,
   studioGetJob,
   type StudioJobStatus,
   type HiggsfieldGenerateImageRequest,
+  type HiggsfieldGenerateVideoRequest,
 } from '@/lib/api';
 
 // job_set_type identifiers from the official @higgsfield/cli npm
@@ -38,11 +40,24 @@ const IMAGE_MODELS: { id: string; label: string }[] = [
   { id: 'image_auto', label: 'Auto (Higgsfield picks)' },
 ];
 
+// Video models from Higgsfield's CLI (`higgsfield --json model list
+// --video`). veo3_1 is the default (Google's strongest video model).
+// Some models cap duration upstream (veo3_1 = 8s); the structured
+// `run` error path surfaces the rejection.
+const VIDEO_MODELS: { id: string; label: string; maxSeconds?: number }[] = [
+  { id: 'veo3_1', label: 'Veo 3.1 (Google)', maxSeconds: 8 },
+  { id: 'kling3_0', label: 'Kling 3.0', maxSeconds: 10 },
+  { id: 'seedance_2_0', label: 'Seedance 2.0', maxSeconds: 10 },
+  { id: 'video_auto', label: 'Auto (Higgsfield picks)' },
+];
+
 const ASPECT_RATIOS = ['1:1', '4:5', '9:16', '16:9'] as const;
 type AspectRatio = (typeof ASPECT_RATIOS)[number];
 
 // Higgsfield's per-account image-gen cap.
 const MAX_VARIANTS = 6;
+
+type Mode = 'image' | 'video';
 
 interface HiggsfieldGeneratorProps {
   accountId: string;
@@ -77,13 +92,19 @@ export default function HiggsfieldGenerator({
   lockAspect,
   caption,
 }: HiggsfieldGeneratorProps) {
+  const [mode, setMode] = useState<Mode>('image');
   const [prompt, setPrompt] = useState(initialPrompt);
   const [model, setModel] = useState(IMAGE_MODELS[0].id);
+  const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0].id);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(lockAspect ?? initialAspect);
   const [variantsCount, setVariantsCount] = useState<number>(1);
+  // Video duration in seconds. Some models cap (veo3_1=8s); the
+  // upstream rejection surfaces cleanly. Default 5s matches typical
+  // ad-creative length.
+  const [duration, setDuration] = useState<number>(5);
   // Multi-aspect mode: render the same prompt across all 4 aspects in
   // one Generate click. Disabled when a parent lockAspect is set
-  // (PMaxWizard inline forces one aspect per slot).
+  // (PMaxWizard inline forces one aspect per slot). Image-only.
   const [multiAspect, setMultiAspect] = useState(false);
   const [busy, setBusy] = useState(false);
   const [variants, setVariants] = useState<VariantState[]>([]);
@@ -108,46 +129,60 @@ export default function HiggsfieldGenerator({
     const trimmed = prompt.trim();
     if (!trimmed || busy) return;
 
-    // Resolve which aspects + variant count.
-    const aspectsToRun: AspectRatio[] = lockAspect
-      ? [lockAspect]
-      : multiAspect
-        ? Array.from(ASPECT_RATIOS)
-        : [aspectRatio];
-    const variantsPerAspect = multiAspect ? 1 : Math.max(1, variantsCount);
-    const total = aspectsToRun.length * variantsPerAspect;
-    if (total > MAX_VARIANTS) {
-      // Shouldn't happen via the UI controls but guard anyway.
-      return;
-    }
-
     setBusy(true);
     setVariants([]);
-    // Close any leftover SSE from a previous run.
     eventSourcesRef.current.forEach((es) => es.close());
     eventSourcesRef.current = [];
 
+    let assetIdsToWatch: string[] = [];
     try {
-      const body: HiggsfieldGenerateImageRequest = {
-        prompt: trimmed,
-        model,
-        aspect_ratios: aspectsToRun.slice(),
-        variants_per_aspect: variantsPerAspect,
-        account_id: accountId,
-        campaign_id: campaignId,
-      };
-      const res = await studioGenerateImage(body);
-      // Initialize variants with pending state.
+      if (mode === 'video') {
+        // Video: single submission per call (no multi-aspect / variants
+        // for video — too slow + expensive). Server validates duration
+        // against the model's max upstream.
+        const body: HiggsfieldGenerateVideoRequest = {
+          prompt: trimmed,
+          model: videoModel,
+          aspect_ratio: lockAspect ?? aspectRatio,
+          duration_seconds: duration,
+          account_id: accountId,
+          campaign_id: campaignId,
+        };
+        const res = await studioGenerateVideo(body);
+        assetIdsToWatch = [res.asset_id];
+      } else {
+        // Image: same multi-aspect + variants behaviour as before.
+        const aspectsToRun: AspectRatio[] = lockAspect
+          ? [lockAspect]
+          : multiAspect
+            ? Array.from(ASPECT_RATIOS)
+            : [aspectRatio];
+        const variantsPerAspect = multiAspect ? 1 : Math.max(1, variantsCount);
+        const total = aspectsToRun.length * variantsPerAspect;
+        if (total > MAX_VARIANTS) {
+          setBusy(false);
+          return;
+        }
+        const body: HiggsfieldGenerateImageRequest = {
+          prompt: trimmed,
+          model,
+          aspect_ratios: aspectsToRun.slice(),
+          variants_per_aspect: variantsPerAspect,
+          account_id: accountId,
+          campaign_id: campaignId,
+        };
+        const res = await studioGenerateImage(body);
+        assetIdsToWatch = res.asset_ids;
+      }
       setVariants(
-        res.asset_ids.map((id) => ({
+        assetIdsToWatch.map((id) => ({
           asset_id: id,
           status: 'pending',
           url: null,
           error_message: null,
         })),
       );
-      // Subscribe to each asset's stream.
-      res.asset_ids.forEach((assetId) => {
+      assetIdsToWatch.forEach((assetId) => {
         const es = new EventSource(`/api/studio/jobs/${assetId}/stream`);
         eventSourcesRef.current.push(es);
         es.onmessage = (ev) => {
@@ -212,9 +247,45 @@ export default function HiggsfieldGenerator({
       <div className="flex items-center gap-2 flex-wrap">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-[10px] uppercase font-mono text-muted-foreground">Higgsfield</span>
-        <span className="text-xs font-medium">Image generation</span>
+        <span className="text-xs font-medium">
+          {mode === 'video' ? 'Video generation' : 'Image generation'}
+        </span>
         {caption && (
           <span className="text-[10px] text-muted-foreground italic">{caption}</span>
+        )}
+        {/* Image / Video mode toggle — segmented control. PMaxWizard
+            slot mode always wants images (videos go in the YouTube ID
+            step), so when lockAspect is set we hide the toggle. */}
+        {!lockAspect && (
+          <div className="ml-auto inline-flex rounded border border-border text-[10px] font-mono">
+            <button
+              type="button"
+              onClick={() => setMode('image')}
+              disabled={busy}
+              className={cn(
+                'px-2 py-0.5 rounded-l transition-colors flex items-center gap-1',
+                mode === 'image'
+                  ? 'bg-violet-500/20 text-violet-600 dark:text-violet-300'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <ImageGlyph className="h-3 w-3" /> Image
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('video')}
+              disabled={busy}
+              className={cn(
+                'px-2 py-0.5 rounded-r transition-colors flex items-center gap-1',
+                mode === 'video'
+                  ? 'bg-pink-500/20 text-pink-600 dark:text-pink-300'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              title="Video generation can take 5-10 minutes per clip"
+            >
+              <VideoIcon className="h-3 w-3" /> Video
+            </button>
+          </div>
         )}
       </div>
 
@@ -230,16 +301,31 @@ export default function HiggsfieldGenerator({
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <label className="flex items-center gap-1.5">
           <span className="text-[10px] uppercase font-mono text-muted-foreground">Model</span>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            disabled={busy}
-            className="h-7 rounded border border-border bg-background px-2 text-xs"
-          >
-            {IMAGE_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
+          {mode === 'video' ? (
+            <select
+              value={videoModel}
+              onChange={(e) => setVideoModel(e.target.value)}
+              disabled={busy}
+              className="h-7 rounded border border-border bg-background px-2 text-xs"
+            >
+              {VIDEO_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}{m.maxSeconds ? ` · max ${m.maxSeconds}s` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={busy}
+              className="h-7 rounded border border-border bg-background px-2 text-xs"
+            >
+              {IMAGE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          )}
         </label>
         <label className="flex items-center gap-1.5">
           <span className="text-[10px] uppercase font-mono text-muted-foreground">Aspect</span>
@@ -259,7 +345,7 @@ export default function HiggsfieldGenerator({
             {ASPECT_RATIOS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </label>
-        {!lockAspect && (
+        {mode === 'image' && !lockAspect && (
           <label
             className="flex items-center gap-1 cursor-pointer select-none"
             title="Render the same prompt across all 4 ad aspects (1:1, 4:5, 9:16, 16:9) in one click."
@@ -273,24 +359,42 @@ export default function HiggsfieldGenerator({
             <span className="text-[10px] uppercase font-mono text-muted-foreground">All 4 aspects</span>
           </label>
         )}
-        <label className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase font-mono text-muted-foreground">Variants</span>
-          <select
-            value={variantsCount}
-            onChange={(e) => setVariantsCount(Number(e.target.value))}
-            disabled={busy || multiAspect}
-            title={
-              multiAspect
-                ? 'Disabled — multi-aspect already uses 4 of the 6 parallel slots'
-                : 'Higgsfield per-account cap = 6 parallel jobs'
-            }
-            className="h-7 rounded border border-border bg-background px-2 text-xs font-mono disabled:opacity-40"
-          >
-            {Array.from({ length: MAX_VARIANTS }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </label>
+        {mode === 'image' && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase font-mono text-muted-foreground">Variants</span>
+            <select
+              value={variantsCount}
+              onChange={(e) => setVariantsCount(Number(e.target.value))}
+              disabled={busy || multiAspect}
+              title={
+                multiAspect
+                  ? 'Disabled — multi-aspect already uses 4 of the 6 parallel slots'
+                  : 'Higgsfield per-account cap = 6 parallel jobs'
+              }
+              className="h-7 rounded border border-border bg-background px-2 text-xs font-mono disabled:opacity-40"
+            >
+              {Array.from({ length: MAX_VARIANTS }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {mode === 'video' && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase font-mono text-muted-foreground">Duration</span>
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={duration}
+              onChange={(e) => setDuration(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+              disabled={busy}
+              className="h-7 w-16 text-xs font-mono"
+              title="Seconds. Some models cap (veo3_1 = 8s); upstream rejects higher values."
+            />
+            <span className="text-[10px] text-muted-foreground">s</span>
+          </label>
+        )}
         <Button
           onClick={submit}
           disabled={busy || !prompt.trim()}
@@ -300,12 +404,14 @@ export default function HiggsfieldGenerator({
           {busy ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              {settledCount}/{variants.length || '…'}
+              {mode === 'video' ? 'Rendering…' : `${settledCount}/${variants.length || '…'}`}
             </>
           ) : (
             <>
               <Sparkles className="h-3.5 w-3.5" />
-              {multiAspect ? 'Generate all 4' : variantsCount > 1 ? `Generate ${variantsCount}` : 'Generate'}
+              {mode === 'video'
+                ? `Generate ${duration}s video`
+                : multiAspect ? 'Generate all 4' : variantsCount > 1 ? `Generate ${variantsCount}` : 'Generate'}
             </>
           )}
         </Button>
@@ -355,15 +461,30 @@ function VariantTile({ variant, index }: { variant: VariantState; index: number 
     );
   }
   if (isOk) {
+    const url = variant.url || '';
+    const isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(url);
     return (
       <a
-        href={variant.url || '#'}
+        href={url || '#'}
         target="_blank"
         rel="noreferrer"
         className="aspect-square rounded border border-green-500/40 overflow-hidden bg-secondary/30 block group relative"
-        title={`#${index + 1} saved to library`}
+        title={`#${index + 1} ${isVideo ? 'video' : 'image'} saved to library`}
       >
-        <img src={variant.url || ''} alt="" className="w-full h-full object-cover" loading="lazy" />
+        {isVideo ? (
+          // Embed as a poster preview so the operator can scrub /
+          // confirm without leaving the page. `metadata` preload keeps
+          // bandwidth low until they hover.
+          <video
+            src={url}
+            className="w-full h-full object-cover"
+            preload="metadata"
+            muted
+            playsInline
+          />
+        ) : (
+          <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+        )}
         <div className="absolute top-1 right-1 bg-green-500/80 text-white rounded-full p-0.5">
           <Check className="h-3 w-3" />
         </div>

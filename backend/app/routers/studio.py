@@ -75,6 +75,25 @@ class GenerateImageResponse(BaseModel):
     asset_ids: list[str]
 
 
+# Video generation accepts a single aspect (most video models support
+# one aspect per submission; multi-aspect for video isn't worth the
+# parallelism cost) and a duration in seconds — model-dependent
+# constraints (e.g. veo3_1 caps at 8s) are enforced by Higgsfield's
+# upstream, surfaced via the existing structured error path.
+class GenerateVideoRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    model: str = "veo3_1"
+    aspect_ratio: str = "16:9"
+    duration_seconds: int | None = Field(default=None, ge=1, le=60)
+    soul_id: Optional[str] = None
+    account_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+
+
+class GenerateVideoResponse(BaseModel):
+    asset_id: str
+
+
 class JobStatusResponse(BaseModel):
     asset_id: str
     status: str
@@ -160,6 +179,52 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
         task.add_done_callback(_BACKGROUND_TASKS.discard)
 
     return GenerateImageResponse(asset_ids=asset_ids)
+
+
+@router.post("/generate-video", response_model=GenerateVideoResponse)
+async def generate_video(body: GenerateVideoRequest) -> GenerateVideoResponse:
+    """Kick off a single video generation. Videos take 5-10+ minutes
+    on veo3_1 / kling3_0 / seedance_2_0; the existing
+    /jobs/:id/stream SSE handles both image and video state changes
+    polymorphically (it just polls the row's status).
+
+    Returns immediately with the new asset_id. Frontend subscribes to
+    /jobs/<id>/stream for progress; tab refresh mid-render reconciles
+    via the DB row.
+    """
+    asset_id = str(uuid.uuid4())
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO ad_assets
+               (id, account_id, campaign_id, type, filename, url,
+                source, status, higgsfield_model, prompt,
+                aspect_ratio, soul_id, duration, created_at)
+               VALUES (?, ?, ?, 'video', '', '', 'higgsfield',
+                       'pending', ?, ?, ?, ?, ?, datetime('now'))""",
+            (
+                asset_id, body.account_id, body.campaign_id,
+                body.model, body.prompt, body.aspect_ratio, body.soul_id,
+                body.duration_seconds,
+            ),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+    task = asyncio.create_task(
+        _run_video_job(
+            asset_id=asset_id,
+            model=body.model,
+            prompt=body.prompt,
+            aspect_ratio=body.aspect_ratio,
+            soul_id=body.soul_id,
+            duration_seconds=body.duration_seconds,
+        )
+    )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return GenerateVideoResponse(asset_id=asset_id)
 
 
 @router.get("/jobs/{asset_id}", response_model=JobStatusResponse)
@@ -299,6 +364,104 @@ async def _run_image_job(
             higgsfield_job_id=hf_job_id,
         )
         logger.info("higgsfield job completed (asset=%s job=%s)", asset_id, hf_job_id)
+
+
+async def _run_video_job(
+    *,
+    asset_id: str,
+    model: str,
+    prompt: str,
+    aspect_ratio: str,
+    soul_id: Optional[str],
+    duration_seconds: Optional[int],
+) -> None:
+    """Background task for video generation. Same shape as the image
+    job, but with HiggsfieldClient(timeout_s=600) for the 5-10 min
+    render time. Still respects the 6-parallel semaphore so video and
+    image jobs share the per-account concurrency budget.
+    """
+    async with _GENERATION_SEMAPHORE:
+        await _update_asset_status(asset_id, status="running")
+        # Video timeout is 10 minutes — well above the 30-180s image
+        # range. _DEFAULT_TIMEOUT_S is constructor-overridable so this
+        # is a clean lever without forking the client.
+        client = HiggsfieldClient(timeout_s=600.0)
+        params: dict[str, Any] = {"aspect_ratio": aspect_ratio}
+        if soul_id:
+            params["soul_id"] = soul_id
+        if duration_seconds is not None:
+            # Higgsfield's CLI accepts --duration as a model-specific
+            # passthrough; some models cap (veo3_1 = 8s) and reject
+            # higher values upstream. The structured `run` error path
+            # already surfaces the rejection cleanly.
+            params["duration"] = duration_seconds
+        try:
+            result = await client.submit_video(
+                model=model, prompt=prompt, **params,
+            )
+        except HiggsfieldError as e:
+            await _update_asset_status(
+                asset_id, status="failed" if e.code != "nsfw" else "nsfw",
+                error_code=e.code or "run",
+                error_message=e.message,
+            )
+            logger.warning("higgsfield video failed (asset=%s code=%s): %s", asset_id, e.code, e.message)
+            return
+        except Exception as e:
+            await _update_asset_status(
+                asset_id, status="failed",
+                error_code="internal",
+                error_message=str(e)[:500],
+            )
+            logger.exception("higgsfield video unexpected failure (asset=%s)", asset_id)
+            return
+
+        cdn_url = result.get("image_url")  # client uses same key for video
+        if not cdn_url:
+            await _update_asset_status(
+                asset_id, status="failed",
+                error_code="shape",
+                error_message="higgsfield returned no video URL",
+            )
+            return
+
+        raw = result.get("raw") or []
+        hf_job_id = None
+        if isinstance(raw, list) and raw and isinstance(raw[0], dict):
+            hf_job_id = str(raw[0].get("id") or "") or None
+
+        try:
+            local_url, filename, _width, _height, size_bytes = await _download_to_assets(
+                asset_id=asset_id, cdn_url=cdn_url,
+            )
+        except Exception as e:
+            await _update_asset_status(
+                asset_id, status="completed",
+                url=cdn_url,
+                higgsfield_cdn_url=cdn_url,
+                higgsfield_job_id=hf_job_id,
+                error_code="download_failed",
+                error_message=f"CDN download failed (asset still usable from CDN): {str(e)[:300]}",
+            )
+            logger.warning("higgsfield video download failed for asset=%s: %s", asset_id, e)
+            return
+
+        # For videos we don't probe width/height/duration via PIL — the
+        # row already has duration from the user request. ffprobe would
+        # be more accurate but is out of scope for this slice; the
+        # existing video pipeline has its own metadata extraction
+        # (services/video.py) the operator can reuse if needed.
+        await _update_asset_completed(
+            asset_id=asset_id,
+            url=local_url,
+            filename=filename,
+            width=None,
+            height=None,
+            size_bytes=size_bytes,
+            higgsfield_cdn_url=cdn_url,
+            higgsfield_job_id=hf_job_id,
+        )
+        logger.info("higgsfield video completed (asset=%s job=%s)", asset_id, hf_job_id)
 
 
 # ── DB helpers ────────────────────────────────────────────────────────

@@ -251,6 +251,20 @@ export function studioGenerateImage(body: HiggsfieldGenerateImageRequest): Promi
   return request('/studio/generate-image', { method: 'POST', body: JSON.stringify(body) });
 }
 
+export interface HiggsfieldGenerateVideoRequest {
+  prompt: string;
+  model: string;
+  aspect_ratio: string;
+  duration_seconds?: number;
+  soul_id?: string;
+  account_id?: string;
+  campaign_id?: string;
+}
+
+export function studioGenerateVideo(body: HiggsfieldGenerateVideoRequest): Promise<{ asset_id: string }> {
+  return request('/studio/generate-video', { method: 'POST', body: JSON.stringify(body) });
+}
+
 export function studioGetJob(assetId: string): Promise<StudioJobStatus> {
   return request<StudioJobStatus>(`/studio/jobs/${assetId}`);
 }
