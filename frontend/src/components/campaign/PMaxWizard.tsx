@@ -31,6 +31,13 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+import HiggsfieldGenerator from '@/components/studio/HiggsfieldGenerator';
+import type { StudioJobStatus } from '@/lib/api';
+
+// Map a wizard slot to the higgsfield aspect that fits best.
+// Google's "landscape" PMax image is 1.91:1 — higgsfield's closest
+// supported aspect is 16:9; the slight crop is negligible for ads.
+type SlotAspect = '1:1' | '4:5' | '9:16' | '16:9';
 
 const STEPS = [
   { id: 'brief',    label: 'Brief & budget'    },
@@ -338,11 +345,12 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   return (
     <div className="space-y-5">
       <AiHint
-        body="Inline higgsfield generation is wired in the next phase (mirrors the meta-ads-agent setup). Upload your assets below to keep moving — each upload returns an asset resource_name that gets attached to the asset group."
+        body="Upload your assets, OR click ‘Generate (Higgsfield)’ to create them inline — the generator opens with the correct aspect locked to the slot, and any successful image lands here automatically."
       />
       <ImageGroup
         label="Logos"
         spec="Any aspect, transparent background preferred"
+        slotAspect="1:1"
         items={bundle.logos}
         onChange={v => setField('logos', v)}
         accountId={accountId}
@@ -351,6 +359,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       <ImageGroup
         label="Landscape marketing image (1.91:1)"
         spec="1200×628 recommended"
+        slotAspect="16:9"
         items={bundle.landscape}
         onChange={v => setField('landscape', v)}
         accountId={accountId}
@@ -359,6 +368,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       <ImageGroup
         label="Square marketing image (1:1)"
         spec="1200×1200 recommended"
+        slotAspect="1:1"
         items={bundle.square}
         onChange={v => setField('square', v)}
         accountId={accountId}
@@ -367,6 +377,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       <ImageGroup
         label="Portrait marketing image (4:5)"
         spec="Optional · 960×1200 recommended"
+        slotAspect="4:5"
         items={bundle.portrait}
         onChange={v => setField('portrait', v)}
         accountId={accountId}
@@ -537,13 +548,23 @@ function TextList({
 }
 
 function ImageGroup({
-  label, spec, items, onChange, accountId, minItems,
+  label, spec, slotAspect, items, onChange, accountId, minItems,
 }: {
-  label: string; spec: string; items: string[]; onChange: (v: string[]) => void;
+  label: string; spec: string; slotAspect: SlotAspect; items: string[]; onChange: (v: string[]) => void;
   accountId: string; minItems: number;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGen, setShowGen] = useState(false);
+
+  const handleGenerated = (asset: StudioJobStatus) => {
+    // Only completed assets count toward the slot; failed/nsfw stay
+    // surfaced inside the generator's own per-tile error display.
+    if (asset.status !== 'completed' || !asset.asset_id) return;
+    // Avoid duplicates if onSettled fires for the same id twice.
+    if (items.includes(asset.asset_id)) return;
+    onChange([...items, asset.asset_id]);
+  };
 
   const handleUpload = async (file: File) => {
     setUploading(true);
@@ -593,6 +614,15 @@ function ImageGroup({
             </button>
           </div>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowGen(true)}
+          className="cursor-pointer border border-dashed border-violet-500/50 rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-violet-500/10 transition-colors text-violet-600 dark:text-violet-300"
+          title={`Generate ${slotAspect} images via Higgsfield`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Generate (Higgsfield)
+        </button>
         <label className={cn(
           'cursor-pointer border border-dashed border-border rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
           uploading && 'opacity-60 pointer-events-none'
@@ -615,6 +645,55 @@ function ImageGroup({
         <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" /> {error}
         </p>
+      )}
+      {/* Higgsfield generation modal — pre-locks the aspect ratio per
+          slot so the operator can't accidentally generate a 16:9 for
+          the square logo group. onSettled hands completed asset_ids
+          straight into the slot's items array (same shape Upload
+          produces, so no PMax-orchestrator-side adapter needed). */}
+      {showGen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
+          onClick={() => setShowGen(false)}
+        >
+          <div
+            className="w-full max-w-2xl bg-background border border-border rounded-lg shadow-xl overflow-hidden max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  Generate {label.toLowerCase()}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Aspect locked to {slotAspect} for this slot. {spec}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGen(false)}
+                className="p-1 hover:bg-secondary rounded"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <HiggsfieldGenerator
+                accountId={accountId}
+                lockAspect={slotAspect}
+                onSettled={handleGenerated}
+                caption={`Slot: ${label.toLowerCase()}`}
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
+              <p className="text-[10px] text-muted-foreground">
+                {items.length} added · close when done
+              </p>
+              <Button size="sm" onClick={() => setShowGen(false)}>Done</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
