@@ -485,6 +485,53 @@ async def _run_image_job(
         logger.info("higgsfield job completed (asset=%s job=%s)", asset_id, hf_job_id)
 
 
+# ── Marketing Studio presets ──────────────────────────────────────────
+
+
+class MarketingHook(BaseModel):
+    """One Marketing Studio hook — a pre-engineered ad concept with a
+    prompt + media previews. Operators pick one as the starting point
+    for a generation instead of writing prompts from scratch."""
+
+    id: str
+    name: str
+    type: Optional[str] = None
+    prompt: str
+    thumbnail_url: Optional[str] = None
+    video_url: Optional[str] = None
+    is_pinned: bool = False
+    source: Optional[str] = None
+
+
+@router.get("/marketing-studio/hooks", response_model=list[MarketingHook])
+async def list_marketing_hooks() -> list[MarketingHook]:
+    """Pre-built ad concepts (UGC, tutorial, unboxing, etc.) from
+    Higgsfield's Marketing Studio. Each hook carries a prompt + preview
+    so the operator can browse visually before picking one to drop
+    into the generator."""
+    client = HiggsfieldClient(timeout_s=30.0)
+    try:
+        items = await client.marketing_hooks_list()
+    except HiggsfieldError as e:
+        raise HTTPException(
+            status_code=401 if e.code == "auth" else 502,
+            detail={"code": e.code, "message": e.message},
+        )
+    out: list[MarketingHook] = []
+    for item in items:
+        out.append(MarketingHook(
+            id=str(item.get("id") or ""),
+            name=str(item.get("name") or "Untitled"),
+            type=item.get("type"),
+            prompt=str(item.get("prompt") or ""),
+            thumbnail_url=item.get("thumbnail_url"),
+            video_url=item.get("video_url"),
+            is_pinned=bool(item.get("is_pinned") or False),
+            source=item.get("source"),
+        ))
+    return out
+
+
 # ── Soul training ─────────────────────────────────────────────────────
 
 

@@ -336,6 +336,39 @@ class HiggsfieldClient:
                 message=f"soul-id wait returned non-JSON: {stdout[:120]!r}", code="shape",
             ) from e
 
+    async def marketing_hooks_list(self) -> list[dict[str, Any]]:
+        """List Higgsfield Marketing Studio hooks — pre-engineered ad
+        concepts (Product Hit, Spicy, etc.) with prompts + preview
+        thumbnails + sample videos. Each operator gets the same preset
+        catalogue from upstream (account-level customization is
+        possible but out of scope for V1)."""
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        argv = [bin_path, "--json", "marketing-studio", "hooks", "list"]
+        stdout, stderr, code = await asyncio.wait_for(
+            _run_cli(argv), timeout=30.0,
+        )
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "marketing-studio hooks list failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            parsed = json.loads(stdout.strip()) if stdout.strip() else {}
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"hooks list returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+        # Envelope is {cursor, has_more, items: [...]}; extract items.
+        if isinstance(parsed, dict) and "items" in parsed:
+            return parsed["items"] if isinstance(parsed["items"], list) else []
+        # Some CLI versions might return a flat list directly.
+        if isinstance(parsed, list):
+            return parsed
+        return []
+
     async def soul_list(self, *, size: int = 100) -> list[dict[str, Any]]:
         """List trained Soul references (machine-wide; Soul training
         is account-level on the higgsfield side, machine-mapped via

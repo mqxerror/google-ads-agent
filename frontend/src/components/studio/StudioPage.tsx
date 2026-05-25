@@ -12,6 +12,8 @@ import VideoCreator from '@/components/chat/VideoCreator';
 import ScriptGenerator from './ScriptGenerator';
 import HiggsfieldGenerator from './HiggsfieldGenerator';
 import SoulCharactersPanel from './SoulCharactersPanel';
+import MarketingPresetsPanel from './MarketingPresetsPanel';
+import type { MarketingHook } from '@/lib/api';
 
 interface AdAsset {
   id: string;
@@ -95,6 +97,13 @@ export default function StudioPage() {
   const [showScripter, setShowScripter] = useState(false);
   const [showHiggsfield, setShowHiggsfield] = useState(false);
   const [showSouls, setShowSouls] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
+  // When the operator picks a Marketing Studio hook, we flow its
+  // prompt into HiggsfieldGenerator via this state and open the
+  // generator panel. HiggsfieldGenerator supports `initialPrompt`
+  // via its `initialPrompt` prop, but a render-key swap is the
+  // simplest way to force a re-mount with the new prompt.
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   // Lazy-load balance when the Higgsfield panel opens, then refresh
   // every 60s. Keeps a fresh number visible without polling when the
@@ -307,6 +316,19 @@ export default function StudioPage() {
             Souls
           </button>
           <button
+            onClick={() => setShowPresets(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors',
+              showPresets
+                ? 'bg-violet-500/25 border-violet-500/50 text-violet-300'
+                : 'bg-secondary hover:bg-secondary/80 border-border'
+            )}
+            title="Browse Higgsfield Marketing Studio preset ad concepts"
+          >
+            <Sparkles className="h-4 w-4" />
+            Presets
+          </button>
+          <button
             onClick={() => setShowCreator(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-sm border border-pink-500/40"
           >
@@ -340,16 +362,34 @@ export default function StudioPage() {
         </div>
       )}
 
+      {/* Marketing Studio presets (S6) — browse pre-engineered hooks
+          and "use" one to flow the prompt into the generator. */}
+      {showPresets && (
+        <div className="mb-4">
+          <MarketingPresetsPanel
+            onUseHook={(h: MarketingHook) => {
+              setPendingPrompt(h.prompt);
+              setShowHiggsfield(true);
+              setShowPresets(false);
+            }}
+          />
+        </div>
+      )}
+
       {/* Higgsfield generator panel (V13 / S2) — generations land in
           ad_assets via the row-as-source-of-truth pattern; refresh on
-          settled to surface them in the library grid below. */}
+          settled to surface them in the library grid below. The
+          `key` swap forces a re-mount when a Presets hook flows in,
+          so the generator picks up the new initialPrompt cleanly. */}
       {showHiggsfield && (
         <div className="mb-4">
           <HiggsfieldGenerator
+            key={pendingPrompt || 'default'}
             accountId={accountId}
             campaignId={campaignScope ?? undefined}
             onSettled={() => refresh()}
-            caption="Image generation — Higgsfield CLI"
+            initialPrompt={pendingPrompt || undefined}
+            caption={pendingPrompt ? 'Loaded from Marketing Studio preset' : 'Image generation — Higgsfield CLI'}
           />
         </div>
       )}

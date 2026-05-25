@@ -323,6 +323,21 @@ export function studioGetSoul(soulPk: string): Promise<SoulCharacter> {
   return request<SoulCharacter>(`/studio/soul/${soulPk}`);
 }
 
+export interface MarketingHook {
+  id: string;
+  name: string;
+  type: string | null;
+  prompt: string;
+  thumbnail_url: string | null;
+  video_url: string | null;
+  is_pinned: boolean;
+  source: string | null;
+}
+
+export function studioListMarketingHooks(): Promise<MarketingHook[]> {
+  return request<MarketingHook[]>('/studio/marketing-studio/hooks');
+}
+
 /**
  * Train a new Soul. FormData because we're uploading 5-20 reference
  * images. The endpoint returns immediately with status=pending; poll
