@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft, ChevronRight, Download, Expand, Shrink, PanelRightClose } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare, ChevronLeft, ChevronRight, Download, Expand, Shrink, PanelRightClose, Hash, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
@@ -14,10 +15,19 @@ import type { ChatMessage, ToolCall, Campaign, Conversation, ConversationSearchR
 
 export default function ChatPanel() {
   const { chatPanelWidth, setChatPanelWidth, selectedCampaignId, chatPanelCollapsed, toggleChatPanel } = useAppStore();
+  const navigate = useNavigate();
+  // URL is now the authoritative source for which conversation is active.
+  // `useParams` reads `/c/:conversationId` — null when the user is on a
+  // non-chat route (e.g. dashboard, setup). sessionStorage is kept as a
+  // fallback for *non-chat-route* loads (open `/` directly and the last
+  // chat resumes) but the URL always wins when both are present.
+  const { conversationId: urlConversationId } = useParams<{ conversationId?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isResponding, setIsResponding] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [conversationId, setConversationIdRaw] = useState<string | null>(() => {
-    // Restore conversation from sessionStorage on mount
+    // URL > sessionStorage on first mount.
+    if (urlConversationId) return urlConversationId;
     const saved = sessionStorage.getItem('activeConversationId');
     return saved || null;
   });
@@ -25,7 +35,37 @@ export default function ChatPanel() {
     if (id) sessionStorage.setItem('activeConversationId', id);
     else sessionStorage.removeItem('activeConversationId');
     setConversationIdRaw(id);
-  }, []);
+    // Mirror to the URL so refresh / browser-back / share-by-link all
+    // resolve to the right chat. `replace:true` keeps history from
+    // ballooning when the user clicks through several conversations.
+    if (id) {
+      if (window.location.pathname !== `/c/${id}`) navigate(`/c/${id}`, { replace: true });
+    } else {
+      if (window.location.pathname.startsWith('/c/')) navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
+  // If the user pastes a `/c/:id` URL while a different chat is active,
+  // the URL wins — sync the in-memory id to it.
+  useEffect(() => {
+    if (urlConversationId && urlConversationId !== conversationId) {
+      setConversationIdRaw(urlConversationId);
+      sessionStorage.setItem('activeConversationId', urlConversationId);
+    }
+  }, [urlConversationId, conversationId]);
+
+  // Copy-to-clipboard for the visible conversation id.
+  const handleCopyId = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      await navigator.clipboard.writeText(conversationId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // navigator.clipboard fails in insecure contexts — fallback would
+      // need a hidden textarea; not worth the code for localhost dev.
+    }
+  }, [conversationId]);
   const [expanded, setExpanded] = useState(false);
   const [fullScreen, setFullScreen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -682,6 +722,20 @@ export default function ChatPanel() {
                 effects already drop the foreign thread; while that resolves
                 the badge speaks for the agent, not the sidebar. */}
             <ContextBadge campaignName={effectiveCampaignName} guidelinesLoaded={true} contextMeta={contextMeta} />
+            {/* Conversation id chip — short prefix, click-to-copy, full
+                id in the tooltip. Hidden when no chat is active. Surfacing
+                the id was the missing affordance for sharing/debugging
+                a specific thread; the same id is now in the URL too. */}
+            {conversationId && (
+              <button
+                onClick={handleCopyId}
+                className="px-1.5 py-0.5 flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors"
+                title={copied ? 'Copied' : `Copy conversation id: ${conversationId}`}
+              >
+                {copied ? <Check className="h-3 w-3 text-green-500" /> : <Hash className="h-3 w-3" />}
+                <span>{conversationId.slice(0, 8)}</span>
+              </button>
+            )}
             {conversations.length > 0 && (
               <button
                 onClick={() => setShowHistory(!showHistory)}

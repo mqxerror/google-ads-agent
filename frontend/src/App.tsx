@@ -131,6 +131,12 @@ function App() {
       <TooltipProvider>
         <Routes>
           <Route path="/" element={<AppRoot />} />
+          {/* Direct conversation links — `/c/:id` opens that exact chat.
+              ChatPanel reads the param from useParams and loads it on
+              mount; useEffect also pushes the current conversationId
+              back into the URL so refresh / share / browser-back all
+              keep the chat in sync with what the user sees. */}
+          <Route path="/c/:conversationId" element={<AppRoot />} />
           <Route path="/setup" element={<SetupWizard />} />
         </Routes>
       </TooltipProvider>
