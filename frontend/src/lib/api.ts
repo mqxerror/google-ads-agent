@@ -280,8 +280,14 @@ export interface CostEstimateRequest {
 }
 
 export interface CostEstimateResponse {
-  credits: number;
-  credits_exact: number;
+  // Nullable: when a model rejects the params we sent (Veo 3 old
+  // needs --input_image; Wan accepts duration as enum strings only),
+  // credits will be null and error_code/message carry the upstream
+  // explanation. The UI surfaces this inline instead of showing "—".
+  credits: number | null;
+  credits_exact: number | null;
+  error_code?: string | null;
+  error_message?: string | null;
 }
 
 export function studioCostEstimate(body: CostEstimateRequest): Promise<CostEstimateResponse> {
@@ -290,7 +296,7 @@ export function studioCostEstimate(body: CostEstimateRequest): Promise<CostEstim
 
 export interface BalanceResponse {
   credits: number | null;
-  credits_exact: number | null;
+  email: string | null;
   plan: string | null;
   extras: Record<string, unknown>;
 }
@@ -336,6 +342,30 @@ export interface MarketingHook {
 
 export function studioListMarketingHooks(): Promise<MarketingHook[]> {
   return request<MarketingHook[]>('/studio/marketing-studio/hooks');
+}
+
+// Landing-page brief extraction. Operator pastes a campaign's landing
+// URL → backend fetches the page, Claude drafts an on-brand creative
+// prompt. The prompt flows into HiggsfieldGenerator as initialPrompt.
+export interface ExtractBriefRequest {
+  url: string;
+  target: 'image' | 'video';
+}
+export interface ExtractBriefResponse {
+  url: string;
+  final_url: string;
+  title: string | null;
+  description: string | null;
+  h1: string | null;
+  body_excerpt: string | null;
+  drafted_prompt: string;
+  og: Record<string, string>;
+}
+export function studioExtractBrief(body: ExtractBriefRequest): Promise<ExtractBriefResponse> {
+  return request<ExtractBriefResponse>('/studio/extract-brief', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /**

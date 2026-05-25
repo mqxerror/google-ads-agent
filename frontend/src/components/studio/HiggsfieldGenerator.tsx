@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader2, AlertCircle, Check, ImageIcon, Video as VideoIcon, Image as ImageGlyph } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Check, ImageIcon, Video as VideoIcon, Image as ImageGlyph, LinkIcon, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
   studioGetJob,
   studioCostEstimate,
   studioListSouls,
+  studioExtractBrief,
   type StudioJobStatus,
   type HiggsfieldGenerateImageRequest,
   type HiggsfieldGenerateVideoRequest,
@@ -158,12 +159,22 @@ export default function HiggsfieldGenerator({
   const eventSourcesRef = useRef<EventSource[]>([]);
 
   // Live cost estimate. Refreshed on model/prompt/duration/mode change
-  // (debounced 400ms so each keystroke doesn't shell out). null means
-  // "not estimated yet"; we show "—" in the UI while loading.
+  // (debounced 400ms so each keystroke doesn't shell out). costError
+  // carries the upstream "model needs different params" message so
+  // the UI can show WHY a cost is missing (e.g. Veo 3 requires an
+  // input image — silently displaying "—" was confusing).
   const [costCredits, setCostCredits] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
   const costAbortRef = useRef<AbortController | null>(null);
   const isKling = mode === 'video' && /^kling/.test(videoModel);
+
+  // Landing-page brief extraction. Operator pastes a campaign's
+  // landing page URL → backend fetches + Claude drafts an on-brand
+  // creative prompt → it lands here as `prompt`.
+  const [briefUrl, setBriefUrl] = useState('');
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
 
   // Soul library + selection. Fetched lazily when a Soul-aware model
   // is picked. Only `ready` Souls are pickable; pending/training/failed
@@ -184,15 +195,15 @@ export default function HiggsfieldGenerator({
     const trimmed = prompt.trim();
     if (!trimmed) {
       setCostCredits(null);
+      setCostError(null);
       return;
     }
-    // Debounce: only fire after 400ms of no keystrokes.
     const handle = window.setTimeout(() => {
-      // Cancel any in-flight cost call.
       costAbortRef.current?.abort();
       const ac = new AbortController();
       costAbortRef.current = ac;
       setCostLoading(true);
+      setCostError(null);
       const activeModel = mode === 'video' ? videoModel : model;
       studioCostEstimate({
         prompt: trimmed,
@@ -204,13 +215,20 @@ export default function HiggsfieldGenerator({
         .then((r) => {
           if (ac.signal.aborted) return;
           setCostCredits(r.credits);
+          // Soft-failure path: backend returned 200 with credits=null
+          // + structured error. Surface the upstream "needs input
+          // image / aspect not supported / etc." so the operator
+          // knows what's wrong instead of staring at "—".
+          if (r.credits === null && r.error_message) {
+            setCostError(_summarizeCostError(r.error_message));
+          } else {
+            setCostError(null);
+          }
         })
-        .catch(() => {
+        .catch((e) => {
           if (ac.signal.aborted) return;
-          // Cost lookup failures shouldn't block Generate — just hide
-          // the badge. The actual submit will still work or surface a
-          // structured error.
           setCostCredits(null);
+          setCostError(e instanceof Error ? e.message : 'cost lookup failed');
         })
         .finally(() => {
           if (!ac.signal.aborted) setCostLoading(false);
@@ -218,6 +236,35 @@ export default function HiggsfieldGenerator({
     }, 400);
     return () => window.clearTimeout(handle);
   }, [prompt, model, videoModel, mode, aspectRatio, duration, klingMode, lockAspect, isKling]);
+
+  // Pull the operator-actionable line out of higgsfield's multi-line
+  // CLI error so the badge tooltip isn't a wall of text.
+  function _summarizeCostError(msg: string): string {
+    // CLI errors look like:
+    //   "Error: Missing required params: input_image
+    //    Invalid values: aspect_ratio=1:1 (allowed: 16:9,9:16)
+    //    Unknown params: duration"
+    const lines = msg.split('\n').filter(Boolean);
+    return lines.slice(0, 3).join(' · ').slice(0, 240);
+  }
+
+  const handleExtractBrief = async () => {
+    const u = briefUrl.trim();
+    if (!u || briefLoading) return;
+    setBriefLoading(true);
+    setBriefError(null);
+    try {
+      const res = await studioExtractBrief({
+        url: u,
+        target: mode === 'video' ? 'video' : 'image',
+      });
+      setPrompt(res.drafted_prompt);
+    } catch (e) {
+      setBriefError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBriefLoading(false);
+    }
+  };
 
   // Keep aspect in sync if the parent changes lockAspect mid-mount
   // (PMaxWizard opens different slot modals with different aspects).
@@ -401,6 +448,49 @@ export default function HiggsfieldGenerator({
         )}
       </div>
 
+      {/* Landing-page brief extraction. Operator pastes a campaign's
+          landing URL, hits Extract, the backend fetches the page and
+          asks Claude to draft an on-brand prompt grounded in the
+          page's real content. Much faster than writing from scratch
+          and the visuals stay aligned with what the page promises. */}
+      {!lockAspect && (
+        <div className="flex items-center gap-2 text-xs">
+          <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <Input
+            value={briefUrl}
+            onChange={(e) => setBriefUrl(e.target.value)}
+            placeholder="Paste a campaign's landing page URL — Claude will draft a prompt from it"
+            disabled={briefLoading || busy}
+            className="h-7 text-xs flex-1"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleExtractBrief();
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExtractBrief}
+            disabled={!briefUrl.trim() || briefLoading || busy}
+            className="h-7 gap-1.5 shrink-0"
+          >
+            {briefLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Wand2 className="h-3 w-3" />
+            )}
+            {briefLoading ? 'Drafting…' : 'Extract brief'}
+          </Button>
+        </div>
+      )}
+      {briefError && (
+        <div className="text-[10px] text-red-600 dark:text-red-400 flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> {briefError}
+        </div>
+      )}
+
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -552,26 +642,35 @@ export default function HiggsfieldGenerator({
             <span className="text-[10px] text-muted-foreground">s</span>
           </label>
         )}
-        {/* Live cost badge — updates 400ms after the operator stops
-            typing. Shows "—" while loading; hides if cost lookup
-            failed. Lets the user pick budget models (e.g. Veo Lite,
-            Kling std) before burning credits. */}
+        {/* Live cost badge. When the model rejects our params (Veo 3
+            needs --input_image; Wan accepts duration enum strings only)
+            the badge turns red and the tooltip surfaces the actual
+            upstream error so the operator can switch model or fix
+            params instead of staring at "—". */}
         <div
           className={cn(
             'flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded border',
-            costCredits !== null && costCredits > 50
-              ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5'
-              : costCredits !== null
-                ? 'border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/5'
-                : 'border-border text-muted-foreground'
+            costError
+              ? 'border-red-500/40 text-red-600 dark:text-red-400 bg-red-500/5'
+              : costCredits !== null && costCredits > 50
+                ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5'
+                : costCredits !== null
+                  ? 'border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/5'
+                  : 'border-border text-muted-foreground'
           )}
           title={
-            costCredits !== null
-              ? `Estimated cost: ${costCredits} Higgsfield credits per generation. Pick a budget model (Veo Lite, Kling std) to lower this.`
-              : 'Cost will appear once you have a prompt + model selected.'
+            costError
+              ? `Model rejected the params: ${costError}`
+              : costCredits !== null
+                ? `Estimated cost: ${costCredits} Higgsfield credits per generation. Pick a budget model (Veo Lite, Kling std) to lower this.`
+                : 'Cost will appear once you have a prompt + model selected.'
           }
         >
-          ≈ {costLoading ? '…' : costCredits ?? '—'} credits
+          {costError ? (
+            <><AlertCircle className="h-3 w-3" /> incompatible</>
+          ) : (
+            <>≈ {costLoading ? '…' : costCredits ?? '—'} credits</>
+          )}
         </div>
         <Button
           onClick={submit}

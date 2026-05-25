@@ -140,16 +140,27 @@ class SoulCharacter(BaseModel):
 
 
 class BalanceResponse(BaseModel):
-    """Pass-through of higgsfield account balance. Shape mirrors CLI
-    output exactly — we surface whatever keys the CLI returns so a
-    future Higgsfield API change (e.g. adding a 'plan' field) flows
-    through to the UI without a code change."""
+    """Pass-through of `higgsfield account status`. Mirrors CLI shape
+    `{email, credits, subscription_plan_type}` so a future Higgsfield
+    API addition flows through to the UI without a code change."""
+
+    credits: Optional[float] = None
+    email: Optional[str] = None
+    plan: Optional[str] = None  # subscription_plan_type
+    extras: dict[str, Any] = Field(default_factory=dict)
+
+
+class CostEstimateNullable(BaseModel):
+    """Cost-estimate response that tolerates per-model param mismatches.
+    Veo 3 (older) requires --input_image and rejects --duration; instead
+    of 502'ing the whole UI, we return credits=null + error_code so the
+    frontend can show "model doesn't fit these params" inline rather
+    than displaying a useless "—" badge."""
 
     credits: Optional[int] = None
     credits_exact: Optional[float] = None
-    plan: Optional[str] = None
-    # Extra fields land in `extras` rather than 500ing on shape drift.
-    extras: dict[str, Any] = Field(default_factory=dict)
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):
@@ -239,14 +250,15 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
     return GenerateImageResponse(asset_ids=asset_ids)
 
 
-@router.post("/cost-estimate", response_model=CostEstimateResponse)
-async def cost_estimate(body: CostEstimateRequest) -> CostEstimateResponse:
-    """Live cost estimate. Wraps `higgsfield generate cost` so the UI
-    can show "≈ N credits" before the operator clicks Generate.
+@router.post("/cost-estimate", response_model=CostEstimateNullable)
+async def cost_estimate(body: CostEstimateRequest) -> CostEstimateNullable:
+    """Live cost estimate. Wraps `higgsfield generate cost`.
 
-    Cost is model-dependent (Veo 3.1 Lite = ~8c for 5s; Kling 3.0 4k
-    mode is multiples of Kling 3.0 std mode); some models charge per
-    second so duration matters.
+    Returns a nullable shape — credits=null with error_code/message
+    when a model rejects the params we sent (Veo 3 old requires
+    `--input_image`; Wan accepts duration as enum strings only; etc).
+    The UI shows "model needs different params" inline instead of an
+    empty "—" with no explanation.
     """
     client = HiggsfieldClient(timeout_s=30.0)
     params: dict[str, Any] = {}
@@ -264,15 +276,19 @@ async def cost_estimate(body: CostEstimateRequest) -> CostEstimateResponse:
         envelope = await client.estimate_cost(
             model=body.model, prompt=body.prompt, **params,
         )
-    except HiggsfieldError as e:
-        raise HTTPException(
-            status_code=400 if e.code in ("cli", "shape") else 502,
-            detail={"code": e.code, "message": e.message},
+        return CostEstimateNullable(
+            credits=int(envelope.get("credits", 0)),
+            credits_exact=float(envelope.get("credits_exact", 0)),
         )
-    return CostEstimateResponse(
-        credits=int(envelope.get("credits", 0)),
-        credits_exact=float(envelope.get("credits_exact", 0)),
-    )
+    except HiggsfieldError as e:
+        # NOT a 4xx/5xx — the UI needs the structured info to render a
+        # human-readable explanation inline. 200 with error fields.
+        logger.info("cost-estimate soft-failed for %s: %s", body.model, e.message)
+        return CostEstimateNullable(
+            credits=None, credits_exact=None,
+            error_code=e.code or "run",
+            error_message=e.message,
+        )
 
 
 @router.get("/balance", response_model=BalanceResponse)
@@ -290,9 +306,12 @@ async def get_balance() -> BalanceResponse:
         )
     return BalanceResponse(
         credits=envelope.get("credits"),
-        credits_exact=envelope.get("credits_exact"),
-        plan=envelope.get("plan"),
-        extras={k: v for k, v in envelope.items() if k not in ("credits", "credits_exact", "plan")},
+        email=envelope.get("email"),
+        plan=envelope.get("subscription_plan_type") or envelope.get("plan"),
+        extras={
+            k: v for k, v in envelope.items()
+            if k not in ("credits", "email", "subscription_plan_type", "plan")
+        },
     )
 
 
@@ -483,6 +502,128 @@ async def _run_image_job(
             higgsfield_job_id=hf_job_id,
         )
         logger.info("higgsfield job completed (asset=%s job=%s)", asset_id, hf_job_id)
+
+
+# ── Landing-page brief extraction ─────────────────────────────────────
+
+
+class ExtractBriefRequest(BaseModel):
+    url: str = Field(min_length=1)
+    # What kind of prompt to draft from the page. The drafter tunes
+    # its system prompt around this so a "video" prompt focuses on
+    # action / motion / scene, while "image" focuses on composition
+    # / lighting / mood.
+    target: str = "image"  # 'image' | 'video'
+
+
+class ExtractBriefResponse(BaseModel):
+    url: str
+    final_url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    h1: Optional[str] = None
+    body_excerpt: Optional[str] = None
+    drafted_prompt: str
+    # Raw signals so the UI can show what fed into the prompt — keeps
+    # the draft auditable; operator can tweak knowing the source data.
+    og: dict[str, str] = Field(default_factory=dict)
+
+
+@router.post("/extract-brief", response_model=ExtractBriefResponse)
+async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
+    """Fetch a landing-page URL, extract its content signals, and ask
+    Claude to draft a creative prompt for image or video generation.
+
+    The operator drops a campaign's landing page URL in, hits Extract,
+    and gets back a prompt grounded in the page's actual content —
+    much faster than writing prompts from scratch, and the visuals
+    stay on-message with what the page promises.
+    """
+    from app.services.page_fetcher import fetch, PageFetchError
+
+    # Step 1 — fetch + parse.
+    try:
+        page = await fetch(body.url)
+    except PageFetchError as e:
+        raise HTTPException(status_code=400, detail={"code": "fetch_failed", "message": str(e)})
+
+    # Step 2 — draft a prompt via Claude. Single-shot via the claude
+    # CLI (which is already on PATH for the agent.py subprocess
+    # pattern). 30s timeout — Sonnet handles this in <5s typically.
+    is_video = body.target == "video"
+    target_label = "video" if is_video else "image"
+    system = (
+        f"You are an expert ad-creative prompt engineer. Given a landing page's content, "
+        f"draft a SINGLE concise prompt for generating a {target_label} ad creative that:\n"
+        f"  - Visually captures the page's offer / value proposition\n"
+        f"  - Stays on-brand (luxury / professional / honest — never sleazy / clickbait)\n"
+        f"  - Avoids any third-party brand names (Marriott, Hilton, IHG, etc.)\n"
+        f"  - For visa / immigration: NO eligibility / quiz language, never frame as 'easy'\n"
+        + (
+            "  - For VIDEO: include camera movement (e.g. slow push-in, dolly, handheld), "
+            "subject action, and a 5-10 second arc. Editorial / cinematic, never TikTok-style.\n"
+            if is_video else
+            "  - For IMAGE: include subject, setting, lighting, mood, lens / framing hints. "
+            "Editorial photography style, not stock-photo cliché.\n"
+        )
+        + "Output ONLY the prompt text — no preamble, no quotes, no explanation. "
+        "1-3 sentences max."
+    )
+
+    user = (
+        f"Landing page URL: {page.url}\n"
+        f"Title: {page.title or '(none)'}\n"
+        f"Meta description: {page.description or '(none)'}\n"
+        f"H1: {page.h1 or '(none)'}\n"
+        f"OG tags: {json.dumps(page.og) if page.og else '(none)'}\n\n"
+        f"Body excerpt (first 3k chars):\n{page.body_excerpt[:2000]}\n\n"
+        f"Draft the {target_label} prompt now."
+    )
+
+    # Use claude CLI in --print (one-shot) mode. Sonnet is fast and
+    # cheap for this size — no need for Opus on a paragraph-summary
+    # task. Pipe the user content via stdin to avoid argv size limits.
+    proc = await asyncio.create_subprocess_exec(
+        "claude", "--print", "--model", "sonnet",
+        "--system-prompt", system,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        out_b, err_b = await asyncio.wait_for(
+            proc.communicate(input=user.encode("utf-8")),
+            timeout=45.0,
+        )
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise HTTPException(
+            status_code=504,
+            detail={"code": "claude_timeout", "message": "Claude prompt-drafter timed out after 45s"},
+        )
+    if proc.returncode != 0:
+        err = err_b.decode("utf-8", errors="replace").strip()
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "claude_failed", "message": err[:500] or "claude CLI exited non-zero"},
+        )
+
+    drafted = out_b.decode("utf-8", errors="replace").strip()
+    # Strip surrounding quotes if Claude wrapped the output in them.
+    if (drafted.startswith('"') and drafted.endswith('"')) or (drafted.startswith("'") and drafted.endswith("'")):
+        drafted = drafted[1:-1].strip()
+
+    return ExtractBriefResponse(
+        url=page.url,
+        final_url=page.final_url,
+        title=page.title,
+        description=page.description,
+        h1=page.h1,
+        body_excerpt=page.body_excerpt[:500],  # smaller for the FE
+        drafted_prompt=drafted,
+        og=page.og,
+    )
 
 
 # ── Marketing Studio presets ──────────────────────────────────────────

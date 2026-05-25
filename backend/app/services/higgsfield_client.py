@@ -398,14 +398,16 @@ class HiggsfieldClient:
 
     async def get_balance(self) -> dict[str, Any]:
         """Read the operator's current Higgsfield credit balance via
-        `higgsfield account balance --json`. Used by the Studio header
-        to surface remaining credits."""
+        `higgsfield account status --json`. The CLI subcommand is
+        `status` (not `balance` — that was my early misread of the
+        help text and explained the persistent "—" in the header
+        pill). Returns `{email, credits, subscription_plan_type}`."""
         bin_path = shutil.which("higgsfield")
         if bin_path is None:
             raise HiggsfieldError(
                 message="higgsfield CLI not on PATH", code="cli",
             )
-        argv = [bin_path, "--json", "account", "balance"]
+        argv = [bin_path, "--json", "account", "status"]
         try:
             stdout, stderr, code = await asyncio.wait_for(
                 _run_cli(argv), timeout=15.0,
