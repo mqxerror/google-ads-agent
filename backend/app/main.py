@@ -25,6 +25,10 @@ async def lifespan(app: FastAPI):
         from app.routers.settings import load_settings_overrides
         await load_settings_overrides()
         start_background_sync()
+        # Surface higgsfield CLI presence at boot so a missing npm-global
+        # PATH entry fails visibly here rather than on first Studio call.
+        from app.services.higgsfield_client import log_cli_presence_at_startup
+        log_cli_presence_at_startup()
         yield
         stop_background_sync()
 
