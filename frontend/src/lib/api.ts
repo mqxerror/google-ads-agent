@@ -345,12 +345,26 @@ export function studioListMarketingHooks(): Promise<MarketingHook[]> {
 }
 
 // Landing-page brief extraction. Operator pastes a campaign's landing
-// URL → backend fetches the page, Claude drafts an on-brand creative
-// prompt. The prompt flows into HiggsfieldGenerator as initialPrompt.
-export interface ExtractBriefRequest {
-  url: string;
-  target: 'image' | 'video';
+// URL → backend fetches the page, Claude drafts on-brand creative
+// prompts (3 angle variants). The picked variant flows into
+// HiggsfieldGenerator as initialPrompt.
+export interface BriefVariant {
+  angle: 'problem-led' | 'aspirational' | 'social-proof' | string;
+  prompt: string;
+  rationale: string;
 }
+
+export interface DecomposedBrief {
+  subject: string;
+  setting: string;
+  value_prop: string;
+  audience: string;
+  tone: string;
+  program: string;
+  hard_constraints: string[];
+  claim_hints: string[];
+}
+
 export interface ExtractBriefResponse {
   url: string;
   final_url: string;
@@ -358,8 +372,22 @@ export interface ExtractBriefResponse {
   description: string | null;
   h1: string | null;
   body_excerpt: string | null;
-  drafted_prompt: string;
   og: Record<string, string>;
+  brief: DecomposedBrief | null;
+  variants: BriefVariant[];
+  pinned_claims_used: string[];
+  /** Back-compat alias for the first variant's prompt. */
+  drafted_prompt: string;
+}
+
+export interface ExtractBriefRequest {
+  url: string;
+  target: 'image' | 'video';
+  /** Optional — when provided, the drafter loads the campaign's
+   * pinned_facts.md and grounds the social-proof variant in
+   * operator-verified claims. */
+  account_id?: string;
+  campaign_id?: string;
 }
 export function studioExtractBrief(body: ExtractBriefRequest): Promise<ExtractBriefResponse> {
   return request<ExtractBriefResponse>('/studio/extract-brief', {

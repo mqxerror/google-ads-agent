@@ -514,6 +514,40 @@ class ExtractBriefRequest(BaseModel):
     # action / motion / scene, while "image" focuses on composition
     # / lighting / mood.
     target: str = "image"  # 'image' | 'video'
+    # Account + campaign context for pinned-claims injection. When
+    # provided, the drafter loads data/memory/{account}/{campaign}/
+    # pinned_facts.md and grounds the social-proof variant in
+    # operator-verified claims (the meta-ads-agent pattern). Without
+    # these, social-proof falls back to composition-only authority.
+    account_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+
+
+class BriefVariant(BaseModel):
+    """One angle variant produced by the prompt drafter. Three of these
+    are returned per extract-brief call: problem-led, aspirational,
+    social-proof. Operator picks the one that fits the campaign's
+    creative rotation."""
+
+    angle: str        # 'problem-led' | 'aspirational' | 'social-proof'
+    prompt: str       # the actual generation prompt
+    rationale: str    # one-line "why this composition fits"
+
+
+class DecomposedBrief(BaseModel):
+    """Structured brief from Stage 1 of the drafter. Surfaced to the
+    UI so operators can see what fed into the variant prompts — keeps
+    the output auditable; if a variant is off, the brief usually tells
+    you why."""
+
+    subject: str
+    setting: str
+    value_prop: str
+    audience: str
+    tone: str
+    program: str
+    hard_constraints: list[str] = Field(default_factory=list)
+    claim_hints: list[str] = Field(default_factory=list)
 
 
 class ExtractBriefResponse(BaseModel):
@@ -523,23 +557,34 @@ class ExtractBriefResponse(BaseModel):
     description: Optional[str] = None
     h1: Optional[str] = None
     body_excerpt: Optional[str] = None
-    drafted_prompt: str
-    # Raw signals so the UI can show what fed into the prompt — keeps
-    # the draft auditable; operator can tweak knowing the source data.
     og: dict[str, str] = Field(default_factory=dict)
+    # Multi-stage output: the structured brief (Stage 1) + three angle
+    # variants (Stage 2).
+    brief: Optional[DecomposedBrief] = None
+    variants: list[BriefVariant] = Field(default_factory=list)
+    pinned_claims_used: list[str] = Field(default_factory=list)
+    # Back-compat alias: first variant's prompt. Old FE callers that
+    # haven't switched to the variants[] picker still get a usable
+    # single prompt.
+    drafted_prompt: str = ""
 
 
 @router.post("/extract-brief", response_model=ExtractBriefResponse)
 async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
-    """Fetch a landing-page URL, extract its content signals, and ask
-    Claude to draft a creative prompt for image or video generation.
+    """Fetch a landing-page URL → decompose into a structured brief
+    → draft three angle-specific generation prompts.
 
-    The operator drops a campaign's landing page URL in, hits Extract,
-    and gets back a prompt grounded in the page's actual content —
-    much faster than writing prompts from scratch, and the visuals
-    stay on-message with what the page promises.
+    Two-stage Claude pipeline (modeled on meta-ads-agent's
+    intent_decomposer). Stage 1 distills page signals into a clean
+    brief; Stage 2 uses the visual_director role file + the
+    campaign's pinned facts to draft three angle variants
+    (problem-led / aspirational / social-proof). Operator picks one.
+
+    The single-shot `drafted_prompt` field is kept as a back-compat
+    alias for the first variant so older FE callers don't break.
     """
     from app.services.page_fetcher import fetch, PageFetchError
+    from app.services.prompt_drafter import draft_variants, PromptDrafterError
 
     # Step 1 — fetch + parse.
     try:
@@ -547,72 +592,27 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
     except PageFetchError as e:
         raise HTTPException(status_code=400, detail={"code": "fetch_failed", "message": str(e)})
 
-    # Step 2 — draft a prompt via Claude. Single-shot via the claude
-    # CLI (which is already on PATH for the agent.py subprocess
-    # pattern). 30s timeout — Sonnet handles this in <5s typically.
-    is_video = body.target == "video"
-    target_label = "video" if is_video else "image"
-    system = (
-        f"You are an expert ad-creative prompt engineer. Given a landing page's content, "
-        f"draft a SINGLE concise prompt for generating a {target_label} ad creative that:\n"
-        f"  - Visually captures the page's offer / value proposition\n"
-        f"  - Stays on-brand (luxury / professional / honest — never sleazy / clickbait)\n"
-        f"  - Avoids any third-party brand names (Marriott, Hilton, IHG, etc.)\n"
-        f"  - For visa / immigration: NO eligibility / quiz language, never frame as 'easy'\n"
-        + (
-            "  - For VIDEO: include camera movement (e.g. slow push-in, dolly, handheld), "
-            "subject action, and a 5-10 second arc. Editorial / cinematic, never TikTok-style.\n"
-            if is_video else
-            "  - For IMAGE: include subject, setting, lighting, mood, lens / framing hints. "
-            "Editorial photography style, not stock-photo cliché.\n"
-        )
-        + "Output ONLY the prompt text — no preamble, no quotes, no explanation. "
-        "1-3 sentences max."
-    )
-
-    user = (
-        f"Landing page URL: {page.url}\n"
-        f"Title: {page.title or '(none)'}\n"
-        f"Meta description: {page.description or '(none)'}\n"
-        f"H1: {page.h1 or '(none)'}\n"
-        f"OG tags: {json.dumps(page.og) if page.og else '(none)'}\n\n"
-        f"Body excerpt (first 3k chars):\n{page.body_excerpt[:2000]}\n\n"
-        f"Draft the {target_label} prompt now."
-    )
-
-    # Use claude CLI in --print (one-shot) mode. Sonnet is fast and
-    # cheap for this size — no need for Opus on a paragraph-summary
-    # task. Pipe the user content via stdin to avoid argv size limits.
-    proc = await asyncio.create_subprocess_exec(
-        "claude", "--print", "--model", "sonnet",
-        "--system-prompt", system,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    # Steps 2 + 3 — decompose into structured brief, then draft 3 variants.
     try:
-        out_b, err_b = await asyncio.wait_for(
-            proc.communicate(input=user.encode("utf-8")),
-            timeout=45.0,
+        package = await draft_variants(
+            page=page.to_dict(),
+            target=body.target,
+            account_id=body.account_id,
+            campaign_id=body.campaign_id,
         )
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise HTTPException(
-            status_code=504,
-            detail={"code": "claude_timeout", "message": "Claude prompt-drafter timed out after 45s"},
-        )
-    if proc.returncode != 0:
-        err = err_b.decode("utf-8", errors="replace").strip()
+    except PromptDrafterError as e:
         raise HTTPException(
             status_code=502,
-            detail={"code": "claude_failed", "message": err[:500] or "claude CLI exited non-zero"},
+            detail={"code": "drafter_failed", "message": str(e)},
         )
 
-    drafted = out_b.decode("utf-8", errors="replace").strip()
-    # Strip surrounding quotes if Claude wrapped the output in them.
-    if (drafted.startswith('"') and drafted.endswith('"')) or (drafted.startswith("'") and drafted.endswith("'")):
-        drafted = drafted[1:-1].strip()
+    brief_obj = DecomposedBrief(**package["brief"])
+    variant_objs = [BriefVariant(**v) for v in package["variants"]]
+    # Back-compat: first non-empty variant prompt as drafted_prompt.
+    fallback = next(
+        (v.prompt for v in variant_objs if v.prompt),
+        "",
+    )
 
     return ExtractBriefResponse(
         url=page.url,
@@ -620,9 +620,12 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
         title=page.title,
         description=page.description,
         h1=page.h1,
-        body_excerpt=page.body_excerpt[:500],  # smaller for the FE
-        drafted_prompt=drafted,
+        body_excerpt=(page.body_excerpt or "")[:500],
         og=page.og,
+        brief=brief_obj,
+        variants=variant_objs,
+        pinned_claims_used=package.get("pinned_claims_used", []),
+        drafted_prompt=fallback,
     )
 
 

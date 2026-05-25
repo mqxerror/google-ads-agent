@@ -27,6 +27,7 @@ import {
   type HiggsfieldGenerateImageRequest,
   type HiggsfieldGenerateVideoRequest,
   type SoulCharacter,
+  type BriefVariant,
 } from '@/lib/api';
 
 // Models that accept --soul-id. When one of these is selected, the
@@ -170,11 +171,14 @@ export default function HiggsfieldGenerator({
   const isKling = mode === 'video' && /^kling/.test(videoModel);
 
   // Landing-page brief extraction. Operator pastes a campaign's
-  // landing page URL → backend fetches + Claude drafts an on-brand
-  // creative prompt → it lands here as `prompt`.
+  // landing page URL → backend runs the 2-stage drafter (decompose +
+  // 3 angle variants per visual_director role) → operator picks
+  // which angle fits the campaign rotation, that prompt becomes
+  // `prompt`.
   const [briefUrl, setBriefUrl] = useState('');
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefError, setBriefError] = useState<string | null>(null);
+  const [briefVariants, setBriefVariants] = useState<BriefVariant[]>([]);
 
   // Soul library + selection. Fetched lazily when a Soul-aware model
   // is picked. Only `ready` Souls are pickable; pending/training/failed
@@ -253,17 +257,33 @@ export default function HiggsfieldGenerator({
     if (!u || briefLoading) return;
     setBriefLoading(true);
     setBriefError(null);
+    setBriefVariants([]);
     try {
       const res = await studioExtractBrief({
         url: u,
         target: mode === 'video' ? 'video' : 'image',
+        account_id: accountId,
+        campaign_id: campaignId,
       });
-      setPrompt(res.drafted_prompt);
+      // Surface all 3 variants; operator picks. Fallback to single-
+      // prompt swap only if the backend returned the legacy shape
+      // (variants empty but drafted_prompt populated — older deploys
+      // or a future stage-2 failure).
+      if (res.variants && res.variants.length > 0) {
+        setBriefVariants(res.variants.filter((v) => v.prompt));
+      } else if (res.drafted_prompt) {
+        setPrompt(res.drafted_prompt);
+      }
     } catch (e) {
       setBriefError(e instanceof Error ? e.message : String(e));
     } finally {
       setBriefLoading(false);
     }
+  };
+
+  const pickVariant = (v: BriefVariant) => {
+    setPrompt(v.prompt);
+    setBriefVariants([]);  // collapse the picker once the operator chooses
   };
 
   // Keep aspect in sync if the parent changes lockAspect mid-mount
@@ -488,6 +508,26 @@ export default function HiggsfieldGenerator({
       {briefError && (
         <div className="text-[10px] text-red-600 dark:text-red-400 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" /> {briefError}
+        </div>
+      )}
+
+      {/* Variant picker — appears after Extract returns three angle
+          variants. Each card shows the angle name + one-line
+          rationale + the prompt preview. Clicking "Use" swaps the
+          prompt into the textarea and collapses the picker. Mirrors
+          the meta-ads-agent practice of showing 3 angles instead of
+          one generic draft. */}
+      {briefVariants.length > 0 && (
+        <div className="border border-violet-500/30 bg-violet-500/5 rounded-md p-2 flex flex-col gap-1.5">
+          <div className="text-[10px] uppercase font-mono text-violet-700 dark:text-violet-300 flex items-center gap-1">
+            <Wand2 className="h-3 w-3" />
+            Pick an angle — each one is grounded in the page's claim hints + your firm's visual rules
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-1.5">
+            {briefVariants.map((v) => (
+              <VariantCard key={v.angle} variant={v} onPick={() => pickVariant(v)} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -785,6 +825,42 @@ function VariantTile({ variant, index }: { variant: VariantState; index: number 
   return (
     <div className="aspect-square rounded border border-border flex items-center justify-center text-[10px] font-mono text-muted-foreground">
       <ImageIcon className="h-3.5 w-3.5 opacity-30" />
+    </div>
+  );
+}
+
+function VariantCard({ variant, onPick }: { variant: BriefVariant; onPick: () => void }) {
+  // Color-code each angle so the operator can tell them apart at a
+  // glance after a few sessions. Colors echo the underlying frame:
+  // problem-led = amber (decision/tension), aspirational = green
+  // (settled outcome), social-proof = blue (institutional trust).
+  const angleColors: Record<string, string> = {
+    'problem-led':   'border-amber-500/40 bg-amber-500/5',
+    'aspirational':  'border-green-500/40 bg-green-500/5',
+    'social-proof':  'border-blue-500/40 bg-blue-500/5',
+  };
+  const accent = angleColors[variant.angle] || 'border-border bg-secondary/30';
+  return (
+    <div className={cn('border rounded p-2 flex flex-col gap-1.5 text-xs', accent)}>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase font-semibold">{variant.angle}</span>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onPick}
+          className="h-5 text-[10px] px-2"
+        >
+          Use
+        </Button>
+      </div>
+      {variant.rationale && (
+        <p className="text-[10px] text-muted-foreground italic line-clamp-2" title={variant.rationale}>
+          {variant.rationale}
+        </p>
+      )}
+      <p className="text-[11px] leading-snug line-clamp-6" title={variant.prompt}>
+        {variant.prompt}
+      </p>
     </div>
   );
 }
