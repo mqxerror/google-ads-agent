@@ -219,6 +219,42 @@ export function forceSyncCampaigns(accountId: string): Promise<{ account_id: str
   return request(`/accounts/${accountId}/sync/campaigns`, { method: 'POST' });
 }
 
+// ── Studio (higgsfield generation) ─────────────────────────────
+
+export interface HiggsfieldGenerateImageRequest {
+  prompt: string;
+  model: string;
+  aspect_ratios: string[];
+  variants_per_aspect: number;
+  soul_id?: string;
+  account_id?: string;
+  campaign_id?: string;
+}
+
+export interface StudioJobStatus {
+  asset_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'nsfw' | string;
+  url: string | null;
+  thumbnail_url: string | null;
+  prompt: string | null;
+  model: string | null;
+  aspect_ratio: string | null;
+  higgsfield_cdn_url: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string | null;
+}
+
+export function studioGenerateImage(body: HiggsfieldGenerateImageRequest): Promise<{ asset_ids: string[] }> {
+  return request('/studio/generate-image', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function studioGetJob(assetId: string): Promise<StudioJobStatus> {
+  return request<StudioJobStatus>(`/studio/jobs/${assetId}`);
+}
+
 // ── Operations (direct campaign actions) ────────────────────────
 
 export function updateCampaignStatus(customerId: string, campaignId: string, status: 'ENABLED' | 'PAUSED'): Promise<{ status: string }> {

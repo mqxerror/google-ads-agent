@@ -38,10 +38,16 @@ export default function ChatPanel() {
     // Mirror to the URL so refresh / browser-back / share-by-link all
     // resolve to the right chat. `replace:true` keeps history from
     // ballooning when the user clicks through several conversations.
-    if (id) {
-      if (window.location.pathname !== `/c/${id}`) navigate(`/c/${id}`, { replace: true });
-    } else {
-      if (window.location.pathname.startsWith('/c/')) navigate('/', { replace: true });
+    // Skip the push when the user is on a non-chat route (e.g.
+    // `/studio` — Studio has its own URL ownership). Without this
+    // guard the chat panel's mount-time setConversationId hijacks the
+    // URL back to `/c/<id>`, breaking deep-links to other surfaces.
+    const path = window.location.pathname;
+    const onChatRoute = path === '/' || path.startsWith('/c/');
+    if (id && onChatRoute) {
+      if (path !== `/c/${id}`) navigate(`/c/${id}`, { replace: true });
+    } else if (!id && path.startsWith('/c/')) {
+      navigate('/', { replace: true });
     }
   }, [navigate]);
 

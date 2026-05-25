@@ -707,7 +707,50 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V12 migration complete (asset_groups table — PMax single source of truth).")
 
-        if version >= 12:
-            logger.info("Database schema is V12 (up to date).")
+        # V13: extend `ad_assets` with higgsfield generation metadata.
+        # ad_assets stays the single source of truth for everything
+        # Studio produces — uploaded files, brand-reel renders, premium-
+        # reel renders, and now higgsfield image/video generations. The
+        # additions are nullable so existing rows (all `source=uploaded`
+        # or `source=generated` for the older video pipelines) remain
+        # valid; only higgsfield-sourced rows populate the new columns.
+        if version < 13:
+            # SQLite doesn't support ADD COLUMN with UNIQUE inline, so
+            # the UNIQUE index for higgsfield_job_id is created
+            # separately. UNIQUE is essential: the retry path in
+            # higgsfield_client can re-poll a job that already submitted
+            # successfully, and we MUST NOT create a duplicate row when
+            # the second invocation finally completes.
+            for col, decl in [
+                ("higgsfield_job_id",         "TEXT"),
+                ("higgsfield_model",          "TEXT"),
+                ("prompt",                    "TEXT"),
+                ("aspect_ratio",              "TEXT"),
+                ("soul_id",                   "TEXT"),
+                ("status",                    "TEXT DEFAULT 'completed'"),
+                ("generation_cost_credits",   "INTEGER"),
+                ("higgsfield_cdn_url",        "TEXT"),
+                ("error_code",                "TEXT"),
+                ("error_message",             "TEXT"),
+            ]:
+                try:
+                    await db.execute(f"ALTER TABLE ad_assets ADD COLUMN {col} {decl}")
+                except aiosqlite.OperationalError:
+                    pass  # column already exists — idempotent
+            await db.executescript("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_assets_higgsfield_job
+                    ON ad_assets(higgsfield_job_id)
+                    WHERE higgsfield_job_id IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_ad_assets_status
+                    ON ad_assets(status, created_at);
+                CREATE INDEX IF NOT EXISTS idx_ad_assets_source_account
+                    ON ad_assets(source, account_id, created_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (13)")
+            await db.commit()
+            logger.info("V13 migration complete (ad_assets extended with higgsfield columns).")
+
+        if version >= 13:
+            logger.info("Database schema is V13 (up to date).")
     finally:
         await db.close()
