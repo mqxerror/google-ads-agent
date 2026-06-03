@@ -123,4 +123,62 @@ WORKFLOW:
 | 2026-04-14 14:15 | / Conversion tracking / Broken (0 reliable conversions) / Fixed (GCLID + dual gtag) / | User asked: review the previous discussion and revise the search term hunter and keywords reports the cross suggested some and the other also did the same | pending | search_term_hunter |
 | 2026-04-14 14:15 | ### PPC Strategist flagged: | User asked: review the previous discussion and revise the search term hunter and keywords reports the cross suggested some and the other also did the same | pending | search_term_hunter |
 | 2026-04-14 14:15 | / Pause QS 1: `permanent residency in portugal` [EXACT] — 134 clicks, 1 conv / **AGREE — but it's moot right now.** This keyword is in the Portugal Residency ad group which is PAUSED. If we ever re-enable that ad group, pause this keyword FIRST. / QS 1 = Google thinks the ad+page is irrelevant for t | User asked: review the previous discussion and revise the search term hunter and keywords reports the cross suggested some and the other also did the same | pending | search_term_hunter |
-| 2026-04-14 14:15 | ### CRO Specialist flagged: | User asked: review the previous discussion and revise the search term hunter and keywords reports the cross suggested some and the other also did the same | pending | search_term_hunter |
+| 2026-04-14 14:15 | ### CRO Specialist flagged: | User asked: review the previous discussion and revise the search term hunter and keywords reports the cross suggested some and the other also did the same | pending | search_term_hunter || 2026-04-21 15:24 | / Pause QS 1 keywords / **NOT DONE — FLAGGED 3 TIMES** / `[permanent residency in portugal]` has burned 186 clicks, ~$1,390, 1 conversion. This is the single most urgent structural fix that keeps not getting done. / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-21 15:24 | ### My Updated Recommendation | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-21 15:24 | The previous agent's review identified 2 high-efficiency converting terms: | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-21 15:24 | / `golden portugal` / 3 / $23.67 / 0 / Vague, 0 conversions across multiple sessions flagged by prior agents, minimal intent signal / Add `[golden portugal]` as [Exact] negative / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-21 15:24 | ### Confirmed Clean Terms (No Action Needed) | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-21 15:58 | / "3,700+ Families Helped" / Case studies or verified client count / | User asked: we need the pro and the search term hunter to craft a plan for the developer telling the best pro or content page for who we are and our team , to add | pending | search_term_hunter |
+| 2026-04-21 15:58 | **From the last 7 days of search terms, I identified 6 distinct doubt/research patterns.** The trust page must answer each one explicitly. Users searching these terms will navigate to the trust page before deciding to fill the form. | User asked: we need the pro and the search term hunter to craft a plan for the developer telling the best pro or content page for who we are and our team , to add | pending | search_term_hunter |
+| 2026-04-21 15:58 | > Most companies selling Golden Visa programs are intermediaries — they earn a commission by referring clients to third-party funds. Mercan is the fund developer. We created, registered, and manage the funds directly. When you invest with Mercan, there are no broker layers, no referral fees, and no  | User asked: we need the pro and the search term hunter to craft a plan for the developer telling the best pro or content page for who we are and our team , to add | pending | search_term_hunter |
+| 2026-04-21 15:58 | Annual Returns (2% fixed) + Buyback from Year 6 | User asked: we need the pro and the search term hunter to craft a plan for the developer telling the best pro or content page for who we are and our team , to add | pending | search_term_hunter |
+| 2026-04-21 15:58 | - Annual yield: 2% fixed — define payment schedule | User asked: we need the pro and the search term hunter to craft a plan for the developer telling the best pro or content page for who we are and our team , to add | pending | search_term_hunter |
+| 2026-04-21 16:09 | / `golden portugal` / EXACT / 3 clicks, 0 conv, 2 sessions flagged / | User asked: execute the approved plan | pending | director |
+| 2026-04-21 16:09 | ### QS 1 Keywords Removed ✅ | User asked: execute the approved plan | pending | director |
+| 2026-04-21 16:09 | / `[EXACT] permanent residency in portugal` / 134 / ~$970 / 1 / **REMOVED** / | User asked: execute the approved plan | pending | director |
+| 2026-04-21 16:09 | / `[PHRASE] permanent residency in portugal` / 52 / ~$390 / 0 / **REMOVED** / | User asked: execute the approved plan | pending | director |
+| 2026-04-21 16:09 | ### Wave 2 RSAs Created (PAUSED — Google review) ✅ | User asked: execute the approved plan | pending | director |
+| 2026-04-21 16:34 | Enabling all 3 Wave 2 ads now.All 3 Wave 2 ads enabled ✅ | User asked: you can enable the ads they will run automatically after review | pending | director |
+| 2026-04-21 16:34 | / "Plan B" RSA / Portugal Golden Visa / **ENABLED** / | User asked: you can enable the ads they will run automatically after review | pending | director |
+| 2026-04-21 16:34 | / "Dual Passport" RSA / Portugal Citizenship / **ENABLED** / | User asked: you can enable the ads they will run automatically after review | pending | director |
+| 2026-04-21 16:34 | / "CMVM/Returns" RSA / Portugal GV Fund / **ENABLED** / | User asked: you can enable the ads they will run automatically after review | pending | director |
+| 2026-04-22 13:36 | I don't have a UK campaign in my current context. Let me search the account for it.Found it — **"Golden Visa - UK - Apr 2026"** (ID: 23777965360), ENABLED. Let me pull its performance data now.Very new campaign. Let me pull the full picture — ad groups, keywords, and ads.Got everything. Here's the f | User asked: how the uk campaign is doing | pending | director |
+| 2026-04-22 13:36 | / Ad Groups / 2 (Greece UK + Portugal UK) / Both ENABLED / | User asked: how the uk campaign is doing | pending | director |
+| 2026-04-22 13:36 | - Contains "Schengen Area Access" — this was flagged and replaced in the USA campaign (Wave 1). The UK ad has the old headline. | User asked: how the uk campaign is doing | pending | director |
+| 2026-04-22 13:36 | / 6 / Clarify "3% Returns" and "4,100+" claims — get verified numbers / Medium / Inconsistent with USA campaign messaging / | User asked: how the uk campaign is doing | pending | director |
+| 2026-04-27 14:23 | - **Portugal Residency is still PAUSED** — it had 641 clicks and 8 conversions historically. That's your second-best ad group sitting idle. | User asked: how portugal campaign is doing since the budget change yesterday | pending | ppc_strategist |
+| 2026-04-27 14:29 | / **Portugal Golden Visa** / ENABLED / 926 / 10 / $542 / 1.08% / **Workhorse** — carries everything / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-27 14:29 | / **Portugal Residency** / **PAUSED** / 641 / 8 / $375 / **1.25%** / **Best CPA, sitting idle** / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-27 14:29 | / Portugal Citizenship / ENABLED / 85 / 0 / ∞ / 0% / Dead weight — 85 clicks, zero / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-27 14:29 | / Portugal GV Fund / ENABLED / 22 / 0 / ∞ / 0% / Low volume, zero / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-27 14:29 | / Mercan Brand / ENABLED / 15 / 0 / ∞ / 0% / Branded, negligible / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |

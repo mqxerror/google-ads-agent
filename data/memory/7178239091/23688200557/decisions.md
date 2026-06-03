@@ -50,4 +50,23 @@ Portugal AR → /ar/portugal-golden-visa? | pending | analytics_analyst |
 | 2026-04-14 17:27 | / **EN - Greece Golden Visa (GCC)** / 805106198060 / ENABLED / `goldenvisas.mercan.com/greece-golden-visa` ✅ / | User asked: we need to use the portugal golden visa new ;ending page like we did for Greece and portugal we have a better lp now check what we have for portugal a | pending | analytics_analyst |
 | 2026-04-14 17:27 | / **EN - Portugal Golden Visa (GCC)** / 805027528474 / ENABLED / `goldenvisas.mercan.com/portugal` ⚠️ / | User asked: we need to use the portugal golden visa new ;ending page like we did for Greece and portugal we have a better lp now check what we have for portugal a | pending | analytics_analyst |
 | 2026-04-14 17:32 | / **EN - Portugal Golden Visa (GCC)** / New RSA created, old paused / 805417278176 / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: yes for portugal please ads English and arabic as you mentioned Portugal EN → /portugal-golden-visa?
-| 2026-04-14 17:32 | / **Portugal Golden Visa - AR** / New RSA created, old paused / 805338509890 / `goldenvisas.mercan.com/ar/portugal-golden-visa` / | User asked: yes for portugal please ads English and arabic as you mentioned Portugal EN → /portugal-golden-visa?
+| 2026-04-14 17:32 | / **Portugal Golden Visa - AR** / New RSA created, old paused / 805338509890 / `goldenvisas.mercan.com/ar/portugal-golden-visa` / | User asked: yes for portugal please ads English and arabic as you mentioned Portugal EN → /portugal-golden-visa?| 2026-04-20 14:17 | **Anomaly: Impressions trending down 3 weeks straight.** Apr 6–12 avg was 552 impr/day. Post-pause Apr 13–19 avg is 287 — a 48% drop. This is partly intentional (General AR paused), but the EN traffic has also softened. Worth watching — not alarming yet, but if impressions keep falling below 200 dai | User asked: Daily review for "Golden Visa Programs - Arabic (MENA)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for | pending | ppc_strategist |
+| 2026-04-20 14:17 | / `[PHRASE] الاقامة الذهبية` / 36 / 3 / ⚠️ Pause candidate — General AR paused but keyword persists / | User asked: Daily review for "Golden Visa Programs - Arabic (MENA)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for | pending | ppc_strategist |
+| 2026-04-20 14:17 | / **الجنسية عن طريق الاستثمار + الاقامة الذهبية** / Overdue / Both still enabled despite 0 conv — pause both / | User asked: Daily review for "Golden Visa Programs - Arabic (MENA)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for | pending | ppc_strategist |
+| 2026-04-20 14:22 | / General Golden Visa - AR *(paused)* / 4 / $5.30 / 0 / — / 95 / $1.32 / | User asked: provide stats for Kuwait regarding the keywords for all programs | pending | director |
+| 2026-04-20 14:22 | **Implication for the Kuwait bid adjustment:** The +25-30% bid bump we flagged should be applied to **EN (GCC)** specifically — that's where Kuwait's value is coming from. Raising Arabic group bids won't help if Kuwaiti users are predominantly searching in English. | User asked: provide stats for Kuwait regarding the keywords for all programs | pending | director |
+| 2026-04-20 14:25 | / **Total removed** / **13 conv** / **$1,017** / / | User asked: lets keep kueit only and remove the others and execute the bid suggested | pending | ppc_strategist |
+| 2026-04-20 14:34 | Let me pull all current ad copy first, then create new RSAs with the mercan.com URLs.Got all ad copy. Here's my execution plan — 6 ads to update (skipping General AR which is already PAUSED): | User asked: yes | pending | director |
+| 2026-04-20 14:34 | / Panama Qualified Investor - AR / `goldenvisas.mercan.com/panama` / **⚠️ No mercan.com Panama page confirmed** / | User asked: yes | pending | director |
+| 2026-04-20 14:34 | Let me start creating the 5 confirmed RSAs + pausing old ads now. Loading tools...Creating 5 new RSAs + pausing 5 old ads — all in parallel:All done. Here's the summary: | User asked: yes | pending | director |
+| 2026-04-20 14:34 | ## Updated Ad URLs — MENA Campaign | User asked: yes | pending | director |
+| 2026-04-20 14:34 | / **EN - Greece Golden Visa (GCC)** / 806122184629 / `mercan.com/greece-golden-visa/` / 805106198060 / Paused / | User asked: yes | pending | director |

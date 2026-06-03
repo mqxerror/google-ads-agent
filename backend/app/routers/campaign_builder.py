@@ -409,6 +409,12 @@ async def promote_build(session_id: str, real_campaign_id: str):
     temp_dir = settings.MEMORY_DIR / session.account_id / session.temp_campaign_id
     real_dir = settings.MEMORY_DIR / session.account_id / real_campaign_id
 
+    # An empty placeholder real dir (created by a prior _campaign_dir call)
+    # must NOT trigger the degraded role-notes-only merge — drop it so the
+    # full build memory (chronicle, decisions, pinned facts) is promoted.
+    if real_dir.exists() and not any(real_dir.iterdir()):
+        real_dir.rmdir()
+
     if temp_dir.exists() and not real_dir.exists():
         shutil.move(str(temp_dir), str(real_dir))
         return {"status": "promoted", "from": session.temp_campaign_id, "to": real_campaign_id}

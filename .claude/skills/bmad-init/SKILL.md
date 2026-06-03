@@ -2,6 +2,7 @@
 name: bmad-init
 description: "Initialize BMad project configuration and load config variables. Use when any skill needs module-specific configuration values, or when setting up a new BMad project."
 argument-hint: "[--module=module_code] [--vars=var1:default1,var2] [--skill-path=/path/to/calling/skill]"
+disable-model-invocation: true
 ---
 
 ## Overview

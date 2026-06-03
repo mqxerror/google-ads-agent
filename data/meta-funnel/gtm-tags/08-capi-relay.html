@@ -1,0 +1,72 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — CAPI Relay (Server-Side Dedup)
+  Container: GTM-WZKDXFH8
+  Trigger: Custom Event — meta_custom_event (from dataLayer)
+  Tag Firing Priority: 10 (fires AFTER the event producer tags)
+
+  Purpose: Catches all meta_custom_event dataLayer pushes and sends them
+  to the CAPI proxy endpoint for server-side relay to Meta Conversions API.
+  Uses the same eventID as the browser pixel for deduplication.
+
+  ━━━━ CAPI PROXY ENDPOINT ━━━━
+  Deploy the capi-proxy.py as a Cloudflare Worker, AWS Lambda,
+  or self-hosted endpoint. Set the URL below.
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-->
+<script>
+(function() {
+  'use strict';
+
+  // ══════════════════════════════════════════════
+  // CONFIGURE: Set your CAPI proxy endpoint URL
+  // ══════════════════════════════════════════════
+  var CAPI_ENDPOINT = '{{CAPI Proxy URL}}';
+  // Example: 'https://capi.mercan.com/meta-events?token=YOUR_SECRET'
+  // The ?token= param authenticates with the CAPI proxy (sendBeacon can't send headers).
+  // Set CAPI_PROXY_SECRET env var on the proxy to match this token value.
+
+  // Skip if no endpoint configured or centralized subscriber not available
+  if (!CAPI_ENDPOINT || CAPI_ENDPOINT.indexOf('{{') === 0) return;
+  if (!window.__mf_onDataLayer) return;
+
+  // ─── Listen for meta_custom_event via centralized dataLayer subscriber (Tag 01) ───
+  window.__mf_onDataLayer(function(entry) {
+    if (entry.event !== 'meta_custom_event') return;
+
+    var payload = {
+      event_name: entry.meta_event_name,
+      event_id: entry.meta_event_id,
+      event_time: Math.floor(Date.now() / 1000),
+      event_source_url: location.href,
+      user_data: entry.user_data || {},
+      custom_data: entry.custom_data || {},
+      action_source: 'website',
+      client_ip_address: '', // Filled server-side by proxy
+      client_user_agent: navigator.userAgent,
+      fbc: getCookie('_fbc') || '',
+      fbp: getCookie('_fbp') || ''
+    };
+
+    // Send to CAPI proxy (fire-and-forget, non-blocking)
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(CAPI_ENDPOINT, JSON.stringify(payload));
+      } else {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', CAPI_ENDPOINT, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify(payload));
+      }
+    } catch(e) {
+      // Silent fail — browser pixel is the primary, CAPI is backup
+    }
+  });
+
+  // ─── Cookie helper ───
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : '';
+  }
+
+})();
+</script>

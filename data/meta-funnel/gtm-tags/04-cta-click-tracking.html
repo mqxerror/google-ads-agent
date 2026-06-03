@@ -1,0 +1,86 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — CTA Click Tracking
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 50
+
+  Events produced:
+    - Phone_Click           (click on tel: link)
+    - WhatsApp_Click        (click on wa.me / WhatsApp link — STUB, no button on page yet)
+    - CTA_BookCall_Click    (click on "Book a call / Schedule consultation" — STUB)
+    - CTA_FreeEval_Click    (click on "Free eligibility / Free assessment" — STUB)
+    - CTA_Guide_Download    (click on Bill C-3 PDF/guide download — STUB)
+
+  Active CTAs on page (from DOM audit 2026-05-21):
+    - tel:+15142829214 (phone link, 4 instances on page)
+    - Submit button (form submit, tracked in 03-form-tracking)
+
+  STUB events are wired with delegated listeners — they'll auto-activate
+  when the corresponding elements are added to the page (no GTM update needed).
+-->
+<script>
+(function() {
+  'use strict';
+
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  // ─── DELEGATED CLICK LISTENER ───
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    var anchor = target.closest('a');
+    var button = target.closest('button');
+
+    // ─── Phone_Click: tel: links ───
+    if (anchor && anchor.href && anchor.href.indexOf('tel:') === 0) {
+      window.__mf_fireEvent('Phone_Click', {
+        phone_number: anchor.href.replace('tel:', ''),
+        click_location: anchor.closest('header') ? 'header' :
+                        anchor.closest('footer') ? 'footer' : 'body'
+      });
+      return;
+    }
+
+    // ─── WhatsApp_Click: wa.me or whatsapp links ───
+    if (anchor && anchor.href && (anchor.href.indexOf('wa.me') !== -1 || anchor.href.indexOf('whatsapp') !== -1)) {
+      window.__mf_fireEvent('WhatsApp_Click', {
+        whatsapp_url: anchor.href
+      });
+      return;
+    }
+
+    // ─── CTA_BookCall_Click: Book a call / Schedule consultation buttons ───
+    var clickText = (anchor || button || target).textContent.toLowerCase().trim();
+    if (/book\s*(a\s*)?call|schedule\s*(a\s*)?consult/i.test(clickText)) {
+      window.__mf_fireEvent('CTA_BookCall_Click', {
+        button_text: clickText.substring(0, 80)
+      });
+      return;
+    }
+
+    // ─── CTA_FreeEval_Click: Free eligibility / Free assessment buttons ───
+    if (/free\s*(eligib|assess|eval|consult)/i.test(clickText)) {
+      window.__mf_fireEvent('CTA_FreeEval_Click', {
+        button_text: clickText.substring(0, 80)
+      });
+      return;
+    }
+
+    // ─── CTA_Guide_Download: PDF/guide download links ───
+    if (anchor && anchor.href) {
+      var href = anchor.href.toLowerCase();
+      if (href.indexOf('.pdf') !== -1 ||
+          /bill\s*c.?3.*guide|download.*guide|guide.*download/i.test(clickText)) {
+        window.__mf_fireEvent('CTA_Guide_Download', {
+          download_url: anchor.href,
+          link_text: clickText.substring(0, 80)
+        });
+        return;
+      }
+    }
+  }, true); // useCapture for early interception
+
+})();
+</script>

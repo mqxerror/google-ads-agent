@@ -6,6 +6,9 @@ import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { formatMicros, formatNumber, formatBiddingStrategy } from '@/lib/formatters';
 import CampaignTabs from '@/components/campaign/CampaignTabs';
 import CampaignBuilder from '@/components/campaign/CampaignBuilder';
+import StudioPage from '@/components/studio/StudioPage';
+import ChangelogPage from '@/components/changelog/ChangelogPage';
+import GuidelinesPage from '@/components/guidelines/GuidelinesPage';
 import CampaignActivityFeed from '@/components/dashboard/CampaignActivityFeed';
 import OutcomeDashboard from '@/components/dashboard/OutcomeDashboard';
 import ConversationGraph from '@/components/dashboard/ConversationGraph';
@@ -204,7 +207,7 @@ function CampaignRow({ campaign, isSelected, onToggleSelect }: { campaign: Campa
 }
 
 export default function ContentArea() {
-  const { selectedCampaignId } = useAppStore();
+  const { selectedCampaignId, showStudio, showChangelog, showGuidelines } = useAppStore();
   const accountId = useClientAccountId();
   const [showBuilder, setShowBuilder] = useState(false);
   const handleShowBuilder = (show: boolean) => setShowBuilder(show);
@@ -221,7 +224,13 @@ export default function ContentArea() {
   return (
     <div className="flex-1 min-w-0 overflow-hidden">
       <ScrollArea className="h-full">
-        {showBuilder ? (
+        {showGuidelines ? (
+          <GuidelinesPage />
+        ) : showChangelog ? (
+          <ChangelogPage />
+        ) : showStudio ? (
+          <StudioPage />
+        ) : showBuilder ? (
           <CampaignBuilder onClose={() => handleShowBuilder(false)} />
         ) : campaign ? (
           <CampaignTabs campaign={campaign} accountId={accountId} />

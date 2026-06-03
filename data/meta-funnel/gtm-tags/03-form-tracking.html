@@ -1,0 +1,139 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Form Interaction Tracking
+  Container: GTM-WZKDXFH8
+  Trigger: DOM Ready (fires once per page)
+  Tag Firing Priority: 50
+
+  Events produced:
+    - Form_Start            (first focus/keypress in any lead-form field)
+    - Form_Field_Email      (email field blurred with valid email)
+    - Form_Field_Phone      (phone field blurred with >= 7 digits)
+    - Canada_Citizenship_Lead         (form submit success — existing, DO NOT rename)
+    - Canada_Citizenship_Lead_Qualified  (form submit + eligibility quiz pass, STUB until quiz exists)
+
+  Page: https://www.mercan.com/canadian-citizenship-by-descent
+  Form field IDs (from DOM audit 2026-05-21):
+    - input_46.3  = First name
+    - input_46.6  = Last name
+    - input_3     = Email
+    - input_5     = Nationality (select)
+    - input_39    = Country of residence (select)
+    - input_42    = Phone
+    - input_21    = How did you hear (select)
+    - input_9     = Message (textarea)
+-->
+<script>
+(function() {
+  'use strict';
+
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  // ─── FIELD REFERENCES ───
+  var emailField   = document.getElementById('input_3');
+  var phoneField   = document.getElementById('input_42');
+  var firstField   = document.getElementById('input_46.3');
+  var lastField    = document.getElementById('input_46.6');
+  var nationalityField = document.getElementById('input_5');
+  var residenceField   = document.getElementById('input_39');
+
+  // All form fields for Form_Start detection
+  var allFields = [
+    firstField, lastField, emailField, phoneField,
+    nationalityField, residenceField,
+    document.getElementById('input_21'),
+    document.getElementById('input_9')
+  ].filter(Boolean);
+
+  // ─── Form_Start: first interaction with any field ───
+  var formStartFired = false;
+  allFields.forEach(function(field) {
+    field.addEventListener('focus', function onFirstFocus() {
+      if (formStartFired) return;
+      formStartFired = true;
+      window.__mf_fireOnce('Form_Start');
+    }, { once: false });
+  });
+
+  // ─── POPULATE __mf_formData on field changes (for user_data hashing) ───
+  function updateFormCache() {
+    if (firstField)      window.__mf_formData.firstName = firstField.value;
+    if (lastField)       window.__mf_formData.lastName  = lastField.value;
+    if (emailField)      window.__mf_formData.email     = emailField.value;
+    if (phoneField)      window.__mf_formData.phone     = phoneField.value;
+    if (residenceField)  window.__mf_formData.country   = residenceField.value;
+  }
+
+  allFields.forEach(function(field) {
+    field.addEventListener('change', updateFormCache);
+    field.addEventListener('blur', updateFormCache);
+  });
+
+  // ─── Form_Field_Email: email field blurred with valid email ───
+  if (emailField) {
+    emailField.addEventListener('blur', function() {
+      var val = emailField.value.trim();
+      // Basic email regex
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        updateFormCache();
+        window.__mf_fireOnce('Form_Field_Email', { field_value_length: String(val.length) });
+      }
+    });
+  }
+
+  // ─── Form_Field_Phone: phone field blurred with >= 7 digits ───
+  if (phoneField) {
+    phoneField.addEventListener('blur', function() {
+      var digits = (phoneField.value || '').replace(/\D/g, '');
+      if (digits.length >= 7) {
+        updateFormCache();
+        window.__mf_fireOnce('Form_Field_Phone', { field_value_length: String(digits.length) });
+      }
+    });
+  }
+
+  // ─── Canada_Citizenship_Lead: form submit success ───
+  // Listen for the existing gf_submit dataLayer event (fired by Gravity Forms)
+  // This is the EXISTING conversion event — DO NOT rename or duplicate.
+  // Uses centralized dataLayer subscriber from Tag 01 (__mf_onDataLayer).
+  window.__mf_onDataLayer(function(entry) {
+    if (entry.event === 'gf_submit') {
+      // Update form cache with latest values before hashing
+      updateFormCache();
+
+      // Fire Meta custom event with user_data
+      window.__mf_fireEvent('Canada_Citizenship_Lead', {
+        form_id: entry.formId || 'gf_descent',
+        submission_method: 'gravity_forms'
+      });
+    }
+  });
+
+  // ─── Canada_Citizenship_Lead_Qualified: STUB ───
+  // This event requires the eligibility quiz (P2 dev task) to exist.
+  // When the quiz is built, it should push a dataLayer event like:
+  //   { event: 'quiz_complete', quizResult: 'qualified', ancestorType: 'grandparent' }
+  // Then this listener will fire:
+  /*
+  dlRef.push = (function(prevPush) {
+    return function() {
+      for (var i = 0; i < arguments.length; i++) {
+        if (arguments[i].event === 'quiz_complete' && arguments[i].quizResult === 'qualified') {
+          // Must also detect subsequent form submission
+          window.__mf_quizQualified = true;
+        }
+        if (arguments[i].event === 'gf_submit' && window.__mf_quizQualified) {
+          window.__mf_fireEvent('Canada_Citizenship_Lead_Qualified', {
+            ancestor_type: 'from_quiz'
+          });
+        }
+      }
+      return prevPush.apply(this, arguments);
+    };
+  })(dlRef.push);
+  */
+
+})();
+</script>

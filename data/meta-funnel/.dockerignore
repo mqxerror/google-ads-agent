@@ -1,0 +1,7 @@
+.git
+.env
+.env.*
+*.md
+*.html
+__pycache__
+.mypy_cache

@@ -1,0 +1,101 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Booking/Calendar Tracking
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 50
+
+  Events produced:
+    - Booking_PageView       (Calendly/Cal.com iframe detected on page)
+    - Booking_Slot_Selected  (calendar slot clicked)
+    - Booking_Confirmed      (booking confirmed via postMessage)
+    - Intake_Complete        (long intake form submitted post-booking)
+
+  STATUS: STUB — no Calendly/Cal.com integration exists on page as of 2026-05-21.
+
+  This tag uses postMessage listener for Calendly events and
+  MutationObserver for dynamically injected booking iframes.
+  No GTM update needed when booking widget is added.
+-->
+<script>
+(function() {
+  'use strict';
+
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  // ─── CALENDLY postMessage LISTENER ───
+  // Calendly fires postMessage events: https://developer.calendly.com/api-docs/ZG9jOjM1-embed-events
+  window.addEventListener('message', function(e) {
+    // Only process Calendly messages
+    if (!e.data || typeof e.data !== 'object') return;
+    if (!e.data.event || e.data.event.indexOf('calendly') === -1) return;
+
+    switch (e.data.event) {
+      case 'calendly.profile_page_viewed':
+      case 'calendly.event_type_viewed':
+        window.__mf_fireOnce('Booking_PageView', {
+          booking_source: 'calendly'
+        });
+        break;
+
+      case 'calendly.date_and_time_selected':
+        window.__mf_fireOnce('Booking_Slot_Selected', {
+          booking_source: 'calendly'
+        });
+        break;
+
+      case 'calendly.event_scheduled':
+        window.__mf_fireEvent('Booking_Confirmed', {
+          booking_source: 'calendly',
+          booking_uri: (e.data.payload && e.data.payload.event && e.data.payload.event.uri) || ''
+        });
+        break;
+    }
+  });
+
+  // ─── Cal.com LISTENER (if used instead of Calendly) ───
+  window.addEventListener('message', function(e) {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (!e.data.action) return;
+
+    // Cal.com embed events
+    if (e.data.action === 'linkReady' || e.data.action === 'eventTypeSelected') {
+      window.__mf_fireOnce('Booking_PageView', { booking_source: 'calcom' });
+    }
+    if (e.data.action === 'bookingSuccessful') {
+      window.__mf_fireEvent('Booking_Confirmed', { booking_source: 'calcom' });
+    }
+  });
+
+  // ─── IFRAME DETECTION (for Booking_PageView fallback) ───
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        var iframes = node.tagName === 'IFRAME' ? [node] : Array.from(node.querySelectorAll ? node.querySelectorAll('iframe') : []);
+        iframes.forEach(function(iframe) {
+          var src = (iframe.src || '').toLowerCase();
+          if (src.indexOf('calendly.com') !== -1 || src.indexOf('cal.com') !== -1) {
+            window.__mf_fireOnce('Booking_PageView', {
+              booking_source: src.indexOf('calendly') !== -1 ? 'calendly' : 'calcom'
+            });
+          }
+        });
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // ─── Intake_Complete: listen for dataLayer push ───
+  // Dev contract: push { event: 'intake_complete' } when long intake form is submitted
+  // Uses centralized dataLayer subscriber from Tag 01 (__mf_onDataLayer).
+  window.__mf_onDataLayer(function(entry) {
+    if (entry.event === 'intake_complete') {
+      window.__mf_fireEvent('Intake_Complete');
+    }
+  });
+
+})();
+</script>

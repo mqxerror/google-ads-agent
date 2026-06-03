@@ -44,10 +44,25 @@ class Settings(BaseSettings):
     CLARITY_PROJECT_ID: str = ""
     CLARITY_API_TOKEN: str = ""
 
+    # Video creative pipeline (Mercan account only for now)
+    HEYGEN_API_KEY: str = ""
+    ELEVENLABS_API_KEY: str = ""
+    YOUTUBE_UPLOAD_CHANNEL: str = "mercan"
+    HEYGEN_DEFAULT_AVATAR_ID: str = "Abigail_expressive_2024112501"
+    ELEVENLABS_DEFAULT_VOICE_ID: str = "EXAVITQu4vr4xnSDxMaL"  # Sarah — mature, reassuring
+
+    # Stock image APIs (free) — used when Director needs a broll image and the
+    # user hasn't supplied any from their library. Either or both work.
+    UNSPLASH_ACCESS_KEY: str = ""        # https://unsplash.com/developers — 50 req/hr free tier
+    PEXELS_API_KEY: str = ""             # https://www.pexels.com/api — generous free tier
+    # AI image generation — Replicate runs FLUX cheaply (~$0.003/image, ~3s).
+    # Only used when explicitly requested per scene; never auto-charged.
+    REPLICATE_API_TOKEN: str = ""        # https://replicate.com/account/api-tokens
+
     # Agent auto-continuation — prevents stopping mid-task
     AGENT_MAX_TURNS_PER_SEGMENT: int = 200  # turns per CLI invocation (high = harness mode)
     AGENT_MAX_CONTINUATIONS: int = 5        # auto-resume cycles if 200 isn't enough (up to 1000 total)
-    AGENT_MAX_TOTAL_COST_USD: float = 10.0  # cost safety cap
+    AGENT_MAX_TOTAL_COST_USD: float = 25.0  # cost safety cap (env: AGENT_MAX_TOTAL_COST_USD)
 
     # Server
     HOST: str = "127.0.0.1"
@@ -59,6 +74,11 @@ class Settings(BaseSettings):
     SYNC_INTERVAL_HOURS: int = 6
     SYNC_LOOKBACK_DAYS: int = 30
     SYNC_ENABLED: bool = True
+
+    # MCP server bearer token — Claude Code uses this to call /mcp on the
+    # backend. Leave blank to auto-generate per-process (token logged at
+    # startup); set in .env for a stable value across restarts.
+    MERCAN_MCP_TOKEN: str = ""
 
     # Memory
     MEMORY_DIR: Path = _PROJECT_ROOT.parent / "data" / "memory"

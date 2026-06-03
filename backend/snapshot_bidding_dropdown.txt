@@ -1,0 +1,483 @@
+uid=11_0 RootWebArea "Campaigns - Mercan Group Main Account - Google Ads" url="https://ads.google.com/aw/campaigns?ocid=247889176&workspaceId=-1804683940&euid=256372701&__u=6296228149&uscid=247889176&__c=8568590424&authuser=0&__e=7178239091"
+  uid=11_1 banner "Top navigation"
+    uid=11_2 status atomic live="polite" relevant="additions text"
+    uid=11_3 button expandable expanded
+    uid=11_4 button "Google Ads – Go to starting page"
+    uid=11_5 generic
+      uid=11_6 StaticText ""What are my top performing campaigns?""
+      uid=11_7 combobox ""What are my top performing campaigns?"" autocomplete="list" expandable haspopup="listbox"
+    uid=11_8 button "Ads Advisor"
+    uid=11_9 button "Appearance" expandable haspopup="menu"
+    uid=11_10 button "Refresh"
+    uid=11_11 button "Open the quick help panel"
+    uid=11_12 button "Notifications" description="You have 8 notifications"
+    uid=11_20 StaticText "717-823-9091 Mercan Group Main Account"
+    uid=11_21 StaticText "mercan.group.1989@gmail.com"
+    uid=11_22 button "Google account" expandable haspopup="menu"
+  uid=11_23 group atomic live="polite" relevant="additions text"
+  uid=11_24 button "Create" haspopup="menu"
+  uid=11_25 StaticText "Create"
+  uid=11_26 menu orientation="vertical"
+    uid=14_7 menu orientation="vertical"
+      uid=14_8 menuitem "Campaigns" description="Campaigns"
+      uid=14_9 menuitem "Goals" description="Goals"
+      uid=14_10 menuitem "Tools" description="Tools"
+      uid=14_11 menuitem "Billing" description="Billing"
+      uid=14_12 menuitem "Admin" description="Admin"
+  uid=11_33 navigation
+    uid=11_34 menu orientation="vertical"
+      uid=14_13 menuitem "Overview"
+      uid=14_14 menuitem "Recommendations"
+      uid=14_15 menuitem "Insights and reports" description="Insights and reports" expandable
+      uid=14_16 menuitem "Campaigns" description="Campaigns" expandable expanded
+      uid=14_17 menuitem "Campaigns"
+      uid=14_18 menuitem "Ad groups"
+      uid=14_19 menuitem "Ads"
+      uid=14_20 menuitem "Asset groups"
+      uid=14_21 menuitem "Experiments"
+      uid=14_22 menuitem "Campaign groups"
+      uid=14_23 menuitem "Assets" description="Assets" expandable
+      uid=14_24 menuitem "Audiences, keywords, and content" description="Audiences, keywords, and content" expandable
+      uid=14_25 menuitem "Change history"
+  uid=11_48 button "View (2 filters) All campaigns" haspopup="dialog"
+    uid=11_49 button "All campaigns"
+  uid=11_50 button "Campaigns (143) Select a campaign" haspopup="dialog"
+  uid=11_51 StaticText "Filters"
+  uid=11_52 StaticText "Filters Applied:"
+  uid=11_53 grid "Filters Applied:"
+    uid=14_26 row "Campaign status: All" haspopup="menu"
+      uid=14_27 button "Campaign status: All"
+    uid=14_28 row "Ad group status: Enabled, Paused" haspopup="menu"
+      uid=14_29 button "Ad group status: Enabled, Paused"
+    uid=11_58 combobox "Add filter" autocomplete="list" expandable haspopup="listbox"
+    uid=11_59 status atomic live="assertive" relevant="additions text"
+  uid=11_60 button "Save"
+  uid=11_61 heading "Campaigns" level="2"
+  uid=11_62 StaticText "Yesterday"
+  uid=11_63 button "Apr 24, 2026 Not applicable" expandable haspopup="dialog"
+  uid=11_64 button "Previous"
+  uid=11_65 button "Next"
+  uid=11_66 button "Show last 30 days"
+  uid=11_67 tab "Campaigns" selectable selected
+  uid=11_68 tab "Drafts" selectable
+  uid=11_69 tab "Settings" selectable
+  uid=11_70 main
+    uid=11_71 StaticText "Impr."
+    uid=11_72 StaticText "0"
+    uid=11_73 StaticText "0"
+    uid=11_74 button "Impr.: 0 for this time period. Hide this metric from the chart. An impression is counted each time your ad is served. Impressions help you understand how often your ad is being seen.. The Impr. metric has changed by 0 (+0.00%) compared to the previous period.. ."
+    uid=11_75 StaticText "Cost"
+    uid=11_76 StaticText "$0.00"
+    uid=11_77 StaticText "$0.00"
+    uid=11_78 button "Cost: $0.00. Show this metric in the chart. Cost is the sum of your spend during this period.. The Cost metric has changed by $0.00 (+0.00%) compared to the previous period.. ."
+    uid=11_79 StaticText "Conv. value"
+    uid=11_80 StaticText "0.00"
+    uid=11_81 StaticText "0.00"
+    uid=11_82 button "Conv. value: 0.00. Show this metric in the chart. Conversion value (Conv. value)  is the sum of conversion values for your conversions. This metric is useful only if you entered a value for your conversion actions.. The Conv. value metric has changed by 0.00 (+0.00%) compared to the previous period.. ."
+    uid=11_83 StaticText "Conversions"
+    uid=11_84 StaticText "0.00"
+    uid=11_85 StaticText "0.00"
+    uid=11_86 button "Conversions: 0.00. Show this metric in the chart. "Conversions" shows the number of conversions you received after ad interactions (such as text ad clicks or video ad views) from all actions you've included in this column.. The Conversions metric has changed by 0.00 (+0.00%) compared to the previous period.. ."
+    uid=11_87 button "Metrics"
+    uid=11_88 button "3 Adjust" expandable haspopup="menu"
+    uid=11_89 button "Download" haspopup="menu"
+    uid=11_90 button "Expand chart"
+    uid=11_91 generic
+      uid=15_0 StaticText "Time series chart showing Impr. from Fri, Apr 24, 2026 to Fri, Apr 24, 2026. Use arrow keys to navigate."
+    uid=11_93 StaticText "Optimize your budgets"
+    uid=11_94 button "+3.3%" expandable
+    uid=11_95 button "More options" expandable haspopup="menu"
+    uid=11_96 StaticText "You missed traffic because you were limited by budget. Fixing your limited budget can help."
+    uid=11_97 StaticText " "
+    uid=11_98 StaticText "Recommended because you missed out potential traffic last week based on data from the ad auctions you participated in"
+    uid=11_99 button "More information" haspopup="menu"
+    uid=11_100 button "View"
+    uid=11_101 button "Create investment strategy"
+    uid=11_102 region "Primary toolbelt for Campaigns"
+      uid=14_31 button "Create campaign" haspopup="menu"
+      uid=15_1 button "Show 1 active filters" expandable haspopup="menu"
+      uid=15_2 StaticText "Filters Applied:"
+      uid=14_32 grid "Filters Applied:"
+        uid=15_3 row "Campaign name contains Panama Delete Campaign name contains Panama" haspopup="menu"
+          uid=15_4 button "Campaign name contains Panama"
+          uid=15_5 button "Delete Campaign name contains Panama"
+      uid=14_33 button "Add filter"
+      uid=14_34 search
+        uid=14_35 button "Search" expandable haspopup="listbox"
+      uid=14_36 button "Segment. Segmentation off" expandable haspopup="menu"
+      uid=14_37 button "Columns" expandable haspopup="menu"
+      uid=14_38 button "Reports" expandable haspopup="menu"
+      uid=14_39 button "Download" expandable haspopup="menu"
+      uid=14_40 button "Expand"
+      uid=14_41 button "More options" expandable haspopup="menu"
+      uid=14_42 button "Hide chart"
+    uid=11_116 grid "Campaigns"
+      uid=15_6 checkbox "Select all rows"
+      uid=15_7 columnheader "Campaign status" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_8 image "Campaign status"
+      uid=15_9 columnheader "Campaign" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_10 StaticText "Campaign"
+      uid=15_11 columnheader "Budget" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_12 StaticText "Budget"
+      uid=15_13 columnheader "Status" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_14 StaticText "Status"
+      uid=15_15 columnheader "Optimization score" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_16 StaticText "Optimization score"
+      uid=15_17 columnheader "Campaign type" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_18 StaticText "Campaign type"
+      uid=15_19 columnheader "Impr." description="Sortable column" live="polite" relevant="additions text"
+        uid=15_20 StaticText "Impr."
+      uid=15_21 columnheader "Interactions" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_22 StaticText "Interactions"
+      uid=15_23 columnheader "Interaction rate" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_24 StaticText "Interaction rate"
+      uid=15_25 columnheader "Avg. cost" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_26 StaticText "Avg. cost"
+      uid=15_27 columnheader "Cost" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_28 StaticText "Cost"
+      uid=15_29 columnheader "Conversions" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_30 StaticText "Conversions"
+      uid=15_31 columnheader "Cost / conv." description="Sortable column" live="polite" relevant="additions text"
+        uid=15_32 StaticText "Cost / conv."
+      uid=15_33 columnheader "Conv. rate" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_34 StaticText "Conv. rate"
+      uid=15_35 columnheader "Campaign ID" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_36 StaticText "Campaign ID"
+      uid=15_37 columnheader "Bid strategy type" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_38 StaticText "Bid strategy type"
+      uid=15_39 columnheader "Clicks" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_40 StaticText "Clicks"
+      uid=15_41 columnheader "Conv. value" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_42 StaticText "Conv. value"
+      uid=15_43 columnheader "Conv. value / cost" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_44 StaticText "Conv. value / cost"
+      uid=15_45 columnheader "Avg. CPC" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_46 StaticText "Avg. CPC"
+      uid=15_47 columnheader "Original conv. value" description="Sortable column" live="polite" relevant="additions text"
+        uid=15_48 StaticText "Original conv. value"
+      uid=15_49 gridcell
+      uid=15_50 gridcell "Expand row Unknown"
+        uid=15_51 button "Expand row" expandable
+        uid=15_52 generic "Unknown"
+      uid=15_53 gridcell "Drafts in progress: 0"
+        uid=15_54 StaticText "Drafts in progress:"
+        uid=15_55 StaticText "0"
+      uid=15_56 gridcell
+      uid=15_57 gridcell
+      uid=15_58 gridcell
+      uid=15_59 gridcell
+      uid=15_60 gridcell
+      uid=15_61 gridcell
+      uid=15_62 gridcell
+      uid=15_63 gridcell
+      uid=15_64 gridcell
+      uid=15_65 gridcell
+      uid=15_66 gridcell
+      uid=15_67 gridcell
+      uid=15_68 gridcell
+      uid=15_69 gridcell
+      uid=15_70 gridcell
+      uid=15_71 gridcell
+      uid=15_72 gridcell
+      uid=15_73 gridcell
+      uid=15_74 gridcell
+      uid=15_75 gridcell "Select row"
+        uid=15_76 checkbox "Select row"
+      uid=15_77 gridcell "Paused Edit this Campaign status, currently 5"
+        uid=15_78 image "Paused"
+        uid=16_0 button "Edit this Campaign status, currently 5" haspopup="menu"
+      uid=15_79 gridcell "Panama QIV — Golden Visa USA Edit name Edit settings"
+        uid=15_80 StaticText "Panama QIV — Golden Visa USA"
+        uid=15_81 button "Edit name"
+        uid=15_82 button "Edit settings"
+      uid=15_83 gridcell "$250.00/day Edit this Budget, currently $250.00"
+        uid=15_84 StaticText "$250.00/day"
+        uid=16_1 button "Edit this Budget, currently $250.00" haspopup="menu"
+      uid=15_85 gridcell "Paused Bid strategy learning, All ads under review"
+        uid=15_86 generic
+          uid=15_87 StaticText "Paused"
+          uid=15_88 StaticText "Bid strategy learning, All ads under review"
+      uid=15_89 gridcell "—"
+        uid=15_90 StaticText "—"
+      uid=15_91 gridcell "Search"
+        uid=15_92 StaticText "Search"
+      uid=15_93 gridcell "0"
+        uid=15_94 StaticText "0"
+      uid=15_95 gridcell "0"
+        uid=15_96 StaticText "0"
+      uid=15_97 gridcell "—"
+        uid=15_98 StaticText "—"
+      uid=15_99 gridcell "—"
+        uid=15_100 StaticText "—"
+      uid=15_101 gridcell "$0.00"
+        uid=15_102 StaticText "$0.00"
+      uid=15_103 gridcell "0.00"
+        uid=15_104 StaticText "0.00"
+      uid=15_105 gridcell "$0.00"
+        uid=15_106 StaticText "$0.00"
+      uid=15_107 gridcell "0.00%"
+        uid=15_108 StaticText "0.00%"
+      uid=15_109 gridcell "23798023420"
+        uid=15_110 StaticText "23798023420"
+      uid=15_111 gridcell "Maximize conversions"
+        uid=15_112 button "Maximize conversions"
+      uid=15_113 gridcell "0"
+        uid=15_114 StaticText "0"
+      uid=15_115 gridcell "0.00"
+        uid=15_116 StaticText "0.00"
+      uid=15_117 gridcell "0.00"
+        uid=15_118 StaticText "0.00"
+      uid=15_119 gridcell "—"
+        uid=15_120 StaticText "—"
+      uid=15_121 gridcell "0.00"
+        uid=15_122 StaticText "0.00"
+      uid=15_123 gridcell
+      uid=15_124 gridcell
+      uid=15_125 StaticText "Total: Filtered campaigns"
+      uid=15_126 button "More information" haspopup="menu"
+      uid=15_127 gridcell
+      uid=15_128 gridcell
+      uid=15_129 gridcell
+      uid=15_130 gridcell "—"
+        uid=15_131 StaticText "—"
+      uid=15_132 gridcell
+      uid=15_133 gridcell "0"
+        uid=15_134 StaticText "0"
+      uid=15_135 gridcell "0"
+        uid=15_136 StaticText "0"
+      uid=15_137 gridcell "—"
+        uid=15_138 StaticText "—"
+      uid=15_139 gridcell "—"
+        uid=15_140 StaticText "—"
+      uid=15_141 gridcell "$0.00"
+        uid=15_142 StaticText "$0.00"
+      uid=15_143 gridcell "0.00"
+        uid=15_144 StaticText "0.00"
+      uid=15_145 gridcell "$0.00"
+        uid=15_146 StaticText "$0.00"
+      uid=15_147 gridcell "0.00%"
+        uid=15_148 StaticText "0.00%"
+      uid=15_149 gridcell
+      uid=15_150 gridcell
+      uid=15_151 gridcell "0"
+        uid=15_152 StaticText "0"
+      uid=15_153 gridcell "0.00"
+        uid=15_154 StaticText "0.00"
+      uid=15_155 gridcell "0.00"
+        uid=15_156 StaticText "0.00"
+      uid=15_157 gridcell "—"
+        uid=15_158 StaticText "—"
+      uid=15_159 gridcell "0.00"
+        uid=15_160 StaticText "0.00"
+      uid=15_161 gridcell
+      uid=15_162 gridcell "Collapse row"
+        uid=15_163 button "Collapse row" expandable expanded
+      uid=15_164 StaticText "Total: Account"
+      uid=15_165 button "More information" haspopup="menu"
+      uid=15_166 gridcell
+      uid=15_167 gridcell "$490.00/day"
+        uid=15_168 StaticText "$490.00/day"
+      uid=15_169 gridcell
+      uid=15_170 gridcell "—"
+        uid=15_171 StaticText "—"
+      uid=15_172 gridcell
+      uid=15_173 gridcell "864"
+        uid=15_174 StaticText "864"
+      uid=15_175 gridcell "102 clicks"
+        uid=15_176 StaticText "102"
+        uid=15_177 StaticText "clicks"
+      uid=15_178 gridcell "11.81%"
+        uid=15_179 StaticText "11.81%"
+      uid=15_180 gridcell "$5.47"
+        uid=15_181 StaticText "$5.47"
+      uid=15_182 gridcell "$558.25"
+        uid=15_183 StaticText "$558.25"
+      uid=15_184 gridcell "1.00"
+        uid=15_185 StaticText "1.00"
+      uid=15_186 gridcell "$558.25"
+        uid=15_187 StaticText "$558.25"
+      uid=15_188 gridcell "0.98%"
+        uid=15_189 StaticText "0.98%"
+      uid=15_190 gridcell
+      uid=15_191 gridcell
+      uid=15_192 gridcell "102"
+        uid=15_193 StaticText "102"
+      uid=15_194 gridcell "1.00"
+        uid=15_195 StaticText "1.00"
+      uid=15_196 gridcell "0.00"
+        uid=15_197 StaticText "0.00"
+      uid=15_198 gridcell "$5.47"
+        uid=15_199 StaticText "$5.47"
+      uid=15_200 gridcell "1.00"
+        uid=15_201 StaticText "1.00"
+      uid=15_202 gridcell
+      uid=15_203 gridcell
+      uid=15_204 StaticText "Total: Search campaigns"
+      uid=15_205 button "More information" haspopup="menu"
+      uid=15_206 gridcell
+      uid=15_207 gridcell
+      uid=15_208 gridcell
+      uid=15_209 gridcell "—"
+        uid=15_210 StaticText "—"
+      uid=15_211 gridcell
+      uid=15_212 gridcell "864"
+        uid=15_213 StaticText "864"
+      uid=15_214 gridcell "102 clicks"
+        uid=15_215 StaticText "102"
+        uid=15_216 StaticText "clicks"
+      uid=15_217 gridcell "11.81%"
+        uid=15_218 StaticText "11.81%"
+      uid=15_219 gridcell "$5.47"
+        uid=15_220 StaticText "$5.47"
+      uid=15_221 gridcell "$558.25"
+        uid=15_222 StaticText "$558.25"
+      uid=15_223 gridcell "1.00"
+        uid=15_224 StaticText "1.00"
+      uid=15_225 gridcell "$558.25"
+        uid=15_226 StaticText "$558.25"
+      uid=15_227 gridcell "0.98%"
+        uid=15_228 StaticText "0.98%"
+      uid=15_229 gridcell
+      uid=15_230 gridcell
+      uid=15_231 gridcell "102"
+        uid=15_232 StaticText "102"
+      uid=15_233 gridcell "1.00"
+        uid=15_234 StaticText "1.00"
+      uid=15_235 gridcell "0.00"
+        uid=15_236 StaticText "0.00"
+      uid=15_237 gridcell "$5.47"
+        uid=15_238 StaticText "$5.47"
+      uid=15_239 gridcell "1.00"
+        uid=15_240 StaticText "1.00"
+      uid=15_241 gridcell
+      uid=15_242 gridcell
+      uid=15_243 StaticText "Total: Display campaigns"
+      uid=15_244 button "More information" haspopup="menu"
+      uid=15_245 gridcell
+      uid=15_246 gridcell
+      uid=15_247 gridcell
+      uid=15_248 gridcell "—"
+        uid=15_249 StaticText "—"
+      uid=15_250 gridcell
+      uid=15_251 gridcell "0"
+        uid=15_252 StaticText "0"
+      uid=15_253 gridcell "0"
+        uid=15_254 StaticText "0"
+      uid=15_255 gridcell "—"
+        uid=15_256 StaticText "—"
+      uid=15_257 gridcell "—"
+        uid=15_258 StaticText "—"
+      uid=15_259 gridcell "$0.00"
+        uid=15_260 StaticText "$0.00"
+      uid=15_261 gridcell "0.00"
+        uid=15_262 StaticText "0.00"
+      uid=15_263 gridcell "$0.00"
+        uid=15_264 StaticText "$0.00"
+      uid=15_265 gridcell "0.00%"
+        uid=15_266 StaticText "0.00%"
+      uid=15_267 gridcell
+      uid=15_268 gridcell
+      uid=15_269 gridcell "0"
+        uid=15_270 StaticText "0"
+      uid=15_271 gridcell "0.00"
+        uid=15_272 StaticText "0.00"
+      uid=15_273 gridcell "0.00"
+        uid=15_274 StaticText "0.00"
+      uid=15_275 gridcell "—"
+        uid=15_276 StaticText "—"
+      uid=15_277 gridcell "0.00"
+        uid=15_278 StaticText "0.00"
+    uid=15_279 StaticText "1 - 1 of 1"
+    uid=11_664 link "Reporting is not real-time." haspopup="menu" url="https://support.google.com/google-ads/?p=help_2544985&hl=en_US"
+      uid=11_665 StaticText "Reporting is not real-time."
+    uid=11_666 StaticText " "
+    uid=11_667 StaticText "Time zone for all dates and times: (GMT-04:00) Eastern Time."
+    uid=11_668 link "Learn more about changing your Google Ads account settings" haspopup="menu" url="https://support.google.com/google-ads/?p=help_9842104&hl=en_US"
+      uid=11_669 StaticText "Learn more"
+    uid=11_670 StaticText "Some inventory may be provided through third party intermediaries."
+    uid=11_671 StaticText "You'll see Media Rating Council (MRC) accreditation noted in the column header's hover text for accredited metrics."
+    uid=11_672 StaticText "© Google, 2026."
+  uid=16_2 generic
+  uid=16_3 generic
+    uid=16_4 button "Close"
+    uid=16_5 StaticText "Settings"
+    uid=16_6 StaticText "Status:"
+    uid=16_7 StaticText " "
+    uid=16_8 StaticText "Paused"
+    uid=16_9 StaticText "Type:"
+    uid=16_10 StaticText " "
+    uid=16_11 StaticText "Search"
+    uid=16_12 main
+      uid=16_13 button "Campaign name" description="Panama QIV — Golden Visa USA" expandable
+      uid=16_14 button "Campaign status" description="Paused" expandable
+      uid=16_15 button "Networks" description="Google Search Network" expandable
+      uid=16_16 heading "Budget and bidding optimization" level="2"
+      uid=16_17 StaticText "Your Search campaign is optimized to drive"
+      uid=16_18 button "Submit lead forms"
+      uid=16_19 StaticText ". "
+      uid=16_20 StaticText "Your bidding strategy is "
+      uid=16_21 button "Maximize conversions"
+      uid=16_19 StaticText ". "
+      uid=16_22 StaticText "Your budget is "
+      uid=16_23 button "$250.00 a day"
+      uid=16_19 StaticText ". "
+      uid=16_24 button "Budget" description="$250.00/day" expandable
+      uid=16_25 button "Conversion goals" description="Account-default: Submit lead forms" expandable
+      uid=17_0 button "Bidding panel" expandable expanded
+      uid=17_1 heading "Bidding" level="3"
+      uid=19_0 button "Back to previous bidding options"
+      uid=19_1 button "Maximize conversions" expandable expanded haspopup="listbox"
+      uid=19_2 checkbox "Set a target cost per action (optional)" checked
+      uid=19_3 StaticText "Target CPA"
+      uid=19_4 button "More information" haspopup="menu"
+      uid=19_5 generic
+        uid=19_6 StaticText "$"
+        uid=19_7 textbox "Target CPA" required value="470.00"
+      uid=19_8 button "Use a portfolio strategy"
+      uid=19_9 StaticText "Google Ads automatically sets your bids to help you get the most conversions within your budget."
+      uid=19_10 StaticText "The strategy you select here will be applied to this campaign only."
+      uid=19_11 link "Learn more about assist entries" haspopup="menu" url="https://support.google.com/google-ads/answer/7381968?hl=en_US"
+        uid=19_12 StaticText "Learn more about Maximize conversions bidding"
+      uid=17_11 button "Cancel"
+      uid=17_12 button "Save"
+      uid=16_27 button "Customer acquisition" description="Bid equally for new and existing customers" expandable
+      uid=16_28 button "Value rules" description="No rule set" expandable
+      uid=16_29 heading "AI Max for Search campaigns" level="2"
+      uid=16_30 StaticText "Get the best AI-powered performance on Google Search"
+      uid=16_31 StaticText "Advertisers that activate AI Max in Search Campaigns will typically see 14% more conversions or conversion value at a similar CPA / ROAS"
+      uid=16_32 StaticText "Engage more customers and boost performance. Easily expand your keywords with broad match technology and let Google AI match content from your landing pages and assets to help you show up on more relevant searches. New ad group settings help you guide which customers you reach."
+      uid=16_33 StaticText "Tailor your ads and keep them fresh. Use Google AI to serve the most relevant ad copy and landing pages to each customer based on their unique interest and intent."
+      uid=16_34 StaticText "Take charge and understand how the newest and best Google AI is working for you. You'll get new actionable insights in search term reports that show how AI Max improves performance."
+      uid=16_35 button "Learn more about AI Max" haspopup="dialog"
+      uid=16_36 button "Optimize your campaign with AI Max"
+        uid=16_37 switch "Optimize your campaign with AI Max"
+      uid=16_38 StaticText "Optimize your campaign with AI Max"
+      uid=16_39 generic live="assertive" relevant="additions text"
+      uid=16_40 button "Asset optimization" description="Text customization and Final URL expansion turned off" expandable
+      uid=16_41 button "Brands" description="Limiting to: 0 brand lists Excluding: 0 brand lists" expandable
+      uid=16_42 heading "Other settings" level="2"
+      uid=16_43 button "Locations" description="United States (country) United States (country)" expandable
+      uid=16_44 button "Languages" description="English" expandable
+      uid=16_45 button "EU political ads" description="Doesn't have EU political ads" expandable
+      uid=16_46 button "Automatically created assets" description="Off: Use only assets I provide directly for my ads" expandable
+      uid=16_47 button "Start and end dates" description="Start date: April 25, 2026 End date: Not set" expandable
+      uid=16_48 button "Broad match keywords" description="Off: Use keyword match types" expandable
+      uid=16_49 button "Dynamic Search Ads setting" description="Get automated search targeting and customized ad headlines based on your website" expandable
+      uid=16_50 button "Ad rotation" description="Optimize: Prefer best performing ads" expandable
+      uid=16_51 button "Campaign URL options" description="No options set" expandable
+      uid=16_52 button "Page feeds" description="Add page feeds to your campaign" expandable
+      uid=16_53 button "IP exclusions" description="No exclusions set" expandable
+      uid=16_54 button "Brands" description="Limiting to: 0 brand lists Excluding: 0 brand lists" expandable
+      uid=16_55 StaticText "© Google, 2026."
+  uid=16_56 generic
+  uid=14_626 generic
+  uid=14_627 generic
+  uid=14_628 generic
+  uid=14_629 StaticText "Fri, Apr 24, 2026"
+  uid=14_630 StaticText "Impr."
+  uid=14_631 StaticText "864"
+  uid=14_632 generic
+  uid=20_0 generic
+  uid=20_1 generic
+    uid=20_2 listbox focusable focused orientation="vertical"
+  uid=20_3 generic

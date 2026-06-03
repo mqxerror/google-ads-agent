@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2, Trash2, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
 import AgentAvatar from './AgentAvatar';
@@ -12,6 +12,12 @@ import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
 interface ChatMessageProps {
   message: ChatMessageType;
   onDelete?: (messageId: string) => void;
+  /** Conversation this message belongs to. Required for the "Send to
+   *  Claude Code" action — when set, an extra hover button appears on
+   *  assistant messages that flips `awaits_claude_code=1` on the
+   *  conversation so Claude Code (the user's terminal session) sees
+   *  the handoff via MCP. */
+  conversationId?: string;
 }
 
 /** Internal tools the user doesn't care about (chain-of-thought noise) */
@@ -146,7 +152,28 @@ const ROLE_COLORS: Record<string, string> = {
   growth_hacker: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-400/30',
 };
 
-export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
+export default function ChatMessage({ message, onDelete, conversationId }: ChatMessageProps) {
+  const [handoffState, setHandoffState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const sendToClaudeCode = async () => {
+    if (!conversationId || handoffState === 'sending') return;
+    setHandoffState('sending');
+    const note = window.prompt('Optional note for Claude Code (what should it do with this thread?):') ?? undefined;
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/handoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(note ? { note } : {}),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setHandoffState('sent');
+      setTimeout(() => setHandoffState('idle'), 4000);
+    } catch (e) {
+      console.error('handoff failed', e);
+      setHandoffState('error');
+      setTimeout(() => setHandoffState('idle'), 4000);
+    }
+  };
   const isUser = message.role === 'user';
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const roleName = message.agentRoleName;
@@ -171,6 +198,33 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
           title="Delete message"
         >
           <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+
+      {/* "Send to Claude Code" button — assistant messages only, requires conversationId */}
+      {showActions && !isUser && conversationId && (
+        <button
+          onClick={sendToClaudeCode}
+          disabled={handoffState === 'sending'}
+          className={cn(
+            'absolute top-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium transition-colors',
+            'right-10',  // sits left of the delete button (right-2)
+            handoffState === 'sent'
+              ? 'bg-emerald-500/15 text-emerald-600'
+              : handoffState === 'error'
+                ? 'bg-destructive/10 text-destructive'
+                : 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20'
+          )}
+          title="Hand this thread off to Wassim's Claude Code session for execution"
+        >
+          {handoffState === 'sending' ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : handoffState === 'sent' ? (
+            <Check className="h-3 w-3" />
+          ) : (
+            <Terminal className="h-3 w-3" />
+          )}
+          {handoffState === 'sent' ? 'Sent' : handoffState === 'error' ? 'Failed' : 'Claude Code'}
         </button>
       )}
       <div
@@ -212,6 +266,25 @@ export default function ChatMessage({ message, onDelete }: ChatMessageProps) {
           <div className="whitespace-pre-wrap">{message.content}</div>
         ) : (
           <TeamOrRegularContent content={message.content} />
+        )}
+
+        {/* Inline rendered video ad */}
+        {message.videoUrl && (
+          <div className="mt-2 rounded-lg overflow-hidden border border-border bg-black">
+            <video
+              src={message.videoUrl}
+              poster={message.videoThumbnail}
+              controls
+              preload="metadata"
+              className="w-full max-h-[360px] bg-black"
+            />
+            <div className="flex items-center justify-between px-2 py-1 bg-secondary/30 text-[10px]">
+              <span className="text-muted-foreground">Video ad</span>
+              <a href={message.videoUrl} download className="text-pink-400 hover:text-pink-300">
+                Download MP4
+              </a>
+            </div>
+          </div>
         )}
 
         {/* Live activity — show what's happening RIGHT NOW */}

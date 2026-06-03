@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
-import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Image as ImageIcon, Loader2, Film } from 'lucide-react';
+import VideoCreator from './VideoCreator';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
@@ -50,14 +51,16 @@ interface ChatInputProps {
   conversations?: ConversationRef[];
   conversationId?: string | null;
   onEnsureConversation?: () => Promise<string>;
+  onVideoReady?: (url: string, script: string, thumbnail?: string) => void;
 }
 
-export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation, onVideoReady }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [model, setModel] = useState<ModelId>('opus');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const [teamRoles, setTeamRoles] = useState<Set<string>>(new Set());
   const [templateCategory, setTemplateCategory] = useState<string>('analyze');
   const [roles, setRoles] = useState<AgencyRole[]>([]);
@@ -461,6 +464,16 @@ The question/topic: ${messageText}`;
         </div>
       )}
 
+      {/* Video creator panel */}
+      <VideoCreator
+        open={showVideo}
+        onClose={() => setShowVideo(false)}
+        onVideoReady={(url, script, thumb) => {
+          onVideoReady?.(url, script, thumb);
+          setShowVideo(false);
+        }}
+      />
+
       {/* Team Session role picker */}
       {showTeam && roles.length > 0 && (
         <div className="bg-card border border-purple-500/30 rounded-lg shadow-lg overflow-hidden">
@@ -557,7 +570,7 @@ The question/topic: ${messageText}`;
             Templates
           </button>
           <button
-            onClick={() => { setShowTeam(!showTeam); setShowTemplates(false); setShowRoles(false); }}
+            onClick={() => { setShowTeam(!showTeam); setShowTemplates(false); setShowRoles(false); setShowVideo(false); }}
             className={cn(
               'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
               showTeam
@@ -568,6 +581,19 @@ The question/topic: ${messageText}`;
           >
             <Users className="h-3 w-3" />
             Team
+          </button>
+          <button
+            onClick={() => { setShowVideo(!showVideo); setShowTeam(false); setShowTemplates(false); setShowRoles(false); }}
+            className={cn(
+              'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+              showVideo
+                ? 'bg-pink-500/20 text-pink-400 font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+            )}
+            title="Generate a video ad from a script (ElevenLabs + HeyGen)"
+          >
+            <Film className="h-3 w-3" />
+            Video
           </button>
           <span className="text-[10px] text-muted-foreground">{currentModel.desc}</span>
         </span>

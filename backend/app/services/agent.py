@@ -209,7 +209,7 @@ _ads_svc = GoogleAdsService()
 
 AVAILABLE_MODELS = {
     "sonnet": "claude-sonnet-4-6",
-    "opus": "claude-opus-4-6",
+    "opus": "claude-opus-4-8",
     "haiku": "claude-haiku-4-5-20251001",
 }
 
@@ -710,8 +710,17 @@ async def stream_agent_response(
     model: str = "sonnet",
     active_role: str | None = None,
     attachments: list[dict] | None = None,
+    tool_allowlist: list[str] | None = None,
 ) -> AsyncIterator[dict]:
-    """Stream agent responses with full layered memory."""
+    """Stream agent responses with full layered memory.
+
+    tool_allowlist: when provided, restricts the Google Ads MCP tools this run
+    may call to names containing any of these substrings (enforced physically
+    by CampaignScopeMiddleware via the LANGAR_AGENT_TOOL_ALLOWLIST env var).
+    An empty list means "no Google Ads tools" — pure analysis of injected
+    context, which is the safest mode for rate-limited audit workflows. None
+    means unrestricted (normal chat behaviour).
+    """
     from app.services.roles import classify_intent, get_role, get_default_role
 
     model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS["sonnet"])
@@ -1293,6 +1302,14 @@ async def stream_agent_response(
     else:
         env.pop("LANGAR_BOUND_CAMPAIGN_ID", None)
         env.pop("LANGAR_BOUND_CAMPAIGN_NAME", None)
+    # Per-agent tool scoping (workflow orchestrator sets this). The same MCP
+    # middleware enforces it. A sentinel "__NONE__" means "no Google Ads tools
+    # at all" (pure context analysis — zero API calls, safest for audits);
+    # a non-empty list restricts to matching tool names; absent = unrestricted.
+    if tool_allowlist is not None:
+        env["LANGAR_AGENT_TOOL_ALLOWLIST"] = ",".join(tool_allowlist) if tool_allowlist else "__NONE__"
+    else:
+        env.pop("LANGAR_AGENT_TOOL_ALLOWLIST", None)
 
     result_queue: queue.Queue[dict | None] = queue.Queue()
     full_response_text: list[str] = []

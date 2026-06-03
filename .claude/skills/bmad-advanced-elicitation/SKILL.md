@@ -2,6 +2,7 @@
 name: bmad-advanced-elicitation
 description: 'Push the LLM to reconsider, refine, and improve its recent output. Use when user asks for deeper critique or mentions a known deeper critique method, e.g. socratic, first principles, pre-mortem, red team.'
 agent_party: '{project-root}/_bmad/_config/agent-manifest.csv'
+disable-model-invocation: true
 ---
 
 # Advanced Elicitation

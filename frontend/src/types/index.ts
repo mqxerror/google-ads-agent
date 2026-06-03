@@ -70,6 +70,8 @@ export interface ChatMessage {
   agentRoleName?: string;  // display name (e.g. "Search Term Hunter")
   agentRoleAvatar?: string; // avatar key (e.g. "search")
   isPending?: boolean;     // queued message waiting to be sent
+  videoUrl?: string;       // rendered ad video (MP4) — shown inline in chat
+  videoThumbnail?: string; // optional poster image
 }
 
 export interface ToolCall {

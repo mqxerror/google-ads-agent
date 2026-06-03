@@ -501,6 +501,27 @@ class CampaignScopeMiddleware(Middleware):
             getattr(context.message, "name", None)
             or getattr(getattr(context.message, "params", None), "name", "unknown")
         )
+        # Per-agent tool allowlist (workflow orchestrator). "__NONE__" blocks
+        # ALL Google Ads tools (pure-analysis agents — zero API calls); a
+        # comma list restricts to tools whose name contains any entry; absent
+        # = unrestricted. Enforced before the scope check so a disallowed tool
+        # is rejected regardless of which campaign it targets.
+        allowlist_raw = (os.environ.get("LANGAR_AGENT_TOOL_ALLOWLIST") or "").strip()
+        if allowlist_raw:
+            if allowlist_raw == "__NONE__":
+                raise ValueError(
+                    f"TOOL_NOT_ALLOWED: tool '{tool_name}' is blocked for this "
+                    f"agent. You are in analysis-only mode — answer from the "
+                    f"campaign data and reports already provided in your context. "
+                    f"Do not call Google Ads tools."
+                )
+            allowed = [a.strip() for a in allowlist_raw.split(",") if a.strip()]
+            if not any(a in tool_name for a in allowed):
+                raise ValueError(
+                    f"TOOL_NOT_ALLOWED: tool '{tool_name}' is not in this agent's "
+                    f"allowed set ({allowed}). Use only your assigned tools, or "
+                    f"answer from the context already provided."
+                )
         # Scope check
         if bound:
             args = getattr(context.message, "arguments", None) or getattr(getattr(context.message, "params", None), "arguments", None) or {}
@@ -527,8 +548,11 @@ class CampaignScopeMiddleware(Middleware):
         try:
             return await call_next(context)
         except Exception as exc:
-            # Don't pollute the log with our own scope violations.
-            if not (isinstance(exc, ValueError) and str(exc).startswith("CAMPAIGN_SCOPE_VIOLATION:")):
+            # Don't pollute the log with our own intentional rejections.
+            _intentional = isinstance(exc, ValueError) and str(exc).startswith(
+                ("CAMPAIGN_SCOPE_VIOLATION:", "TOOL_NOT_ALLOWED:")
+            )
+            if not _intentional:
                 _log_mcp_error(tool_name, exc)
             raise
 

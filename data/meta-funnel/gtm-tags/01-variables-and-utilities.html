@@ -1,0 +1,193 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Shared Utilities
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 100 (must fire BEFORE all other meta-funnel tags)
+
+  Purpose: Provides SHA-256 hashing, UUID generation, bot detection,
+  and the master fbq dispatcher used by all other funnel tags.
+-->
+<script>
+(function() {
+  'use strict';
+
+  // ─── GUARD: only run once per page ───
+  if (window.__mf_utils_loaded) return;
+  window.__mf_utils_loaded = true;
+
+  // ─── BOT DETECTION ───
+  var botPattern = /HeadlessChrome|Googlebot|bingbot|AhrefsBot|Bytespider|SemrushBot|DotBot|MJ12bot|PetalBot|YandexBot|Applebot|facebookexternalhit|Slurp|Baiduspider|crawler|spider|bot/i;
+  window.__mf_isBot = botPattern.test(navigator.userAgent);
+
+  // ─── SHA-256 HASHING (Web Crypto API) ───
+  window.__mf_sha256 = async function(value) {
+    if (!value) return '';
+    var normalized = String(value).toLowerCase().trim();
+    if (!normalized) return '';
+    var encoder = new TextEncoder();
+    var data = encoder.encode(normalized);
+    try {
+      var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      var hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    } catch(e) {
+      return '';
+    }
+  };
+
+  // ─── UUID v4 GENERATOR ───
+  window.__mf_uuid = function() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  };
+
+  // ─── UTM CAPTURE ───
+  var params = new URLSearchParams(location.search);
+  window.__mf_utm = {
+    source: params.get('utm_source') || '',
+    medium: params.get('utm_medium') || '',
+    campaign: params.get('utm_campaign') || ''
+  };
+
+  // ─── SESSION ID (stable per tab session) ───
+  if (!sessionStorage.getItem('__mf_sid')) {
+    sessionStorage.setItem('__mf_sid', window.__mf_uuid());
+  }
+  window.__mf_sessionId = sessionStorage.getItem('__mf_sid');
+
+  // ─── FORM DATA CACHE (populated when form fields are filled) ───
+  window.__mf_formData = {
+    email: '',
+    phone: '',
+    firstName: '',
+    lastName: '',
+    country: '',
+    city: ''
+  };
+
+  // ─── BUILD user_data PAYLOAD (hashed) ───
+  window.__mf_buildUserData = async function() {
+    var fd = window.__mf_formData;
+    var ud = {};
+    if (fd.email) ud.em = await window.__mf_sha256(fd.email);
+    if (fd.phone) {
+      var digits = fd.phone.replace(/\D/g, '');
+      if (digits.length >= 7) ud.ph = await window.__mf_sha256(digits);
+    }
+    if (fd.firstName) ud.fn = await window.__mf_sha256(fd.firstName);
+    if (fd.lastName) ud.ln = await window.__mf_sha256(fd.lastName);
+    if (fd.country) {
+      // Gravity Forms <select> may store ISO-2 in option value or full country name.
+      // If value is already 2 chars, treat it as ISO-2 directly.
+      // Otherwise, map common full names to ISO-2.
+      var raw = fd.country.trim();
+      var iso;
+      if (raw.length === 2) {
+        iso = raw.toLowerCase();
+      } else {
+        var countryMap = {
+          'united states': 'us', 'canada': 'ca', 'united kingdom': 'gb',
+          'united arab emirates': 'ae', 'saudi arabia': 'sa', 'mexico': 'mx',
+          'india': 'in', 'china': 'cn', 'brazil': 'br', 'france': 'fr',
+          'germany': 'de', 'italy': 'it', 'spain': 'es', 'portugal': 'pt',
+          'greece': 'gr', 'turkey': 'tr', 'australia': 'au', 'japan': 'jp',
+          'south korea': 'kr', 'russia': 'ru', 'nigeria': 'ng', 'egypt': 'eg',
+          'south africa': 'za', 'kenya': 'ke', 'colombia': 'co', 'argentina': 'ar',
+          'chile': 'cl', 'peru': 'pe', 'pakistan': 'pk', 'bangladesh': 'bd',
+          'indonesia': 'id', 'philippines': 'ph', 'vietnam': 'vn', 'thailand': 'th',
+          'malaysia': 'my', 'singapore': 'sg', 'iran': 'ir', 'iraq': 'iq',
+          'israel': 'il', 'jordan': 'jo', 'lebanon': 'lb', 'kuwait': 'kw',
+          'qatar': 'qa', 'bahrain': 'bh', 'oman': 'om', 'morocco': 'ma',
+          'algeria': 'dz', 'tunisia': 'tn', 'netherlands': 'nl', 'belgium': 'be',
+          'switzerland': 'ch', 'austria': 'at', 'sweden': 'se', 'norway': 'no',
+          'denmark': 'dk', 'finland': 'fi', 'ireland': 'ie', 'poland': 'pl',
+          'czech republic': 'cz', 'romania': 'ro', 'hungary': 'hu',
+          'new zealand': 'nz', 'hong kong': 'hk', 'taiwan': 'tw'
+        };
+        iso = countryMap[raw.toLowerCase()] || '';
+      }
+      if (iso) ud.country = await window.__mf_sha256(iso);
+    }
+    if (fd.city) ud.ct = await window.__mf_sha256(fd.city);
+    ud.external_id = await window.__mf_sha256(window.__mf_sessionId);
+    return ud;
+  };
+
+  // ─── BUILD custom_data PAYLOAD ───
+  window.__mf_buildCustomData = function(extras) {
+    var cd = {
+      content_category: 'bill_c3_descent',
+      page_path: location.pathname,
+      campaign_source: window.__mf_utm.source,
+      campaign_medium: window.__mf_utm.medium,
+      campaign_name: window.__mf_utm.campaign,
+      landing_variant: ''
+    };
+    if (extras) {
+      for (var k in extras) { if (extras.hasOwnProperty(k)) cd[k] = extras[k]; }
+    }
+    return cd;
+  };
+
+  // ─── MASTER EVENT DISPATCHER ───
+  // Fires fbq trackCustom + pushes to dataLayer for CAPI pickup
+  window.__mf_fireEvent = async function(eventName, customDataExtras) {
+    // Suppress bots
+    if (window.__mf_isBot) return;
+    // Suppress hidden tabs
+    if (document.visibilityState !== 'visible') return;
+
+    var eventID = window.__mf_uuid();
+    var userData = await window.__mf_buildUserData();
+    var customData = window.__mf_buildCustomData(customDataExtras);
+
+    // ─── Browser Pixel ───
+    if (typeof fbq === 'function') {
+      fbq('trackCustom', eventName, customData, { eventID: eventID });
+    }
+
+    // ─── dataLayer push (for GTM → CAPI relay) ───
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'meta_custom_event',
+      meta_event_name: eventName,
+      meta_event_id: eventID,
+      user_data: userData,
+      custom_data: customData
+    });
+  };
+
+  // ─── DEDUP GUARD (prevents same event firing twice in same session) ───
+  window.__mf_fired = {};
+  window.__mf_fireOnce = async function(eventName, customDataExtras) {
+    if (window.__mf_fired[eventName]) return;
+    window.__mf_fired[eventName] = true;
+    await window.__mf_fireEvent(eventName, customDataExtras);
+  };
+
+  // ─── CENTRALIZED dataLayer.push SUBSCRIBER ───
+  // Single monkey-patch point. Other tags register handlers via __mf_onDataLayer().
+  // This prevents multiple independent patches that can conflict with 3rd-party scripts.
+  window.__mf_dlHandlers = [];
+  window.__mf_onDataLayer = function(handler) {
+    window.__mf_dlHandlers.push(handler);
+  };
+
+  var dl = window.dataLayer = window.dataLayer || [];
+  var _origPush = dl.push;
+  dl.push = function() {
+    for (var i = 0; i < arguments.length; i++) {
+      var entry = arguments[i];
+      if (!entry || typeof entry !== 'object') continue;
+      for (var h = 0; h < window.__mf_dlHandlers.length; h++) {
+        try { window.__mf_dlHandlers[h](entry); } catch(e) {}
+      }
+    }
+    return _origPush.apply(this, arguments);
+  };
+
+})();
+</script>

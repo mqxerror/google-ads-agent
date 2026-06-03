@@ -106,6 +106,17 @@ export const AGENT_PROFILES: Record<string, AgentProfile> = {
     emoji: '🚀',
     specialty: 'Scaling strategies, experiments, expansion',
   },
+  script_generator: {
+    id: 'script_generator',
+    name: 'Kai Nakamura',
+    title: 'Video Script Generator',
+    initials: 'KN',
+    color: '#DB2777',
+    bgColor: '#FDF2F8',
+    borderColor: '#EC4899',
+    emoji: '🎬',
+    specialty: 'Short video ad scripts tuned for spoken pace',
+  },
   cro_specialist: {
     id: 'cro_specialist',
     name: 'Elena Rossi',

@@ -1,0 +1,86 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Video Tracking
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 50
+
+  Events produced:
+    - Video_Play         (any HTML5 video element play event)
+    - Video_50           (video reaches 50% progress)
+    - Video_Complete     (video reaches 95% progress)
+
+  STATUS: STUB — no video elements exist on the page as of 2026-05-21.
+  This tag uses MutationObserver to auto-detect videos added dynamically
+  (e.g., by a future P2 dev explainer video). No GTM update needed when
+  videos are added to the page.
+
+  NOTE: YouTube/Vimeo iframes require GTM's built-in YouTube trigger
+  (separate tag, not covered here). This tag handles HTML5 <video> only.
+-->
+<script>
+(function() {
+  'use strict';
+
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  function trackVideo(video) {
+    if (video.__mf_tracked) return;
+    video.__mf_tracked = true;
+
+    var playFired = false;
+    var fiftyFired = false;
+    var completeFired = false;
+
+    var videoSrc = video.src || (video.querySelector('source') || {}).src || 'unknown';
+
+    video.addEventListener('play', function() {
+      if (playFired) return;
+      playFired = true;
+      window.__mf_fireEvent('Video_Play', {
+        video_src: videoSrc.substring(0, 200),
+        video_duration: String(Math.round(video.duration || 0))
+      });
+    });
+
+    video.addEventListener('timeupdate', function() {
+      if (!video.duration) return;
+      var pct = (video.currentTime / video.duration) * 100;
+
+      if (!fiftyFired && pct >= 50) {
+        fiftyFired = true;
+        window.__mf_fireEvent('Video_50', {
+          video_src: videoSrc.substring(0, 200),
+          video_duration: String(Math.round(video.duration))
+        });
+      }
+
+      if (!completeFired && pct >= 95) {
+        completeFired = true;
+        window.__mf_fireEvent('Video_Complete', {
+          video_src: videoSrc.substring(0, 200),
+          video_duration: String(Math.round(video.duration))
+        });
+      }
+    });
+  }
+
+  // Track existing videos
+  document.querySelectorAll('video').forEach(trackVideo);
+
+  // Watch for dynamically added videos
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'VIDEO') trackVideo(node);
+        node.querySelectorAll && node.querySelectorAll('video').forEach(trackVideo);
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+})();
+</script>

@@ -19,7 +19,7 @@
     },
     "chrome": {
       "type": "stdio",
-      "command": "/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin/npx",
+      "command": "/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin/npx",
       "args": [
         "-y",
         "chrome-devtools-mcp@latest",
@@ -27,16 +27,16 @@
         "http://127.0.0.1:9222"
       ],
       "env": {
-        "PATH": "/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin:/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend/.venv/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/Users/mqxerrormac16/.antigravity/extensions/ms-python.debugpy-2025.18.0-darwin-arm64/bundled/scripts/noConfigScripts"
+        "PATH": "/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin:/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend/.venv/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/Users/mqxerrormac16/.vscode/extensions/ms-python.debugpy-2026.6.0-darwin-arm64/bundled/scripts/noConfigScripts:/Users/mqxerrormac16/.claude/plugins/cache/claude-plugins-official/context7/1b527e2ee74e/bin:/Users/mqxerrormac16/.claude/plugins/cache/agricidaniel-seo/claude-seo/1.9.8/bin"
       }
     },
     "clarity": {
       "type": "stdio",
-      "command": "/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin/npx",
+      "command": "/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin/npx",
       "args": [
         "-y",
         "@microsoft/clarity-mcp-server",
-        "--clarity_api_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjQ4M0FCMDhFNUYwRDMxNjdEOTRFMTQ3M0FEQTk2RTcyRDkwRUYwRkYiLCJ0eXAiOiJKV1QifQ.eyJqdGkiOiI0M2VlNGJmYi02NTY2LTQxNTItOTkzZi01NGNlMjc0OTQ5NGQiLCJzdWIiOiIzMTQ5NDY1NTIwMjI4ODYyIiwic2NvcGUiOiJEYXRhLkV4cG9ydCIsIm5iZiI6MTc3NjI2OTM3MSwiZXhwIjo0OTI5ODY5MzcxLCJpYXQiOjE3NzYyNjkzNzEsImlzcyI6ImNsYXJpdHkiLCJhdWQiOiJjbGFyaXR5LmRhdGEtZXhwb3J0ZXIifQ.RUejvkHLPz82ml6BiviC-_DzFHFrp2lO70qbjegEJbv33R15EXLFqP08z0H_AThJLmQH3tJ1-ypTKZN7427rEh0PItq7uXg9LTE7I4aWNwB9mnScDmmLuI3vsgtsDzFnSuLHCG8f9yok4yyHQFfikBTc0sa55RyAppb-J0up8kvPtoA3KpIayRpxGABGSAj4wZjT2cdlhVLZh6gB-RSb6E96kOf_6Mlr7Hh_y_SzPgVKEeGTEOG6z-MUjpNvgnhBVpbkSOjvY6mTzfoCal_AeBIMIB5lMk0JVc2g9w-Hv0Fs7wKCkDcFHqhJn4OwsEJ0_ZFnTa5pPOHZesfU6HRRGw"
+        "--clarity_api_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjQ4M0FCMDhFNUYwRDMxNjdEOTRFMTQ3M0FEQTk2RTcyRDkwRUYwRkYiLCJ0eXAiOiJKV1QifQ.eyJqdGkiOiI1MzExNzRjYS02NTBjLTQyOGUtYTRlOS02ZDMwZjhhNDhjZWQiLCJzdWIiOiI1MjczNjA1MTYxMjE0NDAiLCJzY29wZSI6IkRhdGEuRXhwb3J0IiwibmJmIjoxNzc5ODA5MTQ4LCJleHAiOjQ5MzM0MDkxNDgsImlhdCI6MTc3OTgwOTE0OCwiaXNzIjoiY2xhcml0eSIsImF1ZCI6ImNsYXJpdHkuZGF0YS1leHBvcnRlciJ9.AnsNQ_FvsEQBHc4co9kzD24QNT_5umNDGZ0SAGgmPK52GHCsuJdeNRUqOW29toTFCOvjjyhfbiVFrGI9dH2XE2i2aFwYNLg9dRc-oQjwyIbaaoZvCdXhXJQy_PmjXHVR4eXnpmNgc1YNPjPeshWH-U6A-R1MQUKsHwCp-BZI5mfgjBCI9I8QLs88PM-1MArceSWj9cEqg3IXx7yyCJJsDGN_QTOteKRDtoApVkWlMCJc-7Nbhh0Vy5xvUfRQmj_eV3sto0HPzh9NQcHt2WkWbiEosJuVZAcztkwKtPxZ4nVa8cOC-3onK_eVcayDoeldMSTLBiY6j4udtSkmw_B-IA"
       ]
     }
   }

@@ -163,3 +163,94 @@ Confirm gf_submit → /thank-you redirect → conversion  | pending | gtm_specia
 2. Are we on pace for monthly budget | pending | ppc_strategist |
 | 2026-04-15 14:13 | / Conversions (7d) / 1.5 (modeled ⚠️) / 2 confirmed / | User asked: are the arabic adgroup relevant im thinking to stop them all and keep English only | pending | director |
 | 2026-04-15 14:13 | The **confirmed conversions are coming from English terms** — even within the MENA campaign. The Arabic "conversion" (1.5) is modeled, not confirmed, and we already flagged the phantom conversion concern for this campaign. | User asked: are the arabic adgroup relevant im thinking to stop them all and keep English only | pending | director |
+| 2026-04-16 12:09 | `greece citizenship by investment` ($45.89, QS:1) remains the biggest drag. V4 copy with citizenship-intent headlines is the fix — if QS doesn't move by Apr 22, it gets removed. | User asked: Daily review for "Greece Golden Visa V2":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for monthly budget | pending | ppc_strategist |
+| 2026-04-16 14:43 | The campaign is 9 days old with $1,597 spent and 1 confirmed lead. | User asked: what is the cost for this campaign from the beginning | pending | director |
+| 2026-04-16 14:48 | Removing it now.Done. Removed `[PHRASE] yunanistan emekli oturum izni` from the **Greece Golden Visa - Turkey** campaign, ad group `yunanistan-oturum-gayrimenkul`. | User asked: remove the keyword yunanistan emekli oturum izni | pending | director |
+| 2026-04-18 18:00 | Good — test lead confirmed means the form and webhook pipeline work. Let me do both tasks in parallel: check the TrueConversion heatmap and install Clarity via GTM.## Status Update | User asked: I received the test lead , also I have trueconversion like clarity , I didnt created a session recording for reece but I have for Portugal which is sa | pending | analytics_analyst |
+| 2026-04-18 18:00 | - Verified: `clarity.ms/tag/3149465520228862` loading on `/greece-golden-visa` | User asked: I received the test lead , also I have trueconversion like clarity , I didnt created a session recording for reece but I have for Portugal which is sa | pending | analytics_analyst |
+| 2026-04-18 18:12 | / Portugal Golden Visa / 805315888696 / **ENABLED** / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: check the Portugal ads if they use https://goldenvisas.mercan.com/portugal-golden-visa as landing page in ads the truecoversion report is for an old l | pending | analytics_analyst |
+| 2026-04-18 18:12 | / Portugal Citizenship by Investment / 805394641343 / **ENABLED** / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: check the Portugal ads if they use https://goldenvisas.mercan.com/portugal-golden-visa as landing page in ads the truecoversion report is for an old l | pending | analytics_analyst |
+| 2026-04-18 18:12 | / Portugal Residency / 805279890696 / **ENABLED** / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: check the Portugal ads if they use https://goldenvisas.mercan.com/portugal-golden-visa as landing page in ads the truecoversion report is for an old l | pending | analytics_analyst |
+| 2026-04-18 18:12 | / Portugal Golden Visa Fund / 805394634467 / **ENABLED** / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: check the Portugal ads if they use https://goldenvisas.mercan.com/portugal-golden-visa as landing page in ads the truecoversion report is for an old l | pending | analytics_analyst |
+| 2026-04-18 18:12 | / Mercan Brand / 805315884217 / **ENABLED** / `goldenvisas.mercan.com/portugal-golden-visa` / | User asked: check the Portugal ads if they use https://goldenvisas.mercan.com/portugal-golden-visa as landing page in ads the truecoversion report is for an old l | pending | analytics_analyst |
+| 2026-04-18 18:15 | **Clarity was installed via GTM just hours ago today.** The script is confirmed loading on the page, but: | User asked: test if the clarity mcp works and create a heat map for all landing pages | pending | cro_specialist |
+| 2026-04-18 18:45 | **BUT — even if we discount 50% as tracking noise, that's still ~380 real leads at ~$139 CPA.** And you confirmed you "received many form submissions" — so the leads were real. The CPA may have been higher than reported, but the VOLUME was real. | User asked: the previous campaign for Greece that we spent almost a year on it was doing better even with incorrect tracking setup maybe the old domain name merca | pending | gtm_specialist |
+| 2026-04-18 19:11 | 2. **The old campaign is PAUSED, not sleeping.** You can't just "turn it back on" and get the same results. The bidding algorithm's learned user profiles, time-of-day patterns, and demographic signals have decayed over weeks of inactivity. Google doesn't freeze that learning — it degrades. You'd res | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-18 19:11 | Also noting: `greece golden visa properties for sale` got 1 click at $8.35 — this is exactly the investment-intent term we removed (`greece golden visa properties`) on Apr 14 and planned to re-add Apr 19. **Re-add it tomorrow with V4 copy.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-18 19:11 | These are generic, feature-heavy, and don't address the emotional drivers we identified in the CRO audit. The V3 copy (current) is already better: | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-18 19:11 | 3. **Priority fix for mercan.com page:** If we send traffic there, we MUST verify the form tracking is firing correctly. The old GTM container (GTM-KWFH5X9T) has the Greece conversion tag — confirmed working on Mar 19. But the form is buried. Can we add an above-fold CTA that opens the form as a mod | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-18 19:11 | The old campaign's conversion volume was real (the user confirmed receiving leads). The question is whether that volume came from the domain trust, the keyword breadth, the ad maturity, or all three. The A/B test on domain + the keyword expansion will isolate these variables over the next 2 weeks. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-18 22:20 | **Want me to open GTM-KWFH5X9T in the browser and set this up now?** I can have it installed and verified in one session. This should be done before any content creation or ad URL changes — tracking first, always. | User asked: before the content creation should we create the same tag in mercan .com website the gv lead tag? | pending | gtm_specialist |
+| 2026-04-20 14:11 | **Budget:** $50/day / **Bidding:** Maximize Clicks / **Status:** PAUSED (until you enable) | User asked: create a uk campaign in which you combine portugal and Greece keywords in separate ad groups with 50 use per day maximize click strategy choose the be | pending | ppc_strategist |
+| 2026-04-20 14:11 | **RSA (adapted — removed "US Families" reference):** | User asked: create a uk campaign in which you combine portugal and Greece keywords in separate ad groups with 50 use per day maximize click strategy choose the be | pending | ppc_strategist |
+| 2026-04-20 14:16 | **Step 1: Create budget ($50/day)**Budget created. Now creating the campaign. | User asked: yes baby | pending | director |
+| 2026-04-20 14:16 | **Step 2: Create campaign (PAUSED, Maximize Clicks)**Campaign created (ID: **23777965360**). Now creating both ad groups in parallel. | User asked: yes baby | pending | director |
+| 2026-04-20 14:16 | **Step 3: Create ad groups**Both ad groups created: | User asked: yes baby | pending | director |
+| 2026-04-20 14:16 | **Step 5: Create RSAs**Both RSAs created. Now adding UK location targeting and English language. | User asked: yes baby | pending | director |
+| 2026-04-20 14:16 | / **Status** / **PAUSED** — waiting for you to enable / | User asked: yes baby | pending | director |
+| 2026-04-20 14:24 | - PAUSED status = correct, don't enable until audit is complete | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-20 14:24 | / 4 / **Greece ad group has `greece golden visa properties` keyword** — we removed this from the US campaign on Apr 14 for QS:1 ad relevance mismatch. Same copy = same problem / MEDIUM / Remove before enabling, or wait for V4 copy / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-20 14:24 | / goldenvisas.mercan.com / GTM-K6864NBH / ✅ **INSTALLED & VERIFIED** (Apr 12) / ✅ Installed (Apr 18) / **READY** / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-20 14:24 | **Launch the UK campaign on goldenvisas.mercan.com NOW** (tracking is ready, verified, working). In parallel, I'll install the GV Lead tag on mercan.com's GTM. Once verified, we can A/B test the domains. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-20 14:24 | Don't delay the campaign launch waiting for mercan.com tracking setup. The UK market opportunity is real — every day PAUSED is ~33 potential clicks lost. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-20 14:34 | / **Google Ads Conversion Tracking** / Google Ads Conv / CE - gf_submit / ⏸️ **PAUSED** (orange icon) / | User asked: im using mercan.com domain the other still missing trust pages, we need the gtm sp[ecialist to check the tag on mercan website also | pending | gtm_specialist |
+| 2026-04-20 14:34 | Let me click on the **Greece GV - USA CP** tag to check its conversion label — this is the OLD tag using the old conversion action (`hMe8CLPl184aELCTg4oD`), NOT the GV Lead tag (`fc6FCO3YnI4cELCTg4oD`).Let me click on the Greece GV tag to check its conversion label.Confirmed. Here's what I found: | User asked: im using mercan.com domain the other still missing trust pages, we need the gtm sp[ecialist to check the tag on mercan website also | pending | gtm_specialist |
+| 2026-04-20 14:34 | - GV Lead tag already verified and working | User asked: im using mercan.com domain the other still missing trust pages, we need the gtm sp[ecialist to check the tag on mercan website also | pending | gtm_specialist |
+| 2026-04-23 11:16 | The two QS:1 and QS:2 keywords (`greece citizenship by investment` and `greece residency by investment`) have been burning budget since day 1 with zero return. **These were flagged for removal on Apr 14.** It's Apr 23 — 9 days past the flag. Time to act. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-23 11:16 | PPC flagged CTR collapsing from 10.5% → 6.6%. Here's the creative angle: | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-04-23 13:39 | ### #1 — Ad URLs Verified | User asked: execute all except Deploy V4 ad copy	let us talk about the clarity report | pending | creative_director |
+| 2026-04-23 13:39 | **Both ads still point to goldenvisas.mercan.com** — NOT mercan.com. The URL was never switched. This matters because the user said "I'm using mercan.com" on Apr 20 but the ads weren't updated. | User asked: execute all except Deploy V4 ad copy	let us talk about the clarity report | pending | creative_director |
+| 2026-04-23 13:39 | ### #3 — QS:1/QS:2 Keywords Removed ✅ | User asked: execute all except Deploy V4 ad copy	let us talk about the clarity report | pending | creative_director |
+| 2026-04-23 13:39 | / `greece citizenship by investment` / QS:1 / **Removed** — was burning ~$7-8/day with 0 conversions / | User asked: execute all except Deploy V4 ad copy	let us talk about the clarity report | pending | creative_director |
+| 2026-04-23 13:39 | / `greece residency by investment` / QS:2 / **Removed** — same pattern / | User asked: execute all except Deploy V4 ad copy	let us talk about the clarity report | pending | creative_director |
+| 2026-04-23 13:44 | Good question. You **said** you wanted to use mercan.com on Apr 20, but the ad URLs were **never actually switched** — both ads still point to `goldenvisas.mercan.com/greece-golden-visa` as confirmed today. So all your ad traffic has been going to goldenvisas.mercan.com this whole time. | User asked: open chrome session and see clarity setup form chrome also haven't we switched landing page to mercan.com in a previous discussion? | pending | cro_specialist |
+| 2026-04-23 13:44 | 2. **The Clarity project is paused or inactive** | User asked: open chrome session and see clarity setup form chrome also haven't we switched landing page to mercan.com in a previous discussion? | pending | cro_specialist |
+| 2026-04-23 13:44 | The most likely cause is **#1 — domain not added.** When you created the Clarity project, you probably registered `mercan.com` as the site URL, not `goldenvisas.mercan.com`. Clarity treats subdomains as separate sites. | User asked: open chrome session and see clarity setup form chrome also haven't we switched landing page to mercan.com in a previous discussion? | pending | cro_specialist |
+| 2026-04-23 13:44 | To confirm: **the ads were never switched to mercan.com.** Both ads still point to `goldenvisas.mercan.com/greece-golden-visa`. If you want to switch them to mercan.com, I can do that — but the GTM Specialist flagged that mercan.com has a **consent mode blocker for UK visitors** (all tracking denied | User asked: open chrome session and see clarity setup form chrome also haven't we switched landing page to mercan.com in a previous discussion? | pending | cro_specialist |
+| 2026-04-23 13:52 | Let me check the Setup page to confirm, and then check which project `3149465520228862` actually belongs to.Confirmed: **"Mercan LPs" project ID is `v0e4hhycqm`** but GTM has `3149465520228862`. That's the mismatch! Let me check the Setup page to see the install script and verify.This is very reveal | User asked: Help you add the domain in Clarity settings via Chrome | pending | director |
+| 2026-04-23 13:52 | It should be **`v0e4hhycqm`** (the actual "Mercan LPs" project ID from Clarity). Let me click into the HTML code editor to fix it.I can see the tag is open. The code has `"3149465520228862"` but needs to be `"v0e4hhycqm"`. I need to click the edit button to enable editing, then modify the HTML. Let  | User asked: Help you add the domain in Clarity settings via Chrome | pending | director |
+| 2026-04-23 13:52 | Before the fix, the old ID returned `204 No Content` and `clarity.js` never loaded. Now it's pulling the full library. Let me verify Clarity is actively collecting data.## Clarity Fix Verified - Fully Working! | User asked: Help you add the domain in Clarity settings via Chrome | pending | director |
+| 2026-04-23 13:52 | / 3 / Updated tag HTML / Changed project ID to `v0e4hhycqm` / | User asked: Help you add the domain in Clarity settings via Chrome | pending | director |
+| 2026-04-23 13:52 | / 5 / Verified on live page / Clarity script now returns **200 OK** and `clarity.js` library loads successfully / | User asked: Help you add the domain in Clarity settings via Chrome | pending | director |
+| 2026-04-23 14:47 | - User confirmed: "DO NOT switch bidding strategy — campaign generating great leads" | User asked: what is the bidding strategy here manual or maximize clicks? | pending | ppc_strategist |
+| 2026-04-23 14:47 | **My recommendation:** Stay with Maximize Conversions **if** the CVR issues (0.69%) get fixed by switching to mercan.com or improving LP conversion architecture. If CVR stays at 0.69%, switching strategies won't help — you'll just get 33 clicks/day of unqualified traffic. | User asked: what is the bidding strategy here manual or maximize clicks? | pending | ppc_strategist |
+| 2026-04-23 14:52 | I'll create a structured plan for migrating the Greece V2 campaign from **goldenvisas.mercan.com** to **mercan.com** with full verification. This is a HIGH-IMPACT change, so let me break it down into phases and get your approval before executing.Now I'm in plan mode. Let me create a comprehensive pl | User asked: lets plan to move to mercan.com Greece landing page and verify everything works including clarity in that domain | pending | cro_specialist |

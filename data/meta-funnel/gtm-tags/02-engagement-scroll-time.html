@@ -1,0 +1,105 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Engagement Events (Scroll + Time)
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 50 (fires AFTER utilities tag)
+
+  Events produced:
+    - Page_Engaged     (15s on page AND scroll >= 25%)
+    - Scroll_50        (scroll depth = 50%)
+    - Scroll_75        (scroll depth = 75%)
+    - Scroll_90        (scroll depth = 90%)
+    - Time_60s         (60s on page, tab visible)
+    - Time_180s        (180s on page, tab visible)
+-->
+<script>
+(function() {
+  'use strict';
+
+  // Wait for utilities
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  // ─── SCROLL TRACKING ───
+  var scrollThresholds = { 25: false, 50: false, 75: false, 90: false };
+  var timeOnPage = 0;
+  var timerActive = document.visibilityState === 'visible';
+  var scrollReached25 = false;
+  var timeReached15 = false;
+
+  function getScrollPercent() {
+    var docHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+    var winHeight = window.innerHeight;
+    var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    if (docHeight <= winHeight) return 100;
+    return Math.round((scrollTop / (docHeight - winHeight)) * 100);
+  }
+
+  function checkPageEngaged() {
+    if (scrollReached25 && timeReached15) {
+      window.__mf_fireOnce('Page_Engaged');
+    }
+  }
+
+  function onScroll() {
+    var pct = getScrollPercent();
+
+    if (!scrollThresholds[25] && pct >= 25) {
+      scrollThresholds[25] = true;
+      scrollReached25 = true;
+      checkPageEngaged();
+    }
+    if (!scrollThresholds[50] && pct >= 50) {
+      scrollThresholds[50] = true;
+      window.__mf_fireOnce('Scroll_50', { scroll_depth: '50' });
+    }
+    if (!scrollThresholds[75] && pct >= 75) {
+      scrollThresholds[75] = true;
+      window.__mf_fireOnce('Scroll_75', { scroll_depth: '75' });
+    }
+    if (!scrollThresholds[90] && pct >= 90) {
+      scrollThresholds[90] = true;
+      window.__mf_fireOnce('Scroll_90', { scroll_depth: '90' });
+    }
+  }
+
+  // Throttled scroll listener (100ms)
+  var scrollTimeout;
+  window.addEventListener('scroll', function() {
+    if (scrollTimeout) return;
+    scrollTimeout = setTimeout(function() {
+      scrollTimeout = null;
+      onScroll();
+    }, 100);
+  }, { passive: true });
+
+  // ─── TIME TRACKING (visibility-aware) ───
+  var timerInterval = setInterval(function() {
+    if (!timerActive) return;
+    timeOnPage++;
+
+    if (timeOnPage === 15) {
+      timeReached15 = true;
+      checkPageEngaged();
+    }
+    if (timeOnPage === 60) {
+      window.__mf_fireOnce('Time_60s', { time_on_page: '60' });
+    }
+    if (timeOnPage === 180) {
+      window.__mf_fireOnce('Time_180s', { time_on_page: '180' });
+      clearInterval(timerInterval); // No more time events needed
+    }
+  }, 1000);
+
+  // Pause timer when tab is hidden
+  document.addEventListener('visibilitychange', function() {
+    timerActive = (document.visibilityState === 'visible');
+  });
+
+})();
+</script>

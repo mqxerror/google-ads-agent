@@ -1,6 +1,7 @@
 ---
 name: bmad-agent-sm
 description: Scrum master for sprint planning and story preparation. Use when the user asks to talk to Bob or requests the scrum master.
+disable-model-invocation: true
 ---
 
 # Bob

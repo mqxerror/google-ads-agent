@@ -35,3 +35,7 @@ backend/uv.lock
 # Temp files
 *.tmp
 *.log
+
+# Hyperframes installed kit (vendored — too large to commit)
+backend/hyperframes/node_modules/
+backend/hyperframes/video-projects/*/renders/

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain } from 'lucide-react';
+import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain, Film, ScrollText, BookOpen } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import { fetchAccountsV2, removeAccount } from '@/lib/api';
@@ -29,6 +29,12 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
     setConnectedAccounts,
     switchAccount,
     setShowDashboard,
+    showStudio,
+    setShowStudio,
+    showChangelog,
+    setShowChangelog,
+    showGuidelines,
+    setShowGuidelines,
     darkMode,
     toggleDarkMode,
   } = useAppStore();
@@ -132,6 +138,45 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
 
       {/* Right */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'text-xs gap-1',
+            showStudio ? 'bg-pink-500/15 text-pink-300 hover:bg-pink-500/25 hover:text-pink-300' : 'text-muted-foreground'
+          )}
+          onClick={() => setShowStudio(!showStudio)}
+          title="Ad Studio — generate and manage creative"
+        >
+          <Film className="h-3 w-3" />
+          Studio
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'text-xs gap-1',
+            showGuidelines ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 hover:text-amber-300' : 'text-muted-foreground'
+          )}
+          onClick={() => setShowGuidelines(!showGuidelines)}
+          title="Guidelines — view + suggest edits to account rules"
+        >
+          <BookOpen className="h-3 w-3" />
+          Guidelines
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'text-xs gap-1',
+            showChangelog ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-300' : 'text-muted-foreground'
+          )}
+          onClick={() => setShowChangelog(!showChangelog)}
+          title="Changelog — what's new and what's fixed"
+        >
+          <ScrollText className="h-3 w-3" />
+          Changelog
+        </Button>
         <Button
           variant="ghost"
           size="sm"

@@ -1,0 +1,68 @@
+<!--
+  GTM Custom HTML Tag: Meta Funnel — Eligibility Quiz Tracking
+  Container: GTM-WZKDXFH8
+  Trigger: All Pages (fires once per page)
+  Tag Firing Priority: 50
+
+  Events produced:
+    - Eligibility_Quiz_Start     (first interaction with quiz Q1)
+    - Eligibility_Quiz_Q3        (user reaches question 3)
+    - Eligibility_Quiz_Complete  (quiz final step shown, before lead form)
+
+  STATUS: STUB — quiz does not exist yet (P2 dev task).
+
+  ━━━━ CONTRACT WITH DEV TEAM ━━━━
+  When the eligibility quiz is built, the dev must push these dataLayer events:
+
+  1. On quiz first interaction (click/focus Q1):
+     window.dataLayer.push({ event: 'quiz_start' });
+
+  2. On reaching Q3:
+     window.dataLayer.push({ event: 'quiz_q3' });
+
+  3. On quiz completion (result shown, before form):
+     window.dataLayer.push({
+       event: 'quiz_complete',
+       quizResult: 'qualified' | 'not_sure' | 'not_qualified',
+       ancestorType: 'parent' | 'grandparent' | 'great_grandparent' | 'unknown'
+     });
+
+  This tag listens for those dataLayer events and relays them to Meta.
+  No GTM update needed when the quiz is deployed — just push the events.
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-->
+<script>
+(function() {
+  'use strict';
+
+  if (!window.__mf_fireEvent || !window.__mf_fireOnce) {
+    setTimeout(arguments.callee, 200);
+    return;
+  }
+
+  // Listen for quiz dataLayer events via centralized subscriber (Tag 01)
+  window.__mf_onDataLayer(function(entry) {
+    if (!entry.event) return;
+
+    switch (entry.event) {
+      case 'quiz_start':
+        window.__mf_fireOnce('Eligibility_Quiz_Start', {
+          quiz_version: entry.quizVersion || '1'
+        });
+        break;
+
+      case 'quiz_q3':
+        window.__mf_fireOnce('Eligibility_Quiz_Q3');
+        break;
+
+      case 'quiz_complete':
+        window.__mf_fireOnce('Eligibility_Quiz_Complete', {
+          quiz_result: entry.quizResult || 'unknown',
+          ancestor_type: entry.ancestorType || 'unknown'
+        });
+        break;
+    }
+  });
+
+})();
+</script>

@@ -783,7 +783,66 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V14 migration complete (soul_characters table — Soul library).")
 
-        if version >= 14:
-            logger.info("Database schema is V14 (up to date).")
+        # V15: Director-orchestrated workflow runs. A workflow is one
+        # Director-planned, multi-specialist audit: pre-fetch → plan →
+        # parallel specialist reports → debate → synthesis. `workflow_runs`
+        # is the run header (goal, plan, status, cost, final output);
+        # `workflow_reports` holds each agent's per-phase output so the UI
+        # can render the phase tree and the debate/synthesis can read peers.
+        if version < 15:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS workflow_runs (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT,
+                    campaign_name TEXT,
+                    conversation_id TEXT,
+                    goal TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'running',  -- running | done | error | stopped
+                    plan_json TEXT,                          -- Director's structured plan
+                    final_output TEXT,                       -- Marketing Director synthesis
+                    cost REAL NOT NULL DEFAULT 0,
+                    budget REAL,
+                    stop_reason TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS workflow_reports (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    phase TEXT NOT NULL,                     -- plan | specialist | debate | synthesis
+                    role_id TEXT,
+                    role_name TEXT,
+                    task TEXT,                               -- the prompt this agent was given
+                    content TEXT,                            -- the agent's report/output
+                    cost REAL NOT NULL DEFAULT 0,
+                    seq INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_workflow_runs_account
+                    ON workflow_runs(account_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_workflow_runs_campaign
+                    ON workflow_runs(campaign_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_workflow_reports_run
+                    ON workflow_reports(run_id, seq);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (15)")
+            await db.commit()
+            logger.info("V15 migration complete (workflow_runs + workflow_reports).")
+
+        # V16: timeframe label on workflow runs (daily/weekly/monthly/
+        # quarterly/yearly/lifetime) so history can be filtered/compared by
+        # period and the UI can group "this week's audit vs last week's".
+        if version < 16:
+            try:
+                await db.execute("ALTER TABLE workflow_runs ADD COLUMN timeframe TEXT")
+            except aiosqlite.OperationalError:
+                pass  # idempotent
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (16)")
+            await db.commit()
+            logger.info("V16 migration complete (workflow_runs.timeframe).")
+
+        if version >= 16:
+            logger.info("Database schema is V16 (up to date).")
     finally:
         await db.close()

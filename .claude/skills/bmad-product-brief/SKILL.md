@@ -1,6 +1,7 @@
 ---
 name: bmad-product-brief
 description: Create or update product briefs through guided or autonomous discovery. Use when the user requests to create or update a Product Brief.
+disable-model-invocation: true
 ---
 
 # Create Product Brief

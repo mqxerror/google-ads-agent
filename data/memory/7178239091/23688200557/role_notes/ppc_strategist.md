@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-04-13 11:32
+**Last updated:** 2026-04-20 14:25
 
 **Task:** Deep performance analysis for "Golden Visa Programs - Arabic (MENA)":
 
@@ -96,3 +96,58 @@ Executing both now. Let me pause General AR and start the conversion tracking au
 Good, tools loaded. Let me execute both in parallel — pausing General AR and starting the landing page tag audit.
 First I need the ad group ID for General Golden Visa - AR. From prior session data, it's **198342212847**.**#1 Done — General Golden Visa - AR is now PAUSED.** Saves ~$28/day.
 Now let me audit the landing page. Let me check what tags are firing.API Error: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_011Ca21dTzVko8enKrzo3mL4"}
+
+### 2026-04-20 14:17 — Daily review for "Golden Visa Programs - Arabic (MENA)":
+
+1. How did yesterday c
+
+**Task:** Daily review for "Golden Visa Programs - Arabic (MENA)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for monthly budget? Any pacing issues?
+3. Any keyword
+## MENA Campaign — Daily Review (Apr 20)
+### 1. Yesterday (Apr 19) vs 7-Day Average
+|--------|--------|----------------------|-------|
+**Anomaly: Impressions trending down 3 weeks straight.** Apr 6–12 avg was 552 impr/day. Post-pause Apr 13–19 avg is 287 — a 48% drop. This is partly intentional (General AR paused), but the EN traffic has also softened. Worth watching — not alarming yet, but if impressions keep falling below 200 daily, check for Quality Score degradation or budget exhaustion mid-day.
+### 2. Monthly Budget Pacing
+| | Value |
+|---|---|
+| Recent daily avg (Apr 13–19) | $25.57/day |
+| Daily budget | $30/day |
+| Under-pacing | ~15% |
+| Projected April spend | ~$850-870 |
+| Monthly target | $900 |
+Slightly under budget — acceptable post-optimization. The early-month spike (Apr 9–11: $72–77/day) inflated the first half. **No action needed on budget.**
+### 3. High Spend, Zero Conversions
+| Keyword | Clicks | QS | Action |
+|---------|--------|-----|--------|
+### 4. Top Converting Search Terms (Last 7 Days)
+**Zero conversions in the last 7-day search term window.** The 2 conversions from Apr 13 don't appear attributed to specific search terms in the data. No action needed on keyword adds.
+### 5. Immediate Actions — Apr 19 Review Deadline Has Passed
+The Analytics Analyst set **Apr 19** as the decision point. We're past it. Here's the call:
+| Issue | Status | Action |
+|-------|--------|--------|
+**Top priority today: figure out why the 3 EN ad groups have zero clicks after 8 days.** They were built to absorb 12 keywords from EN (GCC) — if they're not serving, those search terms may have fallen to the homepage ad or are going unmatched. Want me to pull keyword-level auction data and check for conflicts now?
+— *PPC Strategist*
+
+### 2026-04-20 14:25 — lets keep kueit only and remove the others and execute the bid suggested
+
+**Task:** lets keep kueit only and remove the others and execute the bid suggested
+**Hold — this is a high-impact change.** Let me make sure you want what I think you want.
+### What you're asking me to do:
+| Action | Detail |
+|--------|--------|
+| **Keep** | Kuwait only |
+| **Remove** | UAE, Saudi Arabia, Egypt, Qatar, Bahrain, Jordan |
+| **Bid adjustment** | +25-30% on Kuwait (EN GCC ad group) |
+### What you'd lose:
+| Country | Conv | Spend | CPA |
+|---------|------|-------|-----|
+You'd be going from 15 total conversions down to Kuwait's 2 — cutting ~87% of the campaign's conversion volume. Kuwait is the most efficient ($34 CPA) but it's also the smallest market (5% of current traffic).
+**Are you sure you want Kuwait-only?** Or did you mean something like:
+- **A)** Kuwait only — remove all others (what you said)
+- **B)** Keep Kuwait + Saudi (your two best CPA markets) and drop the rest
+- **C)** Keep all markets but add a +25-30% bid boost for Kuwait specifically
+Which one?
+— *PPC Strategist*

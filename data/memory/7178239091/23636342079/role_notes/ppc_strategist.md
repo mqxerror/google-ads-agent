@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-04-14 15:46
+**Last updated:** 2026-04-27 14:23
 
 **Task:** review the discussion and provide your report and strategy the campaign is dead not bringing a lead
 
@@ -153,4 +153,52 @@ Too early to rank top 3 — only 1 converting term. The keyword is already added
 | # | Action | Risk |
 |---|---|---|
 **Want me to execute the 3 keyword pauses now?**
+— *PPC Strategist*
+
+### 2026-04-16 12:08 — Daily review for "Greece Golden Visa V2":
+
+1. How did yesterday compare to the 7
+
+**Task:** Daily review for "Greece Golden Visa V2":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for monthly budget? Any pacing issues?
+3. Any keywords with high spe
+The context loaded is Portugal. Let me pull fresh Greece V2 data now.**API quota exhausted** — Google Ads is rate-limiting for the next ~2 hours (429 error, retry in 7,834 seconds). This is from the multiple queries run during this session.
+**What I can tell you from the Apr 14 session data:**
+|---|:---:|:---:|:---:|
+**I don't have Apr 15 data** — can't pull it until the quota resets (~2hrs from now).
+**Two options:**
+1. **Wait ~2 hours** and I'll pull fresh Apr 15 data for a clean review
+2. **Check manually** in Google Ads UI: Greece Golden Visa V2 campaign → last 7 days → compare Apr 15 vs avg
+The quota burn is from the parallel query attempts earlier in this session. Going forward, daily reviews should use **one query at a time** to avoid exhausting the quota.
+— *PPC Strategist*
+
+### 2026-04-27 14:23 — how portugal campaign is doing since the budget change yesterday
+
+**Task:** how portugal campaign is doing since the budget change yesterday
+## Portugal Golden Visa — Post-Budget Change
+I don't have the exact budget change details in context, but the spend tells the story:
+### Last 5 Days
+| Date | Impr | Clicks | Cost | Conv | CTR | CPC |
+|------|------|--------|------|------|-----|-----|
+The budget cut is visible — spend dropped from ~$200/day to **$84 yesterday** and **$39 today** (partial day, still serving).
+### The Bigger Problem: Conversion Drought
+The budget change isn't the main concern. **This campaign has had 0 conversions for 12 of the last 14 days.** The only bright spot was Apr 21 (2 conversions at $112 CPA). Since then — nothing.
+| Period | Spend | Clicks | Conv | CPA |
+|--------|-------|--------|------|-----|
+### What's Working / Not Working
+**Working:**
+- CPC is stable at ~$7.30 — efficient for this market
+- CTR averaging 22%+ — strong ad relevance
+- Search terms are clean — no major waste
+**Not working:**
+- **Landing page isn't converting.** 380 clicks in 14 days, 3 conversions = **0.8% CVR**. Should be 2–4% on a 89/100 CRO score page.
+- The "Portugal Golden Visa" ad group carries the entire campaign (926 clicks, 10 conv lifetime). All other ad groups combined: 122 clicks, 0 conv.
+- **Portugal Residency is still PAUSED** — it had 641 clicks and 8 conversions historically. That's your second-best ad group sitting idle.
+### My Recommendations
+| # | Action | Impact | Risk |
+|---|--------|--------|------|
+**The #1 question right now: has anyone submitted a test form on `/portugal-golden-visa` recently to confirm it's actually working?** A 0.8% CVR with 22% CTR and clean search terms usually points to a form/tracking issue, not a traffic quality issue.
+What was the budget changed to, and what prompted the reduction?
 — *PPC Strategist*
