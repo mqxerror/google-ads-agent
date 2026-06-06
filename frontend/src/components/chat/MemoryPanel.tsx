@@ -119,7 +119,7 @@ export default function MemoryPanel({ campaignId, campaignName }: MemoryPanelPro
             <div className="space-y-0.5">
               {factLines.map((fact, i) => (
                 <div key={i} className="flex items-start gap-1.5 text-[11px] group">
-                  <Pin className="h-2.5 w-2.5 mt-0.5 text-blue-400 shrink-0" />
+                  <Pin className="h-2.5 w-2.5 mt-0.5 text-accent shrink-0" />
                   <span className="flex-1">{fact}</span>
                   <button
                     onClick={async () => {
@@ -157,11 +157,11 @@ export default function MemoryPanel({ campaignId, campaignName }: MemoryPanelPro
           ) : (
             <div className="space-y-1">
               {decisionRows.slice(-10).reverse().map((d, i) => (
-                <div key={i} className="text-[10px] border-l-2 border-blue-500/30 pl-2 py-0.5">
+                <div key={i} className="text-[10px] border-l-2 border-accent/30 pl-2 py-0.5">
                   <div className="flex items-center gap-1">
                     <span className="text-muted-foreground">{d.date}</span>
                     {d.role && d.role !== 'agent' && (
-                      <span className="bg-blue-500/10 text-blue-400 px-1 rounded text-[9px]">{d.role}</span>
+                      <span className="bg-accent-soft text-accent px-1 rounded text-[9px]">{d.role}</span>
                     )}
                   </div>
                   <p className="font-medium">{d.action}</p>

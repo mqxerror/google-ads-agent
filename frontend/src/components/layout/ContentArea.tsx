@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/stores/appStore';
-import { fetchCampaigns, updateCampaignStatus } from '@/lib/api';
+import { fetchCampaigns, updateCampaignStatus, fetchUpcomingPlans } from '@/lib/api';
+import { groupByDay, statusVisual, relativeTime } from '@/components/plans/planHelpers';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { formatMicros, formatNumber, formatBiddingStrategy } from '@/lib/formatters';
 import CampaignTabs from '@/components/campaign/CampaignTabs';
@@ -14,7 +15,7 @@ import OutcomeDashboard from '@/components/dashboard/OutcomeDashboard';
 import ConversationGraph from '@/components/dashboard/ConversationGraph';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2, Rocket, Filter } from 'lucide-react';
+import { BarChart3, TrendingUp, MousePointerClick, DollarSign, Pause, Play, Loader2, Rocket, Filter, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Campaign } from '@/types';
 
@@ -164,9 +165,69 @@ function AccountOverview({ onOpenBuilder }: { onOpenBuilder?: () => void }) {
           ))}
       </div>
 
+      {/* Upcoming scheduled plans — quiet, secondary timeline. */}
+      <div className="mt-8 pt-6 border-t border-border">
+        <UpcomingPlans accountId={clientAccountId} />
+      </div>
+
       {/* Campaign Activity Feed */}
       <div className="mt-8 pt-6 border-t border-border">
         <CampaignActivityFeed />
+      </div>
+    </div>
+  );
+}
+
+function UpcomingPlans({ accountId }: { accountId: string }) {
+  const { setSelectedCampaign } = useAppStore();
+  const { data: plans = [], isLoading } = useQuery({
+    queryKey: ['plans-upcoming', accountId],
+    queryFn: () => fetchUpcomingPlans(accountId),
+    enabled: !!accountId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
+  if (isLoading || plans.length === 0) return null;
+  const days = groupByDay(plans);
+
+  const openPlan = (campaignId?: string | null) => {
+    if (!campaignId) return;
+    setSelectedCampaign(campaignId);
+    // CampaignTabs listens for this to jump straight to its Plans tab.
+    setTimeout(() => window.dispatchEvent(new CustomEvent('plans:open-tab')), 0);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <CalendarClock className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">Upcoming</h3>
+        <span className="text-xs text-muted-foreground">across campaigns</span>
+      </div>
+      <div className="space-y-4">
+        {days.map((d) => (
+          <div key={d.dayLabel}>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{d.dayLabel}</div>
+            <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+              {d.plans.map((p) => {
+                const sv = statusVisual(p.status);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => openPlan(p.campaign_id)}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', sv.dot, sv.pulse && 'studio-pulse')} aria-label={sv.label} />
+                    <span className="text-muted-foreground w-40 truncate shrink-0">{p.campaign_name || 'Account'}</span>
+                    <span className="flex-1 truncate text-text">{p.title}</span>
+                    <span className="text-[11px] text-subtle shrink-0">{relativeTime(p.next_run_at || p.run_at)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

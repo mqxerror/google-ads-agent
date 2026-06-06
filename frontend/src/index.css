@@ -1,71 +1,393 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+/* ===========================================================================
+   google-ads-agent — calm light design system
+   ---------------------------------------------------------------------------
+   Ported from the Shopify CRO agent's "Studio" light language (see
+   frontend/DESIGN.md). One source of truth: OKLCH tokens on :root, surfaced
+   to Tailwind via the @theme block so components read `bg-surface`,
+   `text-muted`, `border-border`, `text-accent`, etc.
 
-  /* Dark mode (default) */
-  --color-background: hsl(224 71% 4%);
-  --color-foreground: hsl(213 31% 91%);
-  --color-card: hsl(224 71% 6%);
-  --color-card-foreground: hsl(213 31% 91%);
-  --color-primary: hsl(217 91% 60%);
-  --color-primary-foreground: hsl(0 0% 100%);
-  --color-secondary: hsl(217 33% 17%);
-  --color-secondary-foreground: hsl(213 31% 91%);
-  --color-muted: hsl(215 20% 65%);
-  --color-muted-foreground: hsl(215 20% 65%);
-  --color-accent: hsl(217 33% 17%);
-  --color-accent-foreground: hsl(213 31% 91%);
-  --color-destructive: hsl(0 84% 60%);
-  --color-border: hsl(217 33% 17%);
-  --color-ring: hsl(217 91% 60%);
-  --color-sidebar: hsl(224 71% 5%);
-  --color-input: hsl(217 33% 17%);
+   The app previously shipped a dark shadcn HSL palette by default (`.light`
+   was an unused override). We now commit the WHOLE app to the calm light
+   palette by:
+     1. defining the OKLCH surface / text / accent / semantic families, and
+     2. ALIASING every existing shadcn-named token onto them, so the sidebar,
+        dashboards, tables, Studio and all ui/ primitives flip to light for
+        free without touching their markup.
+   No inline hex in components (persona hexes in agentProfiles.ts are the one
+   allowed exception — they're light-mode tuned identity accents).
+   =========================================================================== */
 
-  --color-status-enabled: hsl(142 71% 45%);
-  --color-status-paused: hsl(38 92% 50%);
-  --color-status-removed: hsl(0 84% 60%);
+:root {
+  /* Surfaces — near-white, tinted toward the indigo brand hue, never pure white */
+  --bg-app: oklch(0.978 0.003 281);
+  --surface: oklch(0.995 0.002 281);
+  --surface-2: oklch(0.962 0.004 281);
+  --surface-3: oklch(0.94 0.005 281);
+  --border: oklch(0.918 0.005 281);
+  --border-strong: oklch(0.862 0.006 281);
 
-  --color-tool-api: hsl(280 65% 60%);
-  --color-tool-browser: hsl(172 66% 50%);
+  /* Text — near-black tinted, never pure black.
+     muted/subtle darkened from the initial re-skin so both clear WCAG AA on the
+     near-white surfaces (muted 4.7->5.6:1, subtle 2.6->~4.5:1) while keeping a
+     visible hierarchy step. */
+  --text: oklch(0.235 0.02 277);
+  --text-muted: oklch(0.495 0.024 277);
+  --text-subtle: oklch(0.555 0.022 277);
+
+  /* Accent — calm indigo/violet. Carries <=10% of surface. Darkened so white
+     text on the Send button, accent links, and active-tab labels on
+     accent-soft all clear AA (were 3.99-4.42:1). */
+  --accent: oklch(0.52 0.21 281);
+  --accent-hover: oklch(0.465 0.215 281);
+  --accent-soft: oklch(0.962 0.03 281);
+  --on-accent: oklch(0.995 0.002 281);
+
+  /* Semantic — always a solid + a -soft pair. Darkened so status dots/icons
+     clear the 3:1 UI-component threshold and status text approaches AA. */
+  --success: oklch(0.6 0.16 162);
+  --success-soft: oklch(0.962 0.035 162);
+  --danger: oklch(0.6 0.215 27);
+  --danger-soft: oklch(0.955 0.035 27);
+  --warning: oklch(0.64 0.16 66);
+  --warning-soft: oklch(0.962 0.045 66);
+
+  --focus-ring: oklch(0.585 0.205 281 / 0.45);
+
+  /* Elevation */
+  --shadow-resting: 0 1px 2px oklch(0.2 0.02 277 / 0.06);
+  --shadow-elevated: 0 4px 14px oklch(0.2 0.02 277 / 0.08);
+
+  /* Motion */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Light mode overrides */
-.light {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(224 71% 4%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(224 71% 4%);
-  --color-primary: hsl(217 91% 50%);
-  --color-primary-foreground: hsl(0 0% 100%);
-  --color-secondary: hsl(210 40% 96%);
-  --color-secondary-foreground: hsl(224 71% 4%);
-  --color-muted: hsl(215 16% 47%);
-  --color-muted-foreground: hsl(215 16% 47%);
-  --color-accent: hsl(210 40% 96%);
-  --color-accent-foreground: hsl(224 71% 4%);
-  --color-destructive: hsl(0 84% 60%);
-  --color-border: hsl(214 32% 91%);
-  --color-ring: hsl(217 91% 50%);
-  --color-sidebar: hsl(210 40% 98%);
-  --color-input: hsl(214 32% 91%);
+@theme {
+  --font-sans:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
-  --color-status-enabled: hsl(142 71% 35%);
-  --color-status-paused: hsl(38 92% 40%);
-  --color-status-removed: hsl(0 84% 50%);
+  /* --- The calm light families (chat + new components read these) --------- */
+  --color-bg-app: var(--bg-app);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border-strong: var(--border-strong);
 
-  --color-tool-api: hsl(280 65% 50%);
-  --color-tool-browser: hsl(172 66% 40%);
+  --color-text: var(--text);
+  --color-subtle: var(--text-subtle);
+
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  /* --- shadcn-named aliases → OKLCH families. ----------------------------
+     This is the translation layer: the existing app references
+     bg-background / text-foreground / bg-primary / bg-secondary / bg-card /
+     text-muted-foreground / border-border / etc. Pointing each at an OKLCH
+     token re-skins the entire app to the calm light system in one place. */
+  --color-background: var(--bg-app);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--text-muted);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--on-accent);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--on-accent);
+  --color-border: var(--border);
+  --color-ring: var(--accent);
+  --color-sidebar: var(--surface-2);
+  --color-input: var(--surface-2);
+
+  --color-status-enabled: var(--success);
+  --color-status-paused: var(--warning);
+  --color-status-removed: var(--danger);
+
+  --color-tool-api: var(--accent);
+  --color-tool-browser: var(--success);
+
+  --radius-card: 12px;
+  --radius-bubble: 10px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+
+  --shadow-resting: 0 1px 2px oklch(0.2 0.02 277 / 0.06);
+  --shadow-elevated: 0 4px 14px oklch(0.2 0.02 277 / 0.08);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body {
   margin: 0;
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+  background-color: var(--bg-app);
+  color: var(--text);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Section labels — 11px uppercase tracked, used on pane header strips. */
+.label-section {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Streaming caret — gentle blink only (DESIGN.md motion). */
+@keyframes studio-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0.15;
+  }
+}
+.studio-caret {
+  display: inline-block;
+  color: var(--text-subtle);
+  animation: studio-caret 1.1s var(--ease-out-quint) infinite;
+}
+
+/* Pending tool-call dot — subtle pulse. */
+@keyframes studio-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.studio-pulse {
+  animation: studio-pulse 1.2s var(--ease-out-quint) infinite;
+}
+
+/* Custom-property-driven scrollbars: quiet, thin, on the tinted surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ===========================================================================
+   Chat prose (markdown) — typeset like a document, not a wall of text.
+   Tailwind's typography plugin isn't installed; the reading rhythm is set by
+   hand against tokens. Replaces the old PROSE_CLASSES arbitrary-variant
+   string in ChatMessage.tsx.
+   =========================================================================== */
+.studio-prose {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  /* Cap reading measure ~68ch so long answers don't sprawl edge-to-edge. */
+  max-width: 68ch;
+}
+
+/* --- Paragraphs ---------------------------------------------------------- */
+.studio-prose p {
+  margin: 0 0 0.85em;
+}
+.studio-prose > :first-child {
+  margin-top: 0;
+}
+.studio-prose > :last-child {
+  margin-bottom: 0;
+}
+
+/* --- Headings: hierarchy from scale + weight, not color. ----------------- */
+.studio-prose h1,
+.studio-prose h2,
+.studio-prose h3,
+.studio-prose h4 {
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 1.6em 0 0.55em;
+}
+.studio-prose h1 {
+  font-size: 1.56em;
+  letter-spacing: -0.01em;
+}
+.studio-prose h2 {
+  font-size: 1.25em;
+  letter-spacing: -0.005em;
+}
+.studio-prose h3 {
+  font-size: 1.05em;
+}
+/* h4 used as a quiet sub-label. */
+.studio-prose h4 {
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 1.3em 0 0.5em;
+}
+
+/* --- Lists: visible markers, real indentation, comfortable item spacing. -- */
+.studio-prose ul,
+.studio-prose ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.5em;
+}
+.studio-prose ul {
+  list-style: disc;
+}
+.studio-prose ol {
+  list-style: decimal;
+}
+.studio-prose li {
+  margin: 0.35em 0;
+  padding-left: 0.2em;
+}
+.studio-prose li::marker {
+  color: var(--text-subtle);
+}
+.studio-prose ol > li::marker {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.studio-prose li > ul,
+.studio-prose li > ol {
+  margin: 0.35em 0 0.35em;
+}
+
+/* --- Inline code chip: subtle, mono, slightly smaller. ------------------- */
+.studio-prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.08em 0.36em;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* --- Code block: JetBrains Mono on --surface-2, generous padding. -------- */
+.studio-prose pre {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 0.85em;
+}
+.studio-prose pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre;
+  color: var(--text);
+}
+
+/* --- Links --------------------------------------------------------------- */
+.studio-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.studio-prose a:hover {
+  color: var(--accent-hover);
+}
+
+/* --- Emphasis ------------------------------------------------------------ */
+.studio-prose strong {
+  font-weight: 650;
+  color: var(--text);
+}
+.studio-prose em {
+  font-style: italic;
+}
+
+/* --- Blockquote: a quiet callout, hairline left rule. ------------------- */
+.studio-prose blockquote {
+  margin: 0 0 0.85em;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
+}
+.studio-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Horizontal rule ----------------------------------------------------- */
+.studio-prose hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+
+/* --- Tables -------------------------------------------------------------- */
+.studio-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 0.85em;
+  font-size: 13px;
+}
+.studio-prose th,
+.studio-prose td {
+  border: 1px solid var(--border);
+  padding: 6px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+.studio-prose th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -43,28 +43,28 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
 
   // Color based on usage
   const barColor = usagePercent >= 85
-    ? 'bg-red-500'
+    ? 'bg-danger'
     : usagePercent >= 70
-      ? 'bg-yellow-500'
-      : 'bg-emerald-500';
+      ? 'bg-warning'
+      : 'bg-success';
 
   const barBg = usagePercent >= 85
-    ? 'bg-red-500/10'
+    ? 'bg-danger-soft'
     : usagePercent >= 70
-      ? 'bg-yellow-500/10'
-      : 'bg-secondary';
+      ? 'bg-warning-soft'
+      : 'bg-surface-3';
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 text-xs flex-wrap">
       {campaignName && (
-        <span className="inline-flex items-center gap-1 bg-secondary rounded-full px-2.5 py-0.5 text-foreground">
+        <span className="inline-flex items-center gap-1 bg-surface-3 rounded-full px-2.5 py-0.5 text-text">
           <Megaphone className="h-3 w-3" />
           {campaignName}
         </span>
       )}
       {guidelinesLoaded && (
-        <span className="inline-flex items-center gap-1 bg-secondary rounded-full px-2.5 py-0.5 text-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-status-enabled" />
+        <span className="inline-flex items-center gap-1 bg-surface-3 rounded-full px-2.5 py-0.5 text-text">
+          <span className="w-1.5 h-1.5 rounded-full bg-success" />
           <FileText className="h-3 w-3" />
           Guidelines
         </span>
@@ -78,14 +78,14 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 transition-colors',
               barBg,
-              usagePercent >= 85 ? 'text-red-700 dark:text-red-400' :
-              usagePercent >= 70 ? 'text-yellow-700 dark:text-yellow-400' :
-              'text-foreground'
+              usagePercent >= 85 ? 'text-danger' :
+              usagePercent >= 70 ? 'text-warning' :
+              'text-text'
             )}
           >
             <Brain className="h-3 w-3" />
             <div className="flex items-center gap-1">
-              <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="w-12 h-1.5 bg-surface-3 rounded-full overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-500', barColor)}
                   style={{ width: `${Math.min(usagePercent, 100)}%` }}
@@ -101,7 +101,10 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
 
           {/* Details dropdown */}
           {showDetails && (
-            <div className="absolute top-full left-0 mt-1 z-[999] w-72 bg-popover border border-border rounded-lg shadow-xl p-3 space-y-2">
+            <div
+              className="absolute top-full left-0 mt-1 z-[999] w-72 bg-surface border border-border rounded-lg p-3 space-y-2"
+              style={{ boxShadow: 'var(--shadow-elevated)' }}
+            >
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Context usage</span>
                 <span className="font-medium">
@@ -119,12 +122,12 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
                       <div className="w-20 truncate text-muted-foreground">
                         {formatLayerName(layer.name)}
                       </div>
-                      <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="flex-1 h-1 bg-surface-3 rounded-full overflow-hidden">
                         <div
                           className={cn(
                             'h-full rounded-full',
-                            layer.dropped ? 'bg-red-400' :
-                            layer.truncated ? 'bg-yellow-400' :
+                            layer.dropped ? 'bg-danger' :
+                            layer.truncated ? 'bg-warning' :
                             priorityColor(layer.priority),
                           )}
                           style={{ width: `${(layer.tokens / contextMeta.total_tokens) * 100}%` }}
@@ -132,7 +135,7 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
                       </div>
                       <div className="w-12 text-right tabular-nums text-muted-foreground">
                         {layer.dropped ? (
-                          <span className="text-red-500">dropped</span>
+                          <span className="text-danger">dropped</span>
                         ) : (
                           formatTokens(layer.tokens)
                         )}
@@ -145,7 +148,7 @@ export default function ContextBadge({ campaignName, guidelinesLoaded, contextMe
               {contextMeta.warnings.length > 0 && (
                 <div className="pt-1 border-t border-border space-y-0.5">
                   {contextMeta.warnings.map((w, i) => (
-                    <p key={i} className="text-[10px] text-yellow-600 dark:text-yellow-400">{w}</p>
+                    <p key={i} className="text-[10px] text-warning">{w}</p>
                   ))}
                 </div>
               )}
@@ -180,10 +183,10 @@ function formatLayerName(name: string): string {
 
 function priorityColor(priority: number): string {
   switch (priority) {
-    case 0: return 'bg-blue-500';
-    case 1: return 'bg-emerald-500';
-    case 2: return 'bg-amber-500';
-    case 3: return 'bg-gray-400';
-    default: return 'bg-gray-400';
+    case 0: return 'bg-accent';
+    case 1: return 'bg-success';
+    case 2: return 'bg-warning';
+    case 3: return 'bg-border-strong';
+    default: return 'bg-border-strong';
   }
 }

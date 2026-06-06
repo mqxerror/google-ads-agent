@@ -22,13 +22,14 @@ export default function AgentAvatar({ roleId, profile, size = 'md', showStatus, 
     <div className="relative shrink-0">
       <div
         className={cn(
-          'rounded-full flex items-center justify-center font-semibold border-2 shadow-sm',
+          'rounded-full flex items-center justify-center font-semibold border',
           SIZES[size],
         )}
         style={{
           backgroundColor: agent.bgColor,
           borderColor: agent.borderColor,
           color: agent.color,
+          boxShadow: 'var(--shadow-resting)',
         }}
         title={`${agent.name} — ${agent.title}`}
       >
@@ -37,8 +38,8 @@ export default function AgentAvatar({ roleId, profile, size = 'md', showStatus, 
       {showStatus && (
         <span
           className={cn(
-            'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background',
-            isWorking ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400',
+            'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface',
+            isWorking ? 'studio-pulse bg-accent' : 'bg-success',
           )}
         />
       )}

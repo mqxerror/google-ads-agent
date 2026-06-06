@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.mcp_server import mcp_lifespan
-from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, guidelines, landing_page, memory, operations, outcomes, pmax, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, workflows
+from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, guidelines, landing_page, memory, operations, outcomes, plans, pmax, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, workflows
 from app.services.sync_engine import start_background_sync, stop_background_sync
 
 
@@ -29,7 +29,11 @@ async def lifespan(app: FastAPI):
         # PATH entry fails visibly here rather than on first Studio call.
         from app.services.higgsfield_client import log_cli_presence_at_startup
         log_cli_presence_at_startup()
+        # Scheduled Plans: fire due plans (incl. ones overdue from downtime).
+        from app.services.scheduler import start_scheduler, stop_scheduler
+        start_scheduler()
         yield
+        stop_scheduler()
         stop_background_sync()
 
 
@@ -71,6 +75,7 @@ app.include_router(video.router)
 app.include_router(assets.router)
 app.include_router(changelog.router)
 app.include_router(workflows.router)
+app.include_router(plans.router)
 
 
 # ── MCP server (Streamable HTTP at /mcp) ────────────────────────────

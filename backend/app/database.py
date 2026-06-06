@@ -842,7 +842,61 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V16 migration complete (workflow_runs.timeframe).")
 
-        if version >= 16:
-            logger.info("Database schema is V16 (up to date).")
+        # V17: Scheduled Plans. Decisions made in chat (or added manually)
+        # become time-bound actions the scheduler fires. Safe actions
+        # auto-execute; spend/structural ones wait for approval. Recurring
+        # plans re-arm after each run. `scheduled_plan_runs` is per-fire history.
+        if version < 17:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS scheduled_plans (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT,
+                    campaign_name TEXT,
+                    conversation_id TEXT,              -- originating chat (nullable)
+                    title TEXT NOT NULL,               -- short action label
+                    action_detail TEXT NOT NULL,       -- full instruction the agent runs
+                    context_snippet TEXT,              -- chat excerpt carried over
+                    action_category TEXT DEFAULT 'other', -- budget|bids|status|geo|search_terms|audit|report|other
+                    mode TEXT NOT NULL DEFAULT 'approval', -- auto | approval
+                    schedule_type TEXT NOT NULL DEFAULT 'once', -- once | recurring
+                    run_at TEXT,                       -- ISO datetime for one-time
+                    recurrence TEXT,                   -- e.g. 'weekly:mon:09:00' | 'daily:09:00'
+                    timezone TEXT DEFAULT 'UTC',
+                    status TEXT NOT NULL DEFAULT 'scheduled', -- scheduled|due|running|awaiting_approval|done|failed|paused
+                    next_run_at TEXT,                  -- when the scheduler should fire next
+                    last_run_at TEXT,
+                    last_result TEXT,
+                    last_cost REAL DEFAULT 0,
+                    proposed_change TEXT,              -- approval-mode diff awaiting sign-off
+                    run_count INTEGER DEFAULT 0,
+                    created_by TEXT DEFAULT 'user',    -- user | agent
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS scheduled_plan_runs (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    status TEXT NOT NULL,              -- running|done|failed|skipped|awaiting_approval
+                    result TEXT,
+                    cost REAL DEFAULT 0,
+                    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    finished_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_plans_account
+                    ON scheduled_plans(account_id, next_run_at);
+                CREATE INDEX IF NOT EXISTS idx_plans_campaign
+                    ON scheduled_plans(campaign_id, next_run_at);
+                CREATE INDEX IF NOT EXISTS idx_plans_due
+                    ON scheduled_plans(status, next_run_at);
+                CREATE INDEX IF NOT EXISTS idx_plan_runs_plan
+                    ON scheduled_plan_runs(plan_id, started_at DESC);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (17)")
+            await db.commit()
+            logger.info("V17 migration complete (scheduled_plans + scheduled_plan_runs).")
+
+        if version >= 17:
+            logger.info("Database schema is V17 (up to date).")
     finally:
         await db.close()

@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/canadian-citizenship-by-descent
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
 ## Timeline
 
@@ -58,6 +58,8 @@ Last updated: 2026-06-02
 - **May 15** — [Competitor Intel] Competitor Intel ran Stage 2 for Canadian Citizenship by Descent campaign: researched competitive landscape, scanned competitor ads, and performed keyword research for new product (distinct from golden visa campaigns).
 
 ### June 2026
+- **Jun 04** — [Search Term Hunter] MapleRoots search term audit (Jun 4): 40 terms reviewed, zero negatives needed post leak-fix; `canada bill c3 application` (1 conv, $2.82 cost) flagged 3rd time for exact match addition pending Jun 9 waiting window.
+- **Jun 04** — [PPC Strategist] MapleRoots daily review Jun 4: post-leak-fix day 1 showed -64% clicks (29 vs 81 avg), -63% cost ($33.25 vs $90 avg), 1 conversion — confirmed as expected redistribution, not an alarm. Budget pacing ~$80/day vs $130 cap; no structural changes until Jun 9 review.
 - **Jun 02** — [Agency Director] Documented staged-scale plan and waiting protocol: budget gates $130→$170→$220→$260/day each requiring CPA ≤ $55, waiting window until Jun 9, tTarget CPA bidding switch deferred ~7–10 days. Wrote canonical `scaling_waiting_plan.md`, pinned 3 gates to `pinned_facts.md`, updated MEMORY.md index and decisions.md.
 - **Jun 02** — [PPC Strategist] PPC Strategist confirmed live budget for MapleRoots campaign is $130/day (Budget ID 15581336301, amount_micros: 130000000), not $100 as quoted from stale May 15 build notes — all prior pacing reads citing 27% overspend were incorrect; campaign is actually running 2% under budget and on-target for the month.
 - **Jun 02** — [Agency Director] Reviewed budget-boost request post-leak-fix (June 2): advised holding at $127/day until June 9 (7-day settling window), then staged scale to $150→$200→$260/day gated on CPA ≤ $55. SEO matching Google Ads lead volume in month 1 flagged as a major signal warranting GA4 channel attribution audit.

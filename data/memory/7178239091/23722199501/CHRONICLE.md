@@ -1,5 +1,5 @@
 # Campaign Chronicle: Golden Visa Programs - Arabic (MENA)
-Last updated: 2026-04-23
+Last updated: 2026-06-03
 
 ## Timeline
 
@@ -37,6 +37,11 @@ Last updated: 2026-04-23
 - **Apr 16** — [PPC Strategist] Apr 15 spend hit record low of $80.83 (vs $150 budget), clicks dropped 30% below 7-day avg — learning-phase throttling post-URL change confirmed. Decision: hold intervention until V4 copy launches Apr 19, then reassess `[PHRASE] greece citizenship by investment` (QS:1, $45.89 spent) for removal Apr 22 if no improvement.
 - **Apr 15** — [Agency Director] Director recommended pausing (not deleting) Arabic ad groups in MENA campaign after data showed confirmed conversions coming from English keywords only; Arabic showed 1.5 modeled conversions vs 2 confirmed English, at higher cost (~$47 vs ~$35).
 - **Apr 15** — [PPC Strategist] Greece Golden Visa V2 daily review (Apr 14): CPC dropped 58% in 7 days ($13.63→$6.64) following QS:1 keyword removal; campaign under-pacing 19% ($122/day vs $150 budget) — hold, reassess Apr 19 when V4 copy deploys.
+
+### June 2026
+- **Jun 03** — [Agency Director] User asked: wich campaign you are working on?. Quick state of play on it:
+- **Bidding:** Maximize Conversions (no target CPA), under-pacing — only . Quick state of play on it:
+- **Bidding:** Maximize Conversions (no target CPA), under-pacing — only
 
 ## Key Metrics Milestones
 

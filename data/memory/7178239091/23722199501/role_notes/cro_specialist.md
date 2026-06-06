@@ -1,6 +1,6 @@
 # Cro Specialist Notes
 
-**Last updated:** 2026-04-23 14:52
+**Last updated:** 2026-06-03 14:28
 
 **Task:** the landing page is https://goldenvisas.mercan.com/greece. do analyses there and the a/b testing page not yet used in ads is https://goldenvisas.mercan.com/greece-golden-visa.  do it for both and let 
 
@@ -358,3 +358,21 @@ Once you tell me your preferences on these 3 points, I'll proceed with the migra
 - Clarity: Separate / Combined
 - Timeline: Daily / Compressed
 Then I'll execute the plan step-by-step.
+
+### 2026-06-03 14:28 — the landing page should be only this one https://www.mercan.com/greece-golden-vi
+
+**Task:** the landing page should be only this one https://www.mercan.com/greece-golden-visa and we need the geo targeting done properly as discussed
+
+**Critical Details:** GTM-KWFH5X9T
+Good news first — **switching the LP to `www.mercan.com/greece-golden-visa/` clears the hard blocker.** That page already has the verified Greece conversion tag firing (label `hMe8CLPl184aELCTg4oD`, conv action `7144337715`, GTM-KWFH5X9T, end-to-end tested 2026-03-19). No new tag install needed — tracking is solved by that one decision.
+But I have to stop before writing anything, because there's a **campaign-binding conflict** I won't silently resolve:
+**This conversation is locked to campaign `22551124974`** — the **mature, US-nationwide workhorse** (11,963 clicks · $52,776 · 767 conv · ~$68.81 CPA · settled Maximize Conversions algorithm).
+**Everything you're asking for — the LP swap and the metro geo targeting — was unanimously scoped by the team to V2 (`23722199501`)**, the purpose-built paused campaign. Applying 4–12 metro geo + bid modifiers to `22551124974` would do exactly what the whole team warned against: **geo-restrict and reset the learning on your best-performing campaign.** I won't do that to it.
+Two problems with executing right now:
+1. **I can't write to V2 from this conversation** — the scope guard physically blocks tool calls against a different campaign ID than the one this chat is bound to.
+2. **I shouldn't apply the metro cage to `22551124974`** — it's the wrong campaign for this play, by team consensus and by common sense.
+**So I need you to confirm one of these:**
+- **(A) Do the geo work on V2 (`23722199501`)** — the correct target. You'll need to run it from a conversation bound to V2 (open the V2 campaign in the agent), and I'll execute there: LP → `www.mercan.com/greece-golden-visa/`, Tier-1 metro geo (start San Jose `1014226` + Seattle `1027744`, +15–25% bids), plus the H1B-junk negatives. **Recommended.**
+- **(B) You genuinely want to geo-restrict the mature campaign `22551124974`** — strongly advised against; it resets a 767-conversion algorithm.
+Which one? If it's (A), say the word and I'll tell you exactly how to switch the bound campaign so I can execute cleanly there.
+*— CRO Specialist (Dam3oun-Google)*

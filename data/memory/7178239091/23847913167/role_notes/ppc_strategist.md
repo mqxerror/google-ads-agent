@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-02 13:02
+**Last updated:** 2026-06-04 12:21
 
 **Task:** Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
 
@@ -399,4 +399,40 @@ Bottom line: good catch. The campaign is pacing correctly at $130/day, the leak 
 - **Jun 9 checklist:** confirm blended CPA $66→~$52, QS rebuild on the tightened keyword, AG3 impr-share gain, AG2 CPA after cut → if CPA ≤ $55, step to $170 and flag the bidding switch.
 - **Still pending (separate days):** AG1 AVERAGE→GOOD copy trim, dev P0 LP fixes (button text, remove field, 5 fields), clean `/lp/`-only Clarity pull.
 
+— *PPC Strategist*
+
+### 2026-06-04 12:21 — Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterd
+
+**Task:** Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for monthly budget? Any pacing issues?
+3. Any key
+# Daily Review — MapleRoots (June 4, 2026)
+*Waiting window active: no structural changes until Jun 9.*
+## 1. Yesterday (Jun 3) vs. 7-Day Average
+|--------|-------|--------------------------|---|
+**This is the leak fix working as intended, not an alarm.** The `"canadian citizenship through parents"` phrase match was the campaign's biggest volume driver. Removing it on June 2 cut volume immediately — June 3 was the first full post-fix day. Low impressions + low cost + still 1 conversion = the funnel is running leaner, not broken. Expected pattern for 2–4 more days while Google redistributes
+## 2. Budget Pacing
+| Metric | Value |
+|--------|-------|
+| Jun 3 spend | $33.25 — **74% under $130 budget** |
+| Jun 1–3 avg | ~$80/day (well under $130) |
+| Monthly pace at current rate | ~$2,400 vs $3,900 budget |
+**Underperforming budget right now, not overspending.** The volume drop from the leak fix is the cause. This will self-correct as Google re-learns the keyword mix and AG1's exact-match terms build impression share. Don't touch budget until Jun 9 review.
+## 3. High-Spend Zero-Conversion Keywords
+Both flagged previously — bids already cut to $0.45 on Jun 2. In the waiting window:
+| Keyword | Clicks | Spend | Conv | Status |
+|---------|--------|-------|------|--------|
+No new action. Watching.
+## 4. Top Converting Search Terms (last 7 days)
+| Search Term | Clicks | Cost | Conv | Added? |
+|------------|--------|------|------|--------|
+Only 1 converting search term visible in the last 7 days — very light. This is consistent with the post-fix volume drop. The `canada bill c3 application` query is legitimate Bill C-3 intent → flag to add to AG3 at $0.65 when the Jun 9 review opens.
+## 5. Immediate Actions
+| Priority | Action | When |
+|----------|--------|------|
+**Bottom line:** The campaign is intentionally quieter this week — that's the leak fix doing its job. Don't mistake lower volume for a problem. Jun 9 is the first honest read on whether CPA improved toward the $55 target. Hold steady.
 — *PPC Strategist*

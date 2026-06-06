@@ -1,17 +1,33 @@
-import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, type ComponentPropsWithoutRef } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronRight, ChevronDown, Wrench, Check, X, Loader2, Trash2, Terminal } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check, Loader2, Trash2, Terminal, CalendarPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
 import AgentAvatar from './AgentAvatar';
 import { getAgentProfile } from '@/lib/agentProfiles';
-import { getToolDescription, getSourceIcon } from '@/lib/toolDescriptions';
+import { getToolDescription } from '@/lib/toolDescriptions';
+import { useAppStore } from '@/stores/appStore';
+import { useClientAccountId } from '@/hooks/useClientAccountId';
+import { extractPlan } from '@/lib/api';
+import { setPendingScheduleDraft } from '@/components/plans/planHelpers';
+import type { PlanFormDraft } from '@/components/plans/PlanForm';
 import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
+
+/** Markdown component map shared by every render path so links open safely
+ *  and there's no layout shift between streaming and persisted bubbles. */
+const mdComponents: Components = {
+  a: ({ node: _node, ...props }: ComponentPropsWithoutRef<'a'> & { node?: unknown }) => (
+    <a {...props} target="_blank" rel="noreferrer" />
+  ),
+};
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onDelete?: (messageId: string) => void;
+  /** True when this is the active assistant turn currently streaming tokens.
+   *  Renders a gentle `.studio-caret` after the prose. */
+  isStreaming?: boolean;
   /** Conversation this message belongs to. Required for the "Send to
    *  Claude Code" action — when set, an extra hover button appears on
    *  assistant messages that flips `awaits_claude_code=1` on the
@@ -37,23 +53,20 @@ function ToolCallsSummary({ toolCalls }: { toolCalls: ToolCall[] }) {
   const hasError = toolCalls.some((tc) => tc.status === 'error');
   const pendingCount = toolCalls.filter((tc) => tc.status === 'pending').length;
 
-  // Status indicator
-  const statusEl = !allDone ? (
-    <span className="flex items-center gap-1 text-muted-foreground">
-      <Loader2 className="h-3 w-3 animate-spin" />
-      <span>{pendingCount} running</span>
-    </span>
+  // Quiet state dot (pending pulse / error / done) — no boxed glyphs.
+  const stateDot = !allDone ? (
+    <span className="studio-pulse h-2 w-2 shrink-0 rounded-full bg-subtle" aria-label="running" />
   ) : hasError ? (
-    <span className="flex items-center gap-1 text-destructive">
-      <X className="h-3 w-3" />
-      <span>error</span>
-    </span>
+    <span className="h-2 w-2 shrink-0 rounded-full bg-danger" aria-label="error" />
   ) : (
-    <span className="flex items-center gap-1 text-status-enabled">
-      <Check className="h-3 w-3" />
-      <span>done</span>
-    </span>
+    <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-label="done" />
   );
+
+  const statusText = !allDone
+    ? `${pendingCount} running`
+    : hasError
+      ? 'error'
+      : 'done';
 
   // Summary label
   const actionNames = actions.map((a) => a.name);
@@ -66,47 +79,40 @@ function ToolCallsSummary({ toolCalls }: { toolCalls: ToolCall[] }) {
         : `${uniqueActions.slice(0, 2).join(', ')} +${uniqueActions.length - 2} more`;
 
   return (
-    <div className="mt-2 border border-border/60 rounded-md text-xs overflow-hidden">
-      {/* Compact summary bar */}
+    <div className="mt-2 text-xs">
+      {/* Quiet collapsible summary row — a dot, a count, the calm summary. */}
       <button
         onClick={() => setShowAll(!showAll)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary/40 transition-colors"
+        className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2 transition-colors duration-150"
       >
-        {showAll ? (
-          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-        )}
-        <Wrench className="h-3 w-3 text-muted-foreground shrink-0" />
+        {stateDot}
         <span className="text-muted-foreground truncate">
           {actions.length > 0 && (
-            <span className="font-medium text-foreground">{actions.length} tool{actions.length !== 1 ? 's' : ''}</span>
+            <span className="font-medium text-text">{actions.length} tool{actions.length !== 1 ? 's' : ''}</span>
           )}
           {actions.length > 0 && internal.length > 0 && ' · '}
-          {internal.length > 0 && (
-            <span>{internal.length} internal</span>
-          )}
-          <span className="ml-1.5 text-muted-foreground/70">— {summaryText}</span>
+          {internal.length > 0 && <span>{internal.length} internal</span>}
+          <span className="ml-1.5 text-subtle">— {summaryText}</span>
         </span>
-        <span className="ml-auto shrink-0">{statusEl}</span>
+        <span className={cn('ml-auto shrink-0', hasError && allDone ? 'text-danger' : 'text-muted-foreground')}>
+          {statusText}
+        </span>
+        <span className="shrink-0 text-[10px] text-subtle transition-transform duration-150 group-hover:text-muted">
+          {showAll ? '▾' : '▸'}
+        </span>
       </button>
 
-      {/* Expanded: show action tools inline, internal tools nested */}
+      {/* Expanded: action tools inline, internal tools nested */}
       {showAll && (
-        <div className="border-t border-border/40">
-          {/* Action tools (MCP calls, API calls) — always shown when expanded */}
+        <div className="mt-1 ml-3 border-l border-border pl-3">
           {actions.length > 0 && (
-            <div className="px-1 py-1 space-y-0.5">
+            <div className="space-y-0.5 py-1">
               {actions.map((tc) => (
                 <ToolCallBlock key={tc.id} toolCall={tc} />
               ))}
             </div>
           )}
-
-          {/* Internal tools (ToolSearch, Read, etc.) — extra nested */}
-          {internal.length > 0 && (
-            <InternalToolsGroup tools={internal} />
-          )}
+          {internal.length > 0 && <InternalToolsGroup tools={internal} />}
         </div>
       )}
     </div>
@@ -117,16 +123,16 @@ function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border-t border-border/30">
+    <div className="mt-0.5 border-t border-border pt-0.5">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-1 text-[10px] text-muted-foreground hover:bg-secondary/30 transition-colors"
+        className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-surface-2 transition-colors"
       >
         {expanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
         <span>{tools.length} internal operation{tools.length !== 1 ? 's' : ''} (ToolSearch, etc.)</span>
       </button>
       {expanded && (
-        <div className="px-1 pb-1 space-y-0.5">
+        <div className="pb-1 space-y-0.5">
           {tools.map((tc) => (
             <ToolCallBlock key={tc.id} toolCall={tc} compact />
           ))}
@@ -136,24 +142,44 @@ function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
   );
 }
 
-const ROLE_ICONS: Record<string, string> = {
-  briefcase: '💼', target: '🎯', search: '🔍', palette: '🎨',
-  chart: '📊', eye: '👁️', code: '💻', rocket: '🚀',
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  director: 'bg-gray-500/20 text-gray-700 dark:text-gray-200 border border-gray-400/30',
-  ppc_strategist: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-400/30',
-  search_term_hunter: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-400/30',
-  creative_director: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-400/30',
-  analytics_analyst: 'bg-green-500/20 text-green-700 dark:text-green-300 border border-green-400/30',
-  competitor_intel: 'bg-red-500/20 text-red-700 dark:text-red-300 border border-red-400/30',
-  gtm_specialist: 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-400/30',
-  growth_hacker: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-400/30',
-};
-
-export default function ChatMessage({ message, onDelete, conversationId }: ChatMessageProps) {
+export default function ChatMessage({ message, onDelete, conversationId, isStreaming }: ChatMessageProps) {
   const [handoffState, setHandoffState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [scheduleState, setScheduleState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const accountId = useClientAccountId();
+  const { selectedCampaignId } = useAppStore();
+
+  // "Schedule this" — ask the backend to draft a plan from this message, then
+  // hand the draft to PlansPanel's inline form via a window event. The campaign
+  // view picks it up and opens its Plans tab prefilled. No big modal.
+  const scheduleThis = async () => {
+    if (scheduleState === 'loading') return;
+    setScheduleState('loading');
+    try {
+      const d = await extractPlan({
+        account_id: accountId,
+        campaign_id: selectedCampaignId ?? undefined,
+        text: message.content,
+      });
+      const draft: PlanFormDraft = {
+        title: d.title,
+        action_detail: d.action_detail,
+        action_category: d.action_category,
+        mode: d.mode,
+        suggested_run_at: d.suggested_run_at,
+        recurrence: d.recurrence,
+        context_snippet: message.content,
+        conversation_id: conversationId ?? null,
+      };
+      setPendingScheduleDraft(draft);                 // claimed by PlansPanel on mount
+      window.dispatchEvent(new CustomEvent('plans:open-tab'));
+      window.dispatchEvent(new CustomEvent<PlanFormDraft>('plans:schedule', { detail: draft }));
+      setScheduleState('idle');
+    } catch (e) {
+      console.error('schedule extract failed', e);
+      setScheduleState('error');
+      setTimeout(() => setScheduleState('idle'), 4000);
+    }
+  };
 
   const sendToClaudeCode = async () => {
     if (!conversationId || handoffState === 'sending') return;
@@ -178,8 +204,56 @@ export default function ChatMessage({ message, onDelete, conversationId }: ChatM
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const roleName = message.agentRoleName;
   const roleId = message.agentRole;
-  const roleAvatar = message.agentRoleAvatar;
   const [showActions, setShowActions] = useState(false);
+
+  // ----- Shared body (prose + video + tool rows) ------------------------------
+  const body = (
+    <>
+      {isUser ? (
+        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+      ) : (
+        <div>
+          <TeamOrRegularContent content={message.content} />
+          {isStreaming && <span className="studio-caret ml-0.5 align-baseline">▍</span>}
+        </div>
+      )}
+
+      {/* Inline rendered video ad */}
+      {message.videoUrl && (
+        <div className="mt-2 rounded-[12px] overflow-hidden border border-border bg-black">
+          <video
+            src={message.videoUrl}
+            poster={message.videoThumbnail}
+            controls
+            preload="metadata"
+            className="w-full max-h-[360px] bg-black"
+          />
+          <div className="flex items-center justify-between px-2 py-1 bg-surface-2 text-[10px]">
+            <span className="text-muted-foreground">Video ad</span>
+            <a href={message.videoUrl} download className="text-accent hover:text-accent-hover">
+              Download MP4
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Live activity — a quiet pulsing line for what's happening RIGHT NOW. */}
+      {hasToolCalls && message.toolCalls!.some((tc) => tc.status === 'pending') && (() => {
+        const toolCalls = message.toolCalls!;
+        const pending = toolCalls.filter((tc) => tc.status === 'pending');
+        const latestPending = pending[pending.length - 1];
+        if (!latestPending) return null;
+        return (
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="studio-pulse h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+            <span className="font-medium text-text truncate">{getToolDescription(latestPending.name)}</span>
+            <span className="text-subtle">— {pending.length} running</span>
+          </div>
+        );
+      })()}
+      {hasToolCalls && <ToolCallsSummary toolCalls={message.toolCalls!} />}
+    </>
+  );
 
   return (
     <div
@@ -192,12 +266,35 @@ export default function ChatMessage({ message, onDelete, conversationId }: ChatM
         <button
           onClick={() => onDelete(message.id)}
           className={cn(
-            'absolute top-2 z-10 p-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors',
+            'absolute top-2 z-10 p-1 rounded-md bg-surface-3 text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors',
             isUser ? 'left-2' : 'right-2'
           )}
           title="Delete message"
         >
           <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+
+      {/* "Schedule this" — assistant messages only. Drafts a plan from the turn. */}
+      {showActions && !isUser && (
+        <button
+          onClick={scheduleThis}
+          disabled={scheduleState === 'loading'}
+          className={cn(
+            'absolute top-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium transition-colors',
+            conversationId ? 'right-[9rem]' : 'right-2',
+            scheduleState === 'error'
+              ? 'bg-danger-soft text-danger'
+              : 'bg-surface-3 text-muted-foreground hover:bg-accent-soft hover:text-accent'
+          )}
+          title="Draft a scheduled plan from this message"
+        >
+          {scheduleState === 'loading' ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <CalendarPlus className="h-3 w-3" />
+          )}
+          {scheduleState === 'error' ? 'Failed' : 'Schedule'}
         </button>
       )}
 
@@ -210,10 +307,10 @@ export default function ChatMessage({ message, onDelete, conversationId }: ChatM
             'absolute top-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium transition-colors',
             'right-10',  // sits left of the delete button (right-2)
             handoffState === 'sent'
-              ? 'bg-emerald-500/15 text-emerald-600'
+              ? 'bg-success-soft text-success'
               : handoffState === 'error'
-                ? 'bg-destructive/10 text-destructive'
-                : 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20'
+                ? 'bg-danger-soft text-danger'
+                : 'bg-surface-3 text-muted-foreground hover:bg-accent-soft hover:text-accent'
           )}
           title="Hand this thread off to Wassim's Claude Code session for execution"
         >
@@ -227,111 +324,46 @@ export default function ChatMessage({ message, onDelete, conversationId }: ChatM
           {handoffState === 'sent' ? 'Sent' : handoffState === 'error' ? 'Failed' : 'Claude Code'}
         </button>
       )}
-      <div
-        className={cn(
-          'rounded-lg px-4 py-3 text-sm leading-relaxed',
-          isUser
-            ? 'max-w-[85%] bg-primary text-primary-foreground'
-            : 'w-full bg-secondary/40 text-foreground',
-          message.isPending && 'opacity-60 animate-pulse'
-        )}
-      >
-        {/* Queued badge for pending messages */}
-        {message.isPending && isUser && (
-          <span className="text-[10px] font-medium opacity-70 block mb-1">Queued</span>
-        )}
-        {/* Agent identity header for assistant messages */}
-        {!isUser && (
-          <div className="flex items-center gap-2 mb-2.5 -mt-0.5">
-            <AgentAvatar roleId={roleId} size="sm" showStatus isWorking={message.isPending} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold" style={{ color: getAgentProfile(roleId).color }}>
-                  {getAgentProfile(roleId).name}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {roleName || getAgentProfile(roleId).title}
-                </span>
-              </div>
+
+      {isUser ? (
+        /* User turn — compact accent-soft bubble, right-aligned. */
+        <div
+          className={cn(
+            'max-w-[82%] rounded-[10px] bg-accent-soft px-4 py-2.5 text-text',
+            message.isPending && 'opacity-60'
+          )}
+        >
+          {message.isPending && (
+            <span className="text-[10px] font-medium text-muted-foreground block mb-1">Queued</span>
+          )}
+          {body}
+        </div>
+      ) : (
+        /* Assistant turn — avatar lane + hairline left gutter, no card. */
+        <div className="flex gap-3">
+          <AgentAvatar roleId={roleId} size="sm" showStatus isWorking={message.isPending} />
+          <div className="min-w-0 flex-1 space-y-2 border-l border-border pl-4">
+            <div className="flex items-center gap-1.5 -mt-0.5">
+              <span className="text-xs font-semibold text-text">
+                {getAgentProfile(roleId).name}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {roleName || getAgentProfile(roleId).title}
+              </span>
               {message.createdAt && (
-                <span className="text-[9px] text-muted-foreground/60">
+                <span className="text-[9px] text-subtle ml-auto">
                   {formatRelativeTime(message.createdAt)}
                 </span>
               )}
             </div>
+            {body}
           </div>
-        )}
-
-        {isUser ? (
-          <div className="whitespace-pre-wrap">{message.content}</div>
-        ) : (
-          <TeamOrRegularContent content={message.content} />
-        )}
-
-        {/* Inline rendered video ad */}
-        {message.videoUrl && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-border bg-black">
-            <video
-              src={message.videoUrl}
-              poster={message.videoThumbnail}
-              controls
-              preload="metadata"
-              className="w-full max-h-[360px] bg-black"
-            />
-            <div className="flex items-center justify-between px-2 py-1 bg-secondary/30 text-[10px]">
-              <span className="text-muted-foreground">Video ad</span>
-              <a href={message.videoUrl} download className="text-pink-400 hover:text-pink-300">
-                Download MP4
-              </a>
-            </div>
-          </div>
-        )}
-
-        {/* Live activity — show what's happening RIGHT NOW */}
-        {hasToolCalls && message.toolCalls!.some(tc => tc.status === 'pending') && (() => {
-          const toolCalls = message.toolCalls!;
-          const pending = toolCalls.filter(tc => tc.status === 'pending');
-          const completed = toolCalls.filter(tc => tc.status !== 'pending');
-          const latestPending = pending[pending.length - 1];
-          return (
-            <div className="mt-2 bg-primary/5 border border-primary/20 rounded-lg p-2.5 space-y-1">
-              {latestPending && (
-                <div className="flex items-center gap-2 text-xs font-medium">
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                  <span>{getToolDescription(latestPending.name)}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                <span>{getSourceIcon(latestPending?.source || '')} {latestPending?.source || 'agent'}</span>
-                <span>✅ {completed.length} done</span>
-                <span>⏳ {pending.length} running</span>
-              </div>
-            </div>
-          );
-        })()}
-        {hasToolCalls && <ToolCallsSummary toolCalls={message.toolCalls!} />}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
-const PROSE_CLASSES = `prose prose-sm prose-invert max-w-none
-  [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
-  [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2
-  [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
-  [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-muted-foreground
-  [&_p]:my-1.5 [&_p]:text-sm
-  [&_ul]:my-1.5 [&_ul]:pl-4 [&_ul]:text-sm
-  [&_ol]:my-1.5 [&_ol]:pl-4 [&_ol]:text-sm
-  [&_li]:my-0.5
-  [&_strong]:text-foreground [&_strong]:font-semibold
-  [&_hr]:my-3 [&_hr]:border-border
-  [&_table]:text-xs [&_table]:w-full [&_table]:my-2
-  [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-medium [&_th]:border-b [&_th]:border-border [&_th]:text-muted-foreground
-  [&_td]:px-2 [&_td]:py-1 [&_td]:border-b [&_td]:border-border/50
-  [&_code]:text-xs [&_code]:bg-background/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded
-  [&_pre]:bg-background/50 [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:my-2 [&_pre]:overflow-x-auto
-  [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground`;
 
 function TeamOrRegularContent({ content }: { content: string }) {
   // Check if this is a team session response with ---ROLE: markers
@@ -350,44 +382,41 @@ function TeamOrRegularContent({ content }: { content: string }) {
     return (
       <div className="space-y-3">
         {preamble && (
-          <div className={PROSE_CLASSES}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{preamble}</ReactMarkdown>
+          <div className="studio-prose break-words">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{preamble}</ReactMarkdown>
           </div>
         )}
         {matches.map((match, i) => {
           const roleId = match[1].trim();
           const roleContent = match[2].replace(/---END ROLE---/g, '').trim();
-          const profile = getAgentProfile(roleId);
           return (
-            <div
-              key={i}
-              className="border rounded-xl p-3 transition-colors"
-              style={{ borderColor: profile.borderColor + '40', backgroundColor: profile.bgColor + '10' }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <AgentAvatar roleId={roleId} size="sm" />
-                <span className="text-xs font-semibold" style={{ color: profile.color }}>
-                  {profile.name}
-                </span>
-                <span className="text-[10px] text-muted-foreground">{profile.title}</span>
-              </div>
-              <div className={PROSE_CLASSES}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{roleContent}</ReactMarkdown>
+            /* Each specialist as an avatar-lane + hairline gutter, like the
+               main assistant turn — quiet identity, no filled card. */
+            <div key={i} className="flex gap-3">
+              <AgentAvatar roleId={roleId} size="sm" />
+              <div className="min-w-0 flex-1 border-l border-border pl-4">
+                <div className="flex items-center gap-1.5 mb-1.5 -mt-0.5">
+                  <span className="text-xs font-semibold text-text">{getAgentProfile(roleId).name}</span>
+                  <span className="text-[10px] text-muted-foreground">{getAgentProfile(roleId).title}</span>
+                </div>
+                <div className="studio-prose break-words">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{roleContent}</ReactMarkdown>
+                </div>
               </div>
             </div>
           );
         })}
         {epilogue && (
-          <div className="border-t border-border pt-3 mt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <AgentAvatar roleId="director" size="sm" />
-              <span className="text-xs font-semibold" style={{ color: getAgentProfile('director').color }}>
-                {getAgentProfile('director').name}
-              </span>
-              <span className="text-[10px] text-muted-foreground">Consensus</span>
-            </div>
-            <div className={PROSE_CLASSES}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{epilogue}</ReactMarkdown>
+          <div className="flex gap-3 border-t border-border pt-3 mt-1">
+            <AgentAvatar roleId="director" size="sm" />
+            <div className="min-w-0 flex-1 border-l border-border pl-4">
+              <div className="flex items-center gap-1.5 mb-1.5 -mt-0.5">
+                <span className="text-xs font-semibold text-text">{getAgentProfile('director').name}</span>
+                <span className="text-[10px] text-muted-foreground">Consensus</span>
+              </div>
+              <div className="studio-prose break-words">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{epilogue}</ReactMarkdown>
+              </div>
             </div>
           </div>
         )}
@@ -397,8 +426,8 @@ function TeamOrRegularContent({ content }: { content: string }) {
 
   // Regular message — render as markdown
   return (
-    <div className={PROSE_CLASSES}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    <div className="studio-prose break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>
     </div>
   );
 }

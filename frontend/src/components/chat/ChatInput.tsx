@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Image as ImageIcon, Loader2, Film } from 'lucide-react';
 import VideoCreator from './VideoCreator';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import templates, { TEMPLATE_CATEGORIES, type ChatTemplate } from '@/lib/chatTemplates';
@@ -358,7 +357,7 @@ The question/topic: ${messageText}`;
                   <span className="text-sm">{t.icon}</span>
                   <span className="text-xs font-medium">{t.label}</span>
                   {t.needsCampaign && !campaignName && (
-                    <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-1 rounded">needs campaign</span>
+                    <span className="text-[9px] text-warning bg-warning-soft px-1 rounded">needs campaign</span>
                   )}
                   {t.suggestedModel && (
                     <span className="text-[9px] text-muted-foreground ml-auto">{t.suggestedModel}</span>
@@ -450,7 +449,7 @@ The question/topic: ${messageText}`;
                 onClick={() => { setActiveRole(role.id); setShowRoles(false); }}
                 className={cn(
                   'w-full text-left px-3 py-2 rounded-md hover:bg-secondary/60 transition-colors',
-                  activeRole === role.id && 'bg-blue-500/10 border border-blue-500/30'
+                  activeRole === role.id && 'bg-accent-soft border border-accent/30'
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -476,9 +475,9 @@ The question/topic: ${messageText}`;
 
       {/* Team Session role picker */}
       {showTeam && roles.length > 0 && (
-        <div className="bg-card border border-purple-500/30 rounded-lg shadow-lg overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-purple-500/10">
-            <span className="text-[10px] font-medium text-purple-400">Team Session — Pick specialists to discuss</span>
+        <div className="bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-accent-soft">
+            <span className="text-[10px] font-medium text-accent">Team Session — Pick specialists to discuss</span>
             <button onClick={() => setShowTeam(false)} className="p-0.5 text-muted-foreground hover:text-foreground">
               <X className="h-3 w-3" />
             </button>
@@ -498,7 +497,7 @@ The question/topic: ${messageText}`;
                 className={cn(
                   'flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left transition-colors text-[10px]',
                   teamRoles.has(role.id)
-                    ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300'
+                    ? 'bg-accent-soft border border-accent/40 text-accent'
                     : 'hover:bg-secondary/60 text-muted-foreground'
                 )}
               >
@@ -515,7 +514,8 @@ The question/topic: ${messageText}`;
         </div>
       )}
 
-      {/* Model selector + template button */}
+      {/* Model selector + feature tabs — unified quiet ghosts. Selected =
+          accent-soft; no per-feature blue/purple/pink theming. */}
       <div className="flex items-center gap-1">
         {MODELS.map((m) => {
           const Icon = m.icon;
@@ -524,10 +524,10 @@ The question/topic: ${messageText}`;
               key={m.id}
               onClick={() => setModel(m.id)}
               className={cn(
-                'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+                'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
                 model === m.id
-                  ? 'bg-primary/20 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                  ? 'bg-accent-soft text-accent font-medium'
+                  : 'text-muted-foreground hover:text-text hover:bg-surface-3'
               )}
               title={m.desc}
             >
@@ -542,12 +542,10 @@ The question/topic: ${messageText}`;
             <button
               onClick={() => { setShowRoles(!showRoles); setShowTemplates(false); }}
               className={cn(
-                'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
-                activeRole
-                  ? 'bg-blue-500/20 text-blue-400 font-medium'
-                  : showRoles
-                    ? 'bg-primary/20 text-primary font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
+                activeRole || showRoles
+                  ? 'bg-accent-soft text-accent font-medium'
+                  : 'text-muted-foreground hover:text-text hover:bg-surface-3'
               )}
               title="Select specialist role"
             >
@@ -559,10 +557,10 @@ The question/topic: ${messageText}`;
           <button
             onClick={() => { setShowTemplates(!showTemplates); setShowRoles(false); setShowTeam(false); }}
             className={cn(
-              'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+              'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
               showTemplates
-                ? 'bg-primary/20 text-primary font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                ? 'bg-accent-soft text-accent font-medium'
+                : 'text-muted-foreground hover:text-text hover:bg-surface-3'
             )}
             title="Smart templates"
           >
@@ -572,10 +570,10 @@ The question/topic: ${messageText}`;
           <button
             onClick={() => { setShowTeam(!showTeam); setShowTemplates(false); setShowRoles(false); setShowVideo(false); }}
             className={cn(
-              'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+              'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
               showTeam
-                ? 'bg-purple-500/20 text-purple-400 font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                ? 'bg-accent-soft text-accent font-medium'
+                : 'text-muted-foreground hover:text-text hover:bg-surface-3'
             )}
             title="Team session — multiple specialists discuss together"
           >
@@ -585,10 +583,10 @@ The question/topic: ${messageText}`;
           <button
             onClick={() => { setShowVideo(!showVideo); setShowTeam(false); setShowTemplates(false); setShowRoles(false); }}
             className={cn(
-              'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors',
+              'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
               showVideo
-                ? 'bg-pink-500/20 text-pink-400 font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                ? 'bg-accent-soft text-accent font-medium'
+                : 'text-muted-foreground hover:text-text hover:bg-surface-3'
             )}
             title="Generate a video ad from a script (ElevenLabs + HeyGen)"
           >
@@ -640,8 +638,8 @@ The question/topic: ${messageText}`;
         </div>
       )}
 
-      {/* Input + send */}
-      <div className="flex items-end gap-2">
+      {/* Input + send — one sunken well framed as a single control. */}
+      <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface-2 px-2 py-1.5 transition-colors focus-within:border-accent">
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -650,17 +648,15 @@ The question/topic: ${messageText}`;
           className="hidden"
           onChange={(e) => handleFileSelect(e.target.files)}
         />
-        {/* Attach button */}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-9 w-9 shrink-0 self-end"
+        {/* Attach button — quiet ghost */}
+        <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           title="Attach file"
+          className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md text-muted-foreground hover:bg-surface-3 hover:text-text disabled:opacity-50 transition-colors"
         >
           <Paperclip className="h-4 w-4" />
-        </Button>
+        </button>
         <textarea
           ref={textareaRef}
           value={value}
@@ -669,28 +665,25 @@ The question/topic: ${messageText}`;
           onPaste={handlePaste}
           placeholder={disabled ? "Type to queue next message..." : "Ask about this campaign... (paste images with Cmd+V)"}
           rows={1}
-          className="flex-1 resize-none bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className="flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-text placeholder:text-subtle outline-none"
         />
         {disabled && onStop && (
-          <Button
-            size="icon"
-            variant="destructive"
-            className="h-9 w-9 shrink-0"
+          <button
             onClick={onStop}
             title="Stop agent"
+            className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md bg-danger text-on-accent hover:opacity-90 transition-opacity"
           >
             <Square className="h-4 w-4 fill-current" />
-          </Button>
+          </button>
         )}
-        <Button
-          size="icon"
-          className="h-9 w-9 shrink-0"
+        <button
           disabled={!value.trim() && attachments.length === 0}
           onClick={handleSend}
           title={disabled ? "Queue message" : "Send message"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md bg-accent text-on-accent hover:bg-accent-hover disabled:opacity-40 disabled:hover:bg-accent transition-colors"
         >
           <SendHorizonal className="h-4 w-4" />
-        </Button>
+        </button>
       </div>
     </div>
   );

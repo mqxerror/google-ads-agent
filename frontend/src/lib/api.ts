@@ -823,6 +823,140 @@ export function resetRole(roleId: string): Promise<{ status: string; role_id: st
   return request(`/roles/${roleId}/customize`, { method: 'DELETE' });
 }
 
+// ── Scheduled Plans ──────────────────────────────────────────────
+
+export type PlanStatus =
+  | 'scheduled' | 'due' | 'running' | 'awaiting_approval' | 'done' | 'failed' | 'paused';
+export type PlanActionCategory =
+  | 'budget' | 'bids' | 'status' | 'geo' | 'search_terms' | 'audit' | 'report' | 'other';
+export type PlanMode = 'auto' | 'approval';
+export type PlanScheduleType = 'once' | 'recurring';
+
+export interface PlanRun {
+  id: string;
+  plan_id: string;
+  status: string;
+  result?: string | null;
+  cost?: number | null;
+  created_at: string;
+  ran_at?: string | null;
+}
+
+export interface Plan {
+  id: string;
+  account_id: string;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
+  conversation_id?: string | null;
+  status: PlanStatus;
+  title: string;
+  action_detail: string;
+  action_category: PlanActionCategory;
+  mode: PlanMode;
+  schedule_type: PlanScheduleType;
+  run_at?: string | null;
+  recurrence?: string | null;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_result?: string | null;
+  last_cost?: number | null;
+  proposed_change?: string | null;
+  context_snippet?: string | null;
+  run_count?: number;
+  timezone?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  runs?: PlanRun[];
+}
+
+export interface CreatePlanBody {
+  account_id: string;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
+  conversation_id?: string | null;
+  title: string;
+  action_detail: string;
+  action_category: PlanActionCategory;
+  mode?: PlanMode;
+  schedule_type: PlanScheduleType;
+  run_at?: string | null;
+  recurrence?: string | null;
+  timezone?: string;
+  context_snippet?: string | null;
+}
+
+export interface UpdatePlanBody {
+  title?: string;
+  action_detail?: string;
+  action_category?: PlanActionCategory;
+  mode?: PlanMode;
+  run_at?: string | null;
+  recurrence?: string | null;
+  status?: PlanStatus;
+}
+
+export interface PlanDraft {
+  title: string;
+  action_detail: string;
+  action_category: PlanActionCategory;
+  suggested_run_at?: string | null;
+  recurrence?: string | null;
+  mode?: PlanMode;
+}
+
+export function createPlan(body: CreatePlanBody): Promise<Plan> {
+  return request<Plan>('/plans', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function fetchPlans(accountId: string, campaignId?: string): Promise<Plan[]> {
+  const params = new URLSearchParams({ account_id: accountId });
+  if (campaignId) params.set('campaign_id', campaignId);
+  return request<Plan[]>(`/plans?${params.toString()}`);
+}
+
+export function fetchUpcomingPlans(accountId: string): Promise<Plan[]> {
+  return request<Plan[]>(`/plans/upcoming?account_id=${encodeURIComponent(accountId)}`);
+}
+
+export function fetchPlan(id: string): Promise<Plan> {
+  return request<Plan>(`/plans/${id}`);
+}
+
+export function updatePlan(id: string, body: UpdatePlanBody): Promise<Plan> {
+  return request<Plan>(`/plans/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export function deletePlan(id: string): Promise<{ deleted: boolean }> {
+  return request(`/plans/${id}`, { method: 'DELETE' });
+}
+
+export function approvePlan(id: string): Promise<Plan> {
+  return request<Plan>(`/plans/${id}/approve`, { method: 'POST' });
+}
+
+export function skipPlan(id: string): Promise<Plan> {
+  return request<Plan>(`/plans/${id}/skip`, { method: 'POST' });
+}
+
+export function snoozePlan(id: string, hours = 24): Promise<Plan> {
+  return request<Plan>(`/plans/${id}/snooze?hours=${hours}`, { method: 'POST' });
+}
+
+export function runPlanNow(id: string): Promise<Plan> {
+  return request<Plan>(`/plans/${id}/run-now`, { method: 'POST' });
+}
+
+export interface ExtractPlanBody {
+  account_id: string;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
+  text: string;
+}
+
+export function extractPlan(body: ExtractPlanBody): Promise<PlanDraft> {
+  return request<PlanDraft>('/plans/extract', { method: 'POST', body: JSON.stringify(body) });
+}
+
 export async function launchChrome(): Promise<{ status: string; message?: string; profile_dir?: string }> {
   const res = await fetch('/api/settings/chrome/launch', { method: 'POST' });
   if (!res.ok) {

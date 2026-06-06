@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/panama-qualified-investor-program
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Timeline
 
@@ -37,6 +37,10 @@ Brief: Target audiences: US-based HNW investors
 - **May 20** — [CRO Specialist] CRO analysis of mercan.com/panama-qualified-investor-program for Panama QIP campaign build: identified 13-field form as #1 conversion killer (est. 50-70% lead loss), flagged "Submit" CTA as generic, recommended reducing to 3 fields and rewriting button copy; trust signals and H1 value prop rated strong (8/10).
 
 ### June 2026
+- **Jun 03** — [PPC Strategist] User asked: Analyze the currently selected campaign "Greece Golden Visa V2" — its structure, keywords, match typ. Every piece of LIVE CAMPAIGN DATA in my context (the day-by-day metrics, AG1–AG4, the 19 Panama keyw
+- **Jun 03** — [Agency Director] Drafted Panama QIP investor guide lead-magnet (8–10 page PDF outline) and three hero H1 A/B test variants for the golden visa landing page, targeting $300K investment threshold and October 2026 deadline.
+- **Jun 03** — [Creative Director] Creative Director + Copywriter drafted full Panama QIP landing page copy targeting fix of three conversion failures: wrong-intent traffic (capital qualifier in H1), conversion wall (sticky CTAs + soft offer), and weak emotional copy (Plan B/family-safety angle); Oct 2026 deadline deployed as urgency moat.
+- **Jun 03** — [Agency Director] 2nd conversion received June 2 (total: 2 convs, $2,030 spend, CPA ≈ $1,015, CVR 0.34%); both conversions attributed to `[PHRASE] panama residency for americans` keyword — confirmed as sole converting keyword and strongest signal in account.
 - **Jun 02** — [Agency Director] Campaign scope guard triggered: Director refused team session on "Greece Golden Visa - Turkey" (wrong campaign), correctly enforced Panama QIP (23871240619) boundary. No analysis run; user prompted to confirm correct campaign context before proceeding.
 - **Jun 01** — [GTM Specialist] GTM Specialist ran live Chrome MCP test on Panama landing page — identified Gravity Form (8 fields + reCAPTCHA v2/v3) blocking automated submission; confirmed GTM-WZKDXFH8 container connected via Tag Assistant. Full field UIDs extracted; conversion tag fire verification pending reCAPTCHA resolution.
 - **Jun 01** — [Agency Director] Enhanced Conversions confirmed "Excellent" setup with Panama QIV Lead (ID 7607343274) wired as Primary+TAG — but coverage chart is flat near 0%, diagnosed as: only 1 conversion in 12 days (near-zero denominator) plus unconfirmed `gf_submit` firing for Gravity Form ID 11.

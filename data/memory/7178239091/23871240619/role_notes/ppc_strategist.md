@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-05-25 13:34
+**Last updated:** 2026-06-03 12:20
 
 **Task:** Run stage 5 for campaign build
 
@@ -104,4 +104,20 @@ Enable all 4 ads so the campaign can start serving. Once we have 7+ days of data
 ### Bottom Line
 Campaign fundamentals are healthy (10%+ CTR, $3.10 CPC, 62.5% IS, 0% budget-lost). The negatives and keyword removals from yesterday will reduce waste going forward. **The only thing that will produce conversions is fixing the 13-field form** — that's the #1 priority above all else.
 No tactical changes needed today. Check back Tuesday (May 27) for post-negative-keyword impact.
+— *PPC Strategist*
+
+### 2026-06-03 12:20 — Analyze the currently selected campaign "Greece Golden Visa V2" — its structure,
+
+**Task:** Analyze the currently selected campaign "Greece Golden Visa V2" — its structure, keywords, match types, ad copy, bidding strategy, and performance data.
+
+Then create a NEW campaign based on what's wor
+I have to stop you before I start — this request is for a **different campaign** than the one I'm bound to.
+**Campaign lock:** This conversation is bound to **Panama QIP — Qualified Investor Program (ID 23871240619)** for its entire life. Every piece of LIVE CAMPAIGN DATA in my context (the day-by-day metrics, AG1–AG4, the 19 Panama keywords, the search terms) is Panama's. I have **zero** data on "Greece Golden Visa V2" in context, and the hard rule is: I operate only on this campaign ID and never silen
+This is the same boundary that triggered on June 2 (the "Greece Golden Visa - Turkey" slip).
+So here are your real options:
+**1. You actually want to build the new Greece/Silicon-Valley-Indian campaign** → that's legitimate, but it needs to happen in a conversation bound to the Greece reference campaign (or an unbound/creation context), not this Panama-locked one. Open a session selected on **Greece Golden Visa V2** and paste this exact brief — I'll pull its real structure, keywords, match types, RSAs, bid strategy, an
+**2. You meant to do this for Panama** (copy-paste slip — the brief mentions Greece, not Panama, so I doubt it) → say so and I'll work entirely within Panama QIP.
+**3. You want me to use Panama QIP as the proven reference** to model a *new* campaign → I can do that, since Panama is my locked campaign and I'd be reading *its* data. But note Panama is a weak template right now: **2 conversions in 13 days, $2,030 spend, CPA ≈ $1,015, 0.18–0.34% CVR** — it has a conversion-path problem (the form/phone-validation wall), so I'd be copying structure, not success.
+One quick note on the brief itself: I think you mean **Indian nationals in Silicon Valley** (H-1B/visa-maintenance pain), not "Indiana" the state — worth confirming before any build, because it completely changes geo-targeting and ad copy.
+Which path do you want? I won't touch anything until you confirm scope.
 — *PPC Strategist*

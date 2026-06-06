@@ -11,7 +11,7 @@ Convention: **Story** = the epic/story id it maps to, or `NEW — unplanned` if 
 
 | Date | Feature / change | Story | Files touched |
 |---|---|---|---|
-| | | | |
+| 2026-06-02 | App-wide visual re-skin to Shopify "Studio" calm light design (OKLCH token layer + shadcn aliases → light default; `.studio-prose`/`.studio-caret`/`.studio-pulse`/`.label-section`; quiet tool rows; avatar-lane assistant turns; sunken composer well) | NEW — unplanned | frontend/src/index.css, frontend/index.html, frontend/DESIGN.md (new), frontend/PRODUCT.md (new), src/components/chat/{ChatMessage,ChatInput,ContextBadge,MemoryPanel,AgentAvatar,ToolCallBlock}.tsx, src/components/layout/ChatPanel.tsx |
 
 ## Reconciled
 

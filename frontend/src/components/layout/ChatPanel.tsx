@@ -8,6 +8,7 @@ import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { fetchConversations, createConversation, fetchConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask } from '@/lib/api';
 import ContextBadge, { type ContextMetaData } from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
+import AgentAvatar from '@/components/chat/AgentAvatar';
 import ChatInput, { type ModelId, type Attachment } from '@/components/chat/ChatInput';
 import MemoryPanel from '@/components/chat/MemoryPanel';
 import { Input } from '@/components/ui/input';
@@ -673,10 +674,10 @@ export default function ChatPanel() {
   // screen and then collapsed, exiting full-screen returns you to collapsed.
   if (chatPanelCollapsed && !fullScreen) {
     return (
-      <div className="w-8 bg-sidebar border-l border-border flex flex-col items-center py-2 shrink-0">
+      <div className="w-8 bg-surface-2 border-l border-border flex flex-col items-center py-2 shrink-0">
         <button
           onClick={toggleChatPanel}
-          className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded transition-colors"
+          className="p-1 text-muted-foreground hover:text-text hover:bg-surface-3 rounded transition-colors"
           title="Show chat panel"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -692,7 +693,7 @@ export default function ChatPanel() {
   return (
     <div
       className={cn(
-        'bg-sidebar border-l border-border flex shrink-0 overflow-hidden',
+        'bg-surface border-l border-border flex shrink-0 overflow-hidden',
         fullScreen
           ? 'fixed inset-0 z-50 border-l-0 transition-none'
           : 'relative transition-[width] duration-200'
@@ -703,7 +704,7 @@ export default function ChatPanel() {
       {!fullScreen && (
         <div
           onMouseDown={handleMouseDown}
-          className={cn('w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors flex items-center justify-center', resizingRef.current && 'bg-primary/30')}
+          className={cn('w-1.5 cursor-col-resize hover:bg-accent/20 transition-colors flex items-center justify-center', resizingRef.current && 'bg-accent/20')}
         >
           <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 hover:opacity-100 transition-opacity" />
         </div>
@@ -738,7 +739,7 @@ export default function ChatPanel() {
                 className="px-1.5 py-0.5 flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors"
                 title={copied ? 'Copied' : `Copy conversation id: ${conversationId}`}
               >
-                {copied ? <Check className="h-3 w-3 text-green-500" /> : <Hash className="h-3 w-3" />}
+                {copied ? <Check className="h-3 w-3 text-success" /> : <Hash className="h-3 w-3" />}
                 <span>{conversationId.slice(0, 8)}</span>
               </button>
             )}
@@ -857,10 +858,15 @@ export default function ChatPanel() {
                 Ask anything about your campaigns. The AI agent has access to all 87 Google Ads tools.
               </div>
             )}
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <ChatMessageComponent
                 key={msg.id}
                 message={msg}
+                isStreaming={
+                  isResponding &&
+                  idx === messages.length - 1 &&
+                  msg.role === 'assistant'
+                }
                 conversationId={conversationId ?? undefined}
                 onDelete={async (msgId) => {
                   if (!conversationId) return;
@@ -873,8 +879,12 @@ export default function ChatPanel() {
               />
             ))}
             {isResponding && messages[messages.length - 1]?.role === 'user' && (
-              <div className="px-4 py-2 text-xs text-muted-foreground animate-pulse">
-                Agent is thinking...
+              <div className="flex items-center gap-3 px-3 py-2">
+                <AgentAvatar size="sm" showStatus isWorking />
+                <span className="text-xs italic text-muted-foreground">
+                  thinking
+                  <span className="studio-caret ml-0.5">▍</span>
+                </span>
               </div>
             )}
             <div ref={messagesEndRef} />
