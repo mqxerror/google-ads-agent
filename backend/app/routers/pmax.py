@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from google_ads.services.campaign.pmax_orchestrator import (
     ApiCtx,
     PMaxOrchestrator,
+    PMaxStepError,
     PMaxValidationError,
 )
 
@@ -110,6 +111,25 @@ async def create_pmax(account_id: str, body: PMaxCreateRequest) -> PMaxCreateRes
         raise HTTPException(
             status_code=422,
             detail={"error": "VALIDATION_FAILED", "errors": e.errors},
+        )
+    except PMaxStepError as e:
+        logger.exception(
+            "PMax orchestrator failed for account=%s at step '%s'",
+            account_id, e.step,
+        )
+        # 502 — a Google Ads call failed mid-recipe. The orchestrator
+        # already rolled back; `message` is the full self-contained
+        # story (step + cleanup + underlying error) so the wizard can
+        # show it verbatim, with `step`/`rolled_back` available for
+        # richer UI treatment later.
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "GOOGLE_ADS_ERROR",
+                "step": e.step,
+                "rolled_back": e.rollback_report,
+                "message": str(e)[:800],
+            },
         )
     except Exception as e:
         logger.exception("PMax orchestrator failed for account=%s", account_id)

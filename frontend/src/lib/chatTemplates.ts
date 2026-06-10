@@ -8,7 +8,7 @@ export interface ChatTemplate {
   /** If true, the prompt includes {campaign} placeholder to be filled with selected campaign name */
   needsCampaign?: boolean;
   /** Suggested model for this template */
-  suggestedModel?: 'sonnet' | 'opus' | 'haiku';
+  suggestedModel?: 'fable' | 'sonnet' | 'opus' | 'haiku';
 }
 
 const templates: ChatTemplate[] = [

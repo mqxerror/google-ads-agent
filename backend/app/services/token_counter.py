@@ -16,6 +16,8 @@ CHARS_PER_TOKEN = 4
 
 # Model context windows (input tokens)
 MODEL_CONTEXT_LIMITS = {
+    "claude-fable-5[1m]": 1_000_000,
+    "claude-fable-5": 200_000,
     "claude-sonnet-4-6": 200_000,
     "claude-opus-4-6": 1_000_000,
     "claude-opus-4-8": 1_000_000,

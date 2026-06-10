@@ -121,3 +121,49 @@ Brief: Gree | pending | director |
 1. How did yesterday compare to the 7-day average? Flag any anomalies.
 2. Are we on pace  | pending | ppc_strategist |
 | 2026-06-04 12:05 | **This campaign (Greece GV — Plan B, ID `23906692937`) has no "before" to drop from.** It was created 2026-06-03 and has exactly one day of recorded data: | User asked: since our last changes the click dropped down and conversion drops massively down | pending | director |
+| 2026-06-07 19:37 | **But** one message-match risk amplifies with NYC: the AG4 "Plan B / precarity" angle still has the unresolved landing-page gap. The LP (`mercan.com/greece-golden-visa/`) reads as a calm real-estate guide with **no Plan-B block above the fold** — CRO flagged this at build, it's still open. NYC traff | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 19:37 | - **NYC `1023191`:** the most expensive AND most contested — Henley, Global Citizen Solutions, Get Golden Visa all spend heavy here, plus the CBI-shopper noise the Search Term Hunter flagged. Highest CPC, lowest signal-to-noise. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 19:37 | Tracking is **geo-agnostic** — expanding metros changes nothing about conversion measurement. Conversion action `7144337715` (Greece Golden Visa USA CP, label `hMe8CLPl184aELCTg4oD`, GTM-KWFH5X9T, trigger `gf_submit` on `/greece-golden-visa/`) fires the same whether the click came from San Jose or N | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 19:37 | 1. **Enhanced Conversions still not confirmed enabled** on `7144337715`. If we widen geo and start pulling 3–4× the clicks, every lost match is now a lost lead at higher volume. For low-volume HNW leads this is a multiplier. Enable it *before* the traffic bump. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 19:55 | I approve the bundle — executing. Let me load the tools I need and first verify the current bidding setup (the CPC-cap mechanism depends on whether the campaign is on Maximize Clicks or Manual CPC, which isn't in my context).Tools loaded. Verifying the bidding strategy and fetching the 5 missing met | User asked: I approve the bundle | pending | director |
+| 2026-06-07 19:55 | Executing the bundle now — geo expansion, bid raise, and the two new ad groups in parallel.Geo added (9 metros), bids raised to $15 on the 3 existing groups, and both reserve ad groups created — AG3 `199755301880`, AG5 `192503397770`. Now adding their keywords and RSAs.Bundle executed. Here's what's | User asked: I approve the bundle | pending | director |
+| 2026-06-07 19:55 | **3. Reserve ad groups activated (ENABLED, with keywords + RSAs):** | User asked: I approve the bundle | pending | director |
+| 2026-06-07 19:55 | 1. **CPC-cap assumption — verify in UI.** This server's read tools are erroring (page-size bug), so I couldn't confirm the live bidding strategy. Per the build notes the campaign was left on **Manual CPC** with $9 ad-group bids (the Maximize Clicks switch was only ever a UI recommendation, never con | User asked: I approve the bundle | pending | director |
+| 2026-06-07 19:55 | 3. **AG4 is running against the unresolved LP gap.** AG4's "Plan B / precarity" ads still hit a landing page with no Plan-B block above the fold — CRO + Creative flagged this at build. Wider geo now sends more clicks into that mismatch. Two options: (a) ship the LP Plan-B block, or (b) I contain AG4 | User asked: I approve the bundle | pending | director |
+| 2026-06-07 20:01 | I'll verify the live bidding strategy and per-ad-group bids. Let me load the query tool.Now let me query the campaign's bidding strategy and the per-ad-group CPC bids.The page_size param is what triggers the bug. Let me retry without it.The GAQL tool always injects a default page_size. Let me use th | User asked: in changed it to manual cpu without a bid cap can you verify the bids | pending | ppc_strategist |
+| 2026-06-07 20:01 | / AG1 — Greece Golden Visa / 199619265520 / ENABLED / **$15.00** / | User asked: in changed it to manual cpu without a bid cap can you verify the bids | pending | ppc_strategist |
+| 2026-06-07 20:01 | / AG2 — Residency by Investment / 199619266920 / ENABLED / **$15.00** / | User asked: in changed it to manual cpu without a bid cap can you verify the bids | pending | ppc_strategist |
+| 2026-06-07 20:01 | / AG3 — EU / Second Residency / 199755301880 / ENABLED / **$15.00** / | User asked: in changed it to manual cpu without a bid cap can you verify the bids | pending | ppc_strategist |
+| 2026-06-07 20:01 | / AG4 — Plan B / Second Residency / 200176628587 / ENABLED / **$15.00** / | User asked: in changed it to manual cpu without a bid cap can you verify the bids | pending | ppc_strategist |
+| 2026-06-07 20:12 | AG4 RSAs lead with precarity ("your status shouldn't depend on one employer"), but the LP (`mercan.com/greece-golden-visa/`) still opens with "EU Access from €250K" and carries **no Plan-B block above the fold** (`planB: false`, flagged at build, still open). So those 2 clicks landed on a page that  | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 20:12 | Tracking status: conversion action **`7144337715`** (Greece Golden Visa USA CP, label `hMe8CLPl184aELCTg4oD`, GTM-KWFH5X9T, trigger `gf_submit` on `/greece-golden-visa/`) — **verified end-to-end 2026-03-19**, still valid, geo-agnostic. So the pipe works. With only 4 clicks and 0 form fills, there's  | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 20:12 | 1. **Enhanced Conversions — still not confirmed enabled** on `7144337715`. At higher volume, every unmatched conversion is a lost lead. Enable before the traffic bump lands. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 20:12 | I'll own the part of this that's *actually* a conversion problem rather than a volume problem — because once clicks do climb, **the page is what determines whether they convert, and it has two unfixed defects since build:** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 20:12 | / **Tracking** (`7144337715`, EC + 90-day unconfirmed) / Pipe verified; 2 config items open / Not causing it now, but could *hide* late leads / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |

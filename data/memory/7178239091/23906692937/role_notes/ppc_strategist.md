@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-04 11:57
+**Last updated:** 2026-06-07 20:05
 
 **Task:** As the PPC Strategist, design the complete campaign structure:
 
@@ -124,4 +124,75 @@ The search terms report shows two terms with 0 clicks each:
 **None required today.** The campaign is in its first 24 hours.
 The one watch item worth noting: `golden visa portugal` appeared in the search terms report with 0 clicks, but it was triggered by `[PHRASE] golden visa greece`. Keep an eye on this — if it accumulates impressions or clicks in the next 48 hours, add `portugal` as a **Phrase negative** at the campaign level.
 **Come back with a meaningful review once you have 7 days and 50+ clicks.** Until then, the only job is to let the campaign breathe and watch for junk search terms in the daily report.
+— PPC Strategist
+
+### 2026-06-07 19:51 — make a plan on how to spend all the budget wisely we are not spending at all I d
+
+**Task:** make a plan on how to spend all the budget wisely we are not spending at all I dont have time for a month of low impression ads
+## Spend-the-Budget Plan — Greece GV Plan B | 2026-06-07
+Straight answer first: **the campaign can't spend $100/day in its current shape — and no amount of waiting fixes that.** At $7.76 CPC in 2 metros with tight match and a $9 cap, the math caps you at ~$15–25/day even on a good day. You're not under-pacing by accident; the structure throttles you. Waiting a month changes nothing. To spend the budget we have to **widen the funnel** — deliberately, not
+To spend $100/day at ~$10 CPC you need **~10 clicks/day**. You're getting ~1. That's a 10× volume gap, and exactly three levers close it.
+### The 3 levers that actually unlock spend
+| Lever | Now | Change to | Why it moves spend |
+|---|---|---|---|
+All three are **launch-phase volume expansion**, not mid-flight optimization — so I'd pull them together rather than one-per-day. The one-change-per-day rule exists to keep *attribution* clean on a running campaign; you have 0 conversions, so there's no signal to protect yet. Speed is the right call here.
+### The "wisely" guardrails (this is what keeps it from becoming the old campaign's 95.7% waste)
+- ✅ **Keep "Presence" location only** — no tourists/researchers of Greece
+- ✅ **Keep Phrase/Exact — NO Broad.** Broad + 0 conversion data is *exactly* the AI-Max pattern that torched 95.7% of the old Greece campaign. Hard no until ≥15 conversions.
+- ✅ **Negatives queued same week** — wider geo + NYC pulls citizenship-shoppers (`cheapest citizenship`, `buy citizenship`, `citizenship by investment`). Search Term Hunter's list is ready.
+- ✅ **No PMax** — needs a conversion seed to steer; launching now = budget spray.
+- ✅ **No bidding-strategy change** — stay Maximize Clicks. Switch to Max Conversions only at ≥15 conv/30d.
+### Proposed metros (8–9)
+San Francisco `1014221` · New York `1023191` · Dallas `1026339` · Austin `1026201` (IDs I have) + **Los Angeles, Miami, Boston, Chicago, Washington DC** (I'll fetch these IDs live). All Tier-1 HNW/tech-wealth — no low-value geos.
+### Honest expectation setting
+Even with all three levers, you won't snap to a flat $100/day tomorrow — **18 of 21 keywords still show QS `--`**, and Google ramps new-campaign trust over a few days. Realistically this takes you from ~$8/day to **~$40–70/day within 3–5 days**, climbing toward full budget over ~1–2 weeks as QS establishes. That's *not* a month — but it's also not a switch. The levers remove the structural ceiling
+If you want to go even more aggressive (national + remove the cap), I'd advise against it — that's the brute-force version that reintroduces the waste risk with no conversion signal to catch it.
+### What I need from you
+This bundles **medium/high-impact changes** (geo + CPC cap + 2 new ad groups), so I need your go-ahead before executing. On approval I'll:
+1. Fetch the 5 missing metro IDs (LA, Miami, Boston, Chicago, DC)
+2. Add all metros, Presence-only
+3. Raise Max CPC cap $9 → $15
+4. Activate AG3 + AG5 with their keywords
+5. Queue the CBI negative list to apply in 48h once the wider net runs
+**Approve the full bundle, or want to dial it back** (e.g. geo + CPC cap only, hold the reserve ad groups)? Say the word and I execute.
+— PPC Strategist
+
+### 2026-06-07 20:01 — in changed it to manual cpu without a bid cap can you verify the bids
+
+**Task:** in changed it to manual cpu without a bid cap can you verify the bids
+I'll verify the live bidding strategy and per-ad-group bids. Let me load the query tool.Now let me query the campaign's bidding strategy and the per-ad-group CPC bids.The page_size param is what triggers the bug. Let me retry without it.The GAQL tool always injects a default page_size. Let me use the dedicated ad-groups search tool instead.Bids verified — all 5 ad groups confirmed live.
+## Bid Verification — Greece GV Plan B (`23906692937`)
+| Ad Group | ID | Status | Max CPC |
+|---|---|---|---|
+All five sit at exactly `15000000` micros = **$15.00**. The bid raise from the bundle landed correctly on every group.
+### One thing to clear up about "without a bid cap"
+On **Manual CPC**, there's no *separate* campaign-level cap to remove — **the ad-group Max CPC bid IS the cap.** So your campaign isn't "uncapped" — each ad group is capped at **$15.00 per click**. That's exactly the ceiling we agreed on in the bundle, and it's correct: it lets you win the SF/NYC auctions (which clear ~$11–14) that the old $9 bid was silently losing.
+If by "without a bid cap" you meant you wanted **no ceiling at all** (let Google bid whatever it takes), that's not what's live — and I'd advise against it. With 0 conversions and QS still mostly `--`, an uncapped bid risks overpaying into the noisiest auctions (NYC/Miami CBI-shopper traffic) with no conversion signal to justify it. **$15 is the right cap for now.**
+### Note on the bidding strategy itself
+I could confirm the per-ad-group bids cleanly via the ad-group tool, but this server's GAQL tool still has the `page_size` bug, so I couldn't pull the campaign-level `bidding_strategy_type` field to print it back verbatim. The fact that these `cpc_bid_micros` are active and being respected confirms you're on **Manual CPC** (these bids only function under Manual CPC / eCPC). If you want belt-and-su
+**Bottom line: bids are correct at $15.00 across all 5 ad groups — that $15 is your effective max CPC cap.** Nothing to fix. Want me to leave it here, or were you trying to remove the cap entirely?
+— PPC Strategist
+
+### 2026-06-07 20:05 — what is the best daily budget for this campaign to drive 5 conversion a day?
+
+**Task:** what is the best daily budget for this campaign to drive 5 conversion a day?
+## Best Daily Budget for 5 Conv/Day — Greece GV Plan B
+**Honest answer first: no budget number is trustworthy yet, because this campaign has 0 conversions.** Without a single conversion, there's no conversion rate (CVR) to compute a budget from — anything I hand you would be an invented baseline, which I won't do. But I can show you the math, label every assumption, and tell you why 5/day is the wrong target *today*.
+### The math (every CVR here is an ASSUMPTION, not this campaign's data)
+5 conv/day requires `5 ÷ CVR` clicks/day, at a realistic post-expansion CPC of **~$12** (SF/NYC/Miami clear $11–14):
+|---|---|---|---|
+Even at a *generous* 3% CVR, 5 conversions/day implies a **$2,000/day budget — 20× your current $100.** At a more realistic 1–2% for cold HNW lead-gen on a 7/10 page, it's **$3,000–6,000/day.**
+### Why budget isn't actually the lever here
+Two hard ceilings sit above the money:
+1. **Search volume ceiling.** Your 36 tight Phrase/Exact keywords across 11 metros physically cannot generate 167–500 clicks/day. This niche — "greece golden visa," "second passport," HNW residency-by-investment — is **low-volume by nature.** Right now all 11 metros combined produce ~1–3 clicks/day. Even uncapped, you'd top out at maybe 15–40 clicks/day once QS matures — nowhere near 167+. **No bu
+2. **5/day = 150 leads/month.** For context, the *old* Greece campaign at $200/day generated a handful of leads. 5 qualified €250K-investor consults per day would be an exceptional agency-wide month, not a daily rate. The target itself is mis-scaled for this product's market.
+### What I'd actually do
+**Stop optimizing for a conversion rate you don't have. Get to the first 5–10 conversions *total* to establish a real CVR — then I can compute an exact budget.**
+| Phase | Budget | Goal |
+|---|---|---|
+### Bottom line
+- **5 conv/day is not a budget question — it's a market-size + funnel-maturity question.** The searchable HNW volume in this niche won't sustain it at any budget.
+- **You can't even spend $100/day yet**, so raising the budget changes nothing until QS matures and impressions climb.
+- **The honest path:** run the current $100/day, get the first handful of conversions, and I'll give you a budget for a *realistic* target (start with 1/day). A €250K-deal product needs lead *quality*, not 150 leads/month.
+Want me to set a concrete gate — e.g. "if we hit 5 total conversions by Jun 21, I recompute the budget for a 1/day target"? That replaces guesswork with your own data.
 — PPC Strategist

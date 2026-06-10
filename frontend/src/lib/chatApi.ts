@@ -52,7 +52,7 @@ export async function sendChatMessage(params: SendChatParams): Promise<SendChatR
       content: params.text,
       account_id: params.accountId,
       campaign_id: params.campaignId,
-      model: params.model || 'opus',
+      model: params.model || 'fable',
       active_role: params.roleId || null,
       attachments: params.attachments || [],
     }),

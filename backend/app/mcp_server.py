@@ -183,6 +183,126 @@ async def list_personas() -> str:
     return json.dumps(rows, indent=2)
 
 
+# ── Scheduled Plans tools (Epic 9) ───────────────────────────────────
+# Mirror routers/plans.py + services/scheduler.py so plans can be created,
+# inspected, and approved from ANY Claude Code session — the "schedule from
+# anywhere" unlock. Money/structural categories (budget|bids|status|geo)
+# default to approval mode: the scheduler proposes, a human approves.
+
+
+@mcp.tool
+async def create_plan(
+    account_id: str,
+    title: str,
+    action_detail: str,
+    campaign_id: str | None = None,
+    campaign_name: str | None = None,
+    action_category: str = "other",
+    schedule_type: str = "once",
+    run_at: str | None = None,
+    recurrence: str | None = None,
+    mode: str | None = None,
+    context_snippet: str | None = None,
+) -> str:
+    """Schedule an action the agent will execute (or propose for approval) at a
+    set time. action_category: budget|bids|status|geo|search_terms|audit|report|other
+    (budget/bids/status/geo are approval-gated by default — they never spend
+    before a human approves). schedule_type 'once' needs run_at (ISO datetime,
+    UTC); 'recurring' needs recurrence like 'daily:09:00', 'weekly:mon:09:00',
+    or 'monthly:15:09:00'. mode overrides the inferred auto|approval."""
+    import uuid as _uuid
+    from app.services import scheduler as _sched
+
+    pid = str(_uuid.uuid4())
+    resolved_mode = mode or _sched.infer_mode(action_category)
+    if schedule_type == "recurring":
+        nxt = _sched.compute_next_run(recurrence)
+        next_run = nxt.isoformat(sep=" ", timespec="seconds") if nxt else None
+    else:
+        next_run = (run_at or "").replace("T", " ").replace("Z", "").strip() or None
+    if not next_run:
+        return json.dumps({"error": "no valid run time — give run_at (once) or recurrence (recurring)"})
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO scheduled_plans
+           (id, account_id, campaign_id, campaign_name, title, action_detail,
+            context_snippet, action_category, mode, schedule_type, run_at,
+            recurrence, status, next_run_at, created_by)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'scheduled',?,'mcp')""",
+        [pid, account_id, campaign_id, campaign_name, title, action_detail,
+         context_snippet, action_category, resolved_mode, schedule_type,
+         next_run if schedule_type == "once" else None, recurrence, next_run],
+    )
+    await db.commit()
+    return json.dumps({
+        "created": pid, "mode": resolved_mode, "next_run_at": next_run,
+        "note": "approval-gated — the agent will propose the change and wait for sign-off"
+                if resolved_mode == "approval" else "auto — executes at the scheduled time",
+    })
+
+
+@mcp.tool
+async def list_plans(
+    account_id: str,
+    campaign_id: str | None = None,
+    include_done: bool = False,
+) -> str:
+    """List scheduled plans (needs-attention first). Shows status
+    (scheduled|due|running|awaiting_approval|done|failed|paused), mode,
+    next run, last result, and any proposed_change awaiting approval."""
+    db = await get_db()
+    q = ("SELECT id, campaign_id, campaign_name, title, action_category, mode, "
+         "schedule_type, recurrence, status, next_run_at, last_run_at, "
+         "last_result, last_cost, proposed_change FROM scheduled_plans "
+         "WHERE account_id = ?")
+    args: list = [account_id]
+    if campaign_id:
+        q += " AND campaign_id = ?"
+        args.append(campaign_id)
+    if not include_done:
+        q += " AND status != 'done'"
+    q += (" ORDER BY (status IN ('awaiting_approval','failed')) DESC, "
+          "next_run_at IS NULL, next_run_at LIMIT 100")
+    rows: list[dict] = []
+    async with db.execute(q, args) as cur:
+        async for r in cur:
+            d = dict(r)
+            # Keep long text fields readable in tool output
+            for k in ("last_result", "proposed_change"):
+                if d.get(k) and len(d[k]) > 600:
+                    d[k] = d[k][:600] + "…"
+            rows.append(d)
+    return json.dumps(rows, indent=2, default=str)
+
+
+@mcp.tool
+async def approve_plan(plan_id: str) -> str:
+    """Approve a plan that is awaiting_approval — the agent then EXECUTES the
+    proposed change (spend/structural changes only happen after this)."""
+    from app.services import scheduler as _sched
+    result = await _sched.approve_plan(plan_id)
+    return json.dumps(result, default=str)
+
+
+@mcp.tool
+async def skip_plan(plan_id: str) -> str:
+    """Decline a plan awaiting approval (or skip its current cycle). Recurring
+    plans re-arm to their next scheduled slot; one-time plans close as done."""
+    from app.services import scheduler as _sched
+    result = await _sched.skip_plan(plan_id)
+    return json.dumps(result, default=str)
+
+
+@mcp.tool
+async def run_plan_now(plan_id: str) -> str:
+    """Fire a plan immediately instead of waiting for its schedule. Approval-
+    gated plans still only PROPOSE (then await approval) — they never spend
+    unapproved."""
+    from app.services import scheduler as _sched
+    result = await _sched.run_now(plan_id)
+    return json.dumps(result, default=str)
+
+
 # ── Auth middleware ───────────────────────────────────────────────────
 
 

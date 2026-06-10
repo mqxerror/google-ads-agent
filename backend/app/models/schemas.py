@@ -90,7 +90,7 @@ class ChatMessageRequest(BaseModel):
     account_id: str | None = None
     campaign_id: str | None = None
     campaign_name: str | None = None
-    model: str = "sonnet"  # sonnet, opus, haiku
+    model: str = "sonnet"  # fable (UI default), sonnet, opus, haiku
     active_role: str | None = None  # force a specific specialist role
     attachments: list[AttachmentInfo] = Field(default_factory=list)
 

@@ -15,9 +15,10 @@ export interface Attachment {
   size: number;
 }
 
-export type ModelId = 'sonnet' | 'opus' | 'haiku';
+export type ModelId = 'fable' | 'sonnet' | 'opus' | 'haiku';
 
 const MODELS: { id: ModelId; label: string; desc: string; icon: typeof Zap }[] = [
+  { id: 'fable', label: 'Fable 5', desc: 'Deepest · default', icon: Brain },
   { id: 'sonnet', label: 'Sonnet', desc: 'Fast & smart', icon: Zap },
   { id: 'opus', label: 'Opus', desc: 'Deep analysis', icon: Brain },
   { id: 'haiku', label: 'Haiku', desc: 'Quick & cheap', icon: Sparkles },
@@ -55,7 +56,7 @@ interface ChatInputProps {
 
 export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation, onVideoReady }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [model, setModel] = useState<ModelId>('opus');
+  const [model, setModel] = useState<ModelId>('fable');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
   const [showTeam, setShowTeam] = useState(false);

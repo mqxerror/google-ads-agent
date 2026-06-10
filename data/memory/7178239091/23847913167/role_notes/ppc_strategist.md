@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-04 12:21
+**Last updated:** 2026-06-08 11:37
 
 **Task:** Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
 
@@ -435,4 +435,65 @@ Only 1 converting search term visible in the last 7 days — very light. This is
 | Priority | Action | When |
 |----------|--------|------|
 **Bottom line:** The campaign is intentionally quieter this week — that's the leak fix doing its job. Don't mistake lower volume for a problem. Jun 9 is the first honest read on whether CPA improved toward the $55 target. Hold steady.
+— *PPC Strategist*
+
+### 2026-06-07 18:39 — we have a 170 budget and we are spending 30 we need a whole year for the full bu
+
+**Task:** we have a 170 budget and we are spending 30 we need a whole year for the full budget spend which is 220
+You're right, and this flips the whole plan. The problem isn't budget — it's that we **strangled our own reach** and the budget number is now fiction.
+## The real picture
+We're not "settling" — we're in a **volume death-spiral**. Impressions have fallen every single day since the leak fix:
+| Date | Impr | Clicks | Spend |
+|------|------|--------|-------|
+That's **-87% spend in 6 days**. At ~$18/day against a $170 budget we're using **~11% of it**. You're spot-on: raising the budget to $220 does *nothing* — you can't spend $170 when reach has collapsed to $18.
+## What actually happened
+The Jun 2 leak fix **over-corrected**. Converting `"canadian citizenship through parents"` PHRASE → EXACT didn't just plug the leak — it deleted 727 clicks of reach. EXACT only matches that one exact string. And the campaign-level negatives we added (`parent was born in canada`, `i was born in canada`) were *already* enough to block the DIY intent. We threw out the volume with the bathwater.
+**The good news that earns us the right to act now:** CPA on the post-leak window (Jun 2–7) is **$48 — under the $55 gate**. The efficiency goal the waiting window was meant to confirm is *already met*. Waiting until Jun 9 while impressions bleed to ~100/day just starves it further.
+## The fix is REACH, not budget
+Budget stays put — it's not the lever. One change-type today: **restore match coverage on the clusters that actually convert.**
+| # | Action | Why |
+|---|--------|-----|
+I'd **leave through-parents as EXACT** — it converted at only 0.96% ($66+ CPA), above the gate. We restore volume through the *winning* Bill C-3 + ancestry clusters, not the loser.
+This is a volume-rescue, not a scale-up — so it overrides the "hold till Jun 9" window. The window's job was to read CPA; we've read it ($48 ✅). Sitting on our hands two more days just bleeds reach.
+**Want me to execute items 1–3 now?** Budget stays at current until reach recovers — *then* we talk scaling.
+— *PPC Strategist*
+
+### 2026-06-07 18:48 — remove the cut and the strategy from now on we clean search terms daily and keep
+
+**Task:** remove the cut and the strategy from now on we clean search terms daily and keep traffic coming increase the budget to 150 today the June 19 we increase it to 250
+Clear directive — executing. Three moves: restore reach, bump budget to $150 today, and schedule the $250 step for Jun 19. Plus the new standing policy (daily search-term cleaning, keep the taps open). Let me load the write tools.Executing all moves in parallel.Done — all three writes succeeded. Now updating memory so the new plan governs future sessions (budget $150, cut removed, daily-clean stra
+## Executed ✅
+| # | Action | Detail | Status |
+|---|--------|--------|--------|
+**New standing strategy pinned:** keep traffic flowing, clean search terms **daily** with negatives (reactive) instead of pre-emptively cutting match coverage. The waiting-window hold is lifted.
+## Two things you should know
+1. **I kept the 2 DIY negatives** (`parent was born in canada`, `i was born in canada`) as guardrails. They block the pure do-it-yourself parent-path searcher while the restored phrase match recaptures the broader volume. Since we now clean daily, I can pull them anytime — but they let us "remove the cut" without fully reopening the $66-CPA leak. Say the word if you want them gone too.
+2. **`through parents` is the one to watch.** It was the campaign's volume engine *and* its leak (0.96% CVR, $66 CPA). With daily cleaning that's manageable — but it's the first place I'll look in tomorrow's search-term sweep. The 3 AG3 Bill C-3 adds are pure upside (proven converters, low competition), so the reach recovery should skew toward the *good* volume.
+**Expectation setting:** reach won't snap back to 120 clicks/day overnight — the restored phrase keyword starts fresh on Quality Score and needs ~48h to rebuild auction presence. I'd expect clicks to climb from 15 → 40–60 over the next 2–3 days, then toward 80–100 by the weekend. That's what gives the $150 budget (and the Jun-19 $250 step) something real to spend on.
+**Heads-up for Jun 19:** before the $250 step fires, I'd want one look at CPA on the rebuilt volume — if reach recovers but CPA drifts above ~$55, doubling the budget would scale inefficiency. I'll flag it that morning either way; your call stands.
+— *PPC Strategist*
+
+### 2026-06-08 11:37 — what is the best strategy to quickly get the traffic quickly and keep daily sear
+
+**Task:** what is the best strategy to quickly get the traffic quickly and keep daily search term cleanup does the maximize click works ?
+Short answer: **Yes, Maximize Clicks works for exactly this goal — fast traffic + full-budget spend — and it pairs well with daily search-term cleanup. But don't flip it today, and never run it without a max-CPC cap.** Here's the honest breakdown.
+## Does Maximize Clicks fit our situation?
+**Yes — it's literally the tool for "get traffic fast and spend the budget."** It chases the most clicks your $150 can buy and will fill the budget aggressively. And your new standing policy (daily negatives) is the *perfect* guardrail for it: Max Clicks casts a wider net → daily cleanup prunes the junk. They're complementary, not in tension.
+But two hard caveats from this account's own history:
+1. **Always set a max-CPC cap.** Per our business context, *"Google can spend up to 2× daily budget with Maximize Clicks (TARGET_SPEND)."* Uncapped, it can also chase $1.80–$2.50 clicks. Our planner range is $0.17–$0.83 and we already pay $1.05–$1.18. **Cap it at ~$1.20** so it buys volume without runaway CPC.
+2. **It optimizes for clicks, not conversions** — fine right now because intent is the cleanest in campaign history, but it means CPA discipline rests entirely on the daily cleanup + bid cap.
+## Why NOT switch it *today*
+The reach collapse wasn't a bidding problem — it was a **coverage** problem (we deleted the `through parents` phrase match Jun 2). We restored that keyword last night, and **it's mid-QS-rebuild — Google needs ~48h before it wins auctions at full strength.** Switching bid strategy on top of a keyword that's still rebuilding QS:
+- stacks learning-phase instability on an unsettled signal (can't read what caused what),
+- won't manufacture reach the fresh-QS keyword can't yet support today anyway.
+Max Clicks accelerates spend into *available* auctions — but our available auctions are throttled by QS for ~24–48h more. So flipping today buys little and muddies the read.
+## What I'd actually do — fastest clean path
+**Today (same-type manual move, low risk, immediate):** bump the reach keywords to win more of the auctions that *are* live right now —
+- `[PHRASE] canadian citizenship through parents` $0.65 → **$0.90**
+- the 3 AG3 Bill C-3 adds $0.65 → **$0.85**
+That pushes volume immediately while QS rebuilds, no strategy-change instability.
+**Jun 9–10 (one clean change):** if reach is still under-spending the $150 budget after the restored keyword settles, **switch to Maximize Clicks with a $1.20 max-CPC cap.** By then the QS is rebuilt, the signal is clean, and Max Clicks has real auctions to fill — that's when it pays off, and it carries us straight into the Jun-19 $250 step with budget the strategy will actually consume.
+**Daily cleanup stays on regardless of bid strategy** — it's independent of Manual vs Max Clicks.
+Net: **Max Clicks is the right "spend it fast" engine — but it's a Jun 9–10 move, capped at $1.20, after the restored keyword finishes its QS rebuild.** Today, a quick bid bump on the reach keywords gets traffic climbing without the learning-phase hit.
+Want me to apply the bid bumps now ($0.90 / $0.85), and pencil the Maximize Clicks + $1.20 cap switch for Jun 9?
 — *PPC Strategist*

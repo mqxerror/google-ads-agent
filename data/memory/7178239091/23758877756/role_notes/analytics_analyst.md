@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-06-02 15:38
+**Last updated:** 2026-06-07 20:26
 
 **Task:** Conversion-tracking + attribution audit for Greece Golden Visa - Turkey (23758877756). Context: GTM-WZKDXFH8 V12 fixed the trigger May 20 (regex greece-golden-visa|yunanistan-altin-vize), conversion l
 
@@ -73,4 +73,20 @@ The Hunter correctly concedes in cross-examination that negatives address ~$60�
 |-----|--------|------|-------|-----------|
 | Today (pre-changes) | Verify language targeting live (API check: English + Turkish or Czech?) | Read-only | PPC Strategist | No cost; may change all subsequent QS diagnoses |
 The LP form fix (9→3 fields + dead-click bugs) is outside this table — it's the single highest-leverage action in the campaign but belongs to the LP team. The brief should go out in parallel today. It is not a "change" under the one-change-per-day rule; it's a separate workstream that should not wait for the ads calendar to complete.
+— *Analytics Analyst*
+
+### 2026-06-07 20:26 — why the report is about greece plan b campaign and talks about metros
+
+**Task:** why the report is about greece plan b campaign and talks about metros
+Short answer: there is no "Plan B campaign" and nothing about "metros" in anything I'm working on. I think two unrelated things are getting crossed.
+**What this campaign actually is:**
+- **Greece Golden Visa - Turkey**, ID **23758877756**, account 7178239091.
+- Turkish-language search campaign, 3 ad groups, landing page `mercan.com/tr/yunanistan-altin-vize`.
+- 14-day data: ~$590 spend, ~140 clicks, **0–1 conversions**, CPC band $2.56–$6.08.
+**Where "Plan B" comes from:** "Plan B" is a *copy/messaging angle* in my playbook — family-safety / second-residency-as-insurance positioning for HNW investors. It's a recommendation lens for ad and landing-page copy, **not** a campaign name. If a report mentioned "Plan B," it was talking about messaging strategy, not a separate campaign.
+**"Metros":** nothing in my context, data, or prior findings references metros (or Metro the brand, or metro/subway). That term doesn't appear anywhere in this campaign's reports, ad groups, keywords, or search terms. The only proper nouns here are Greek cities in the search terms — Atina (Athens), Selanik (Thessaloniki), Halkidiki, Kavala, Piraeus.
+So either:
+1. You're looking at a **different report/conversation** (possibly the main US Greece campaign, or another account entirely), or
+2. A previous response garbled something — in which case, paste the exact line that says "Plan B campaign" / "metros" and I'll trace where it came from.
+Which report are you looking at? If you can paste the sentence that mentions metros, I'll tell you exactly where it originated and whether it's even about this campaign.
 — *Analytics Analyst*

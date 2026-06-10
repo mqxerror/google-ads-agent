@@ -375,7 +375,7 @@ async def run_workflow(
             async for event in stream_agent_response(
                 user_message=plan_prompt, account_id=account_id,
                 campaign_id=campaign_id, campaign_name=campaign_name,
-                conversation_id=conv_id, model="opus", active_role="director",
+                conversation_id=conv_id, model="fable", active_role="director",
                 tool_allowlist=[],  # planning is pure reasoning
             ):
                 if event.get("type") == "text":
@@ -502,7 +502,7 @@ async def run_workflow(
         async for event in stream_agent_response(
             user_message=synth_task, account_id=account_id,
             campaign_id=campaign_id, campaign_name=campaign_name,
-            conversation_id=conv_id, model="opus", active_role="director",
+            conversation_id=conv_id, model="fable", active_role="director",
             tool_allowlist=[],
         ):
             etype = event.get("type")

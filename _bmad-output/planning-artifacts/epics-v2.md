@@ -60,6 +60,18 @@ Enable full campaign creation from briefs, bulk operations, search term manageme
 Cross-platform testing, CI pipeline, contributing guide, README polish, install script hardening, and V1→V2 migration.
 **FRs covered:** NFR-M5, NFR-M6, NFR-M7, NFR-R7, NFR-S7
 
+### Epic 8: PMax Finalization
+Close the loop from the existing PMaxWizard (709 lines), `routers/pmax.py`, and `asset_groups` table (V12) to a live end-to-end Performance Max campaign create — budget, asset group, audience signals, review, enable. ~70% built; finish, harden, verify against a real account.
+**Source:** PRD §8 Phase 1.5 (2026-06-10) · `research/product-roadmap.md` coverage workstream
+
+### Epic 9: MCP Plan Tools
+Expose Scheduled Plans on the HTTP MCP bridge (`app/mcp_server.py`): `create_plan`, `list_plans`, `approve_plan`, `skip_plan`, `run_plan_now`. Reuses the existing scheduler/REST logic and bearer-token auth so plans can be created and approved from any Claude Code session.
+**Source:** PRD §8 Phase 1.5 (2026-06-10) · roadmap Phase A0
+
+### Epic 10: Shopping Campaigns
+Greenfield: Merchant Center account linking, product feed awareness, listing group structure, and a Shopping campaign creation flow (builder stage + tools). Completes the sellable campaign-type coverage (Search ✓, PMax ✓ after Epic 8, Shopping).
+**Source:** PRD §8 Phase 1.5 (2026-06-10) · roadmap coverage workstream
+
 ---
 
 ## Epic 1: Multi-Account Foundation & Smart Onboarding
@@ -926,6 +938,118 @@ So that I can prioritize features based on real usage.
 
 ---
 
+## Epic 8: PMax Finalization (Phase 1.5)
+
+Close the wizard → live (PAUSED) PMax campaign loop. Gap audit 2026-06-10:
+campaign/budget/asset-group creation work; flow breaks at asset linking because
+the wizard passes local upload UUIDs where the orchestrator expects Google Ads
+asset resource names; audience signals are collected but never attached.
+
+### Story 8.1: Image Asset Bridge (local upload → Google Ads asset)
+
+As an operator finishing the PMax wizard,
+I want my uploaded logos/images turned into real Google Ads image assets,
+So that asset-group linking succeeds and the campaign actually materialises.
+
+**Acceptance Criteria:**
+
+**Given** a wizard bundle whose `logos`/`images` entries are local upload UUIDs
+**When** the PMax orchestrator runs its asset step
+**Then** each local UUID's file bytes are pushed via `AssetService.create_image_asset()`
+**And** the returned `customers/.../assets/...` resource name replaces the UUID in the bundle
+**And** entries that are already resource names pass through unchanged
+**And** asset-group linking uses only resource names (no more garbage-id API rejections)
+
+**Technical notes:** orchestrator-side bridge (not in the generic upload endpoint);
+files read from the assets.py upload storage path; rollback pattern preserved.
+
+### Story 8.2: Audience Signals Attachment
+
+**Given** a bundle with non-empty `audience_signals`
+**When** asset linking has succeeded
+**Then** signals are attached via `AssetGroupSignalService.mutate_asset_group_signals()`
+**And** a bundle without signals skips the step silently.
+
+### Story 8.3: PAUSED-safe create + step-level error surface
+
+**Given** any orchestrator failure mid-flow
+**When** the error is returned to the wizard
+**Then** it names the exact step that failed and what was rolled back
+**And** the campaign is always created PAUSED and never auto-enabled
+**And** enabling remains a human action (UI or explicit agent command).
+
+**Status note (2026-06-10):** implemented same-day under Wassim's one-time
+autonomous-execution authorization; pending a human-run live wizard submit for
+final e2e verification (no live mutations were run autonomously).
+
+---
+
+## Epic 9: MCP Plan Tools (Phase 1.5)
+
+Expose Scheduled Plans on the HTTP MCP bridge so plans can be created and
+approved from any Claude Code session.
+
+### Story 9.1: Plan tools on the bridge
+
+As a user in any Claude Code session connected to the agent's MCP,
+I want create_plan / list_plans / approve_plan / skip_plan / run_plan_now tools,
+So that I can schedule and govern agent actions without opening the app.
+
+**Acceptance Criteria:**
+
+**Given** the MCP is connected with a valid bearer token
+**When** I call `create_plan` with category budget|bids|status|geo
+**Then** the plan is created approval-gated (mode=approval) and never executes spend before `approve_plan`
+**And** `create_plan` with search_terms|audit|report|other defaults to auto mode
+**And** one-time plans require `run_at`, recurring require a valid `recurrence` (daily/weekly/monthly forms)
+**And** `list_plans` orders needs-attention (awaiting_approval|failed) first and truncates long text fields
+**And** `approve_plan`/`skip_plan`/`run_plan_now` mirror the REST lifecycle exactly (same scheduler functions)
+
+**Status note (2026-06-10):** implemented + verified (10 tools registered on the
+bridge, plan tools present; service restarted healthy).
+
+---
+
+## Epic 10: Shopping Campaigns (Phase 1.5)
+
+Greenfield. Completes sellable campaign-type coverage (Search ✓, PMax ✓ via
+Epic 8, Shopping). Stories below are the planning baseline; expand/adjust at
+implementation time.
+
+### Story 10.1: Merchant Center linking
+
+**Given** an account with a Google Merchant Center account
+**When** the user links it (or the agent detects an existing link)
+**Then** the link status + merchant id are stored per account and surfaced in the UI
+**And** a missing link produces a clear, actionable error (not a silent failure).
+
+### Story 10.2: Product feed awareness
+
+**Given** a linked Merchant Center
+**When** the agent loads campaign context
+**Then** feed health (approved/disapproved product counts, top categories) is
+available to personas and the campaign builder.
+
+### Story 10.3: Shopping campaign creation flow
+
+**Given** a linked Merchant Center with approved products
+**When** the user runs the Shopping flow in the Campaign Builder (new type tile)
+**Then** a Shopping campaign is created PAUSED with budget, priority, and
+listing-group structure (all-products baseline, optional category splits)
+**And** money-affecting settings respect the approval-gate philosophy.
+
+### Story 10.4: Listing group management tools
+
+Agent tools to inspect/split/negate listing groups post-launch (parity with
+keyword management in Search).
+
+### Story 10.5: Builder + MCP surface
+
+Shopping appears in the Campaign Builder type picker and (later) as MCP draft
+tools, matching the PMax pattern.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -956,9 +1080,13 @@ Epic 1: Multi-Account Foundation ──────┐
 | 5th | Epic 3: Dashboards & Charts | 5 stories | Visual impact, needs Epic 1+2 data |
 | 6th | Epic 6: Advanced Editing | 5 stories | Power features, needs intelligence layer |
 | 7th | Epic 7: Public Release | 5 stories | Final polish before launch |
+| 8th | Epic 8: PMax Finalization | 3 stories | ~70% built — fastest coverage win (Phase 1.5) |
+| 9th | Epic 9: MCP Plan Tools | 1 story | Small, unlocks scheduling from any Claude Code |
+| 10th | Epic 10: Shopping Campaigns | 5 stories | Greenfield — largest Phase 1.5 lift |
 
-**Total: 7 epics, 33 stories for Phase 1**
+**Total: 7 epics, 33 stories for Phase 1 · +3 epics / 9 stories (Phase 1.5, stories added 2026-06-10; Epics 8–9 implemented same day, Epic 10 pending)**
 
 ---
 
 *Next step: Begin implementation starting with Epic 1, Story 1.1.*
+*Phase 1.5 next step: expand Epics 8–10 into full stories via `/bmad-create-epics-and-stories`, then implement in order 8 → 9 → 10.*

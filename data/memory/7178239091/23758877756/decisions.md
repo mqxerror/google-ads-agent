@@ -187,3 +187,4 @@ GOAL: Full daily + weekly + ad-copy audit, then team-reconcile the three reports
 | 2026-06-02 15:40 | Everything above is a plan, not executed. **Say the word and I'll start with the Jun 3 negatives** (lowest-impact, no confirmation needed) — but I'd hold even those until blocker A (Czech/Turkish) is verified, since it may reshuffle priorities. | User asked: You are the Marketing Director. Your team has finished its audit.
 
 GOAL: Full daily + weekly + ad-copy audit, then team-reconcile the three reports in | pending | director |
+| 2026-06-08 11:29 | 1. **Czech language targeting is STILL live.** Targeting reads `English, Czech` — flagged by 3 specialists on Jun 2, never fixed. Should be English + Turkish. Czech is dead weight in Türkiye. | User asked: is teh citizenship campaign recovering ? | pending | director |

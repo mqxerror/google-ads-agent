@@ -594,6 +594,23 @@ Open-source templates that encode marketing best practices:
 - Plugin system
 - Client-facing reports with branding
 
+### Phase 1.5: Commercialization Coverage (added 2026-06-10)
+
+**Goal:** Complete campaign-type coverage and remote plan management so the MCP
+is sellable, not just an internal tool. Source: `research/product-roadmap.md`
+(Track A coverage workstream + Phase A0). Gates the GTM phase.
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| PMax Finalization | Close the loop from PMaxWizard + pmax router + asset_groups (V12) to a live end-to-end PMax campaign create (~70% built) | P0 |
+| MCP Plan Tools | Expose create_plan / list_plans / approve_plan / skip_plan / run_plan_now on the HTTP MCP bridge (app/mcp_server.py) so Scheduled Plans work from any Claude Code; reuses scheduler logic, bearer auth | P0 |
+| Shopping Campaigns | Merchant Center linking, product feed awareness, listing groups, Shopping campaign creation flow (greenfield) | P1 |
+
+> **Note (2026-06-10):** the Phase-1 non-goal "Cloud/SaaS deployment (stays
+> local-first forever)" is **superseded** for the hosted-MCP track — the app
+> stays local-first for individual users, but the MCP bridge will additionally
+> be hostable (token-secured) per the productization roadmap.
+
 ### Phase 2: Agency Features
 
 **Goal:** Full agency workflow support with team knowledge sharing and client reporting.

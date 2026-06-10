@@ -13,9 +13,10 @@ import { useClientAccountId } from '@/hooks/useClientAccountId';
 import PMaxWizard from './PMaxWizard';
 // chatApi used for atomic conversation creation in runStage and Research
 
-type ModelId = 'sonnet' | 'opus' | 'haiku';
+type ModelId = 'fable' | 'sonnet' | 'opus' | 'haiku';
 const MODELS: { id: ModelId; label: string; desc: string; icon: typeof Zap }[] = [
-  { id: 'opus', label: 'Opus', desc: 'Best quality (recommended)', icon: Brain },
+  { id: 'fable', label: 'Fable 5', desc: 'Best quality (recommended)', icon: Brain },
+  { id: 'opus', label: 'Opus', desc: 'Deep analysis', icon: Brain },
   { id: 'sonnet', label: 'Sonnet', desc: 'Fast & smart', icon: Zap },
   { id: 'haiku', label: 'Haiku', desc: 'Quick & cheap', icon: Sparkles },
 ];
@@ -164,7 +165,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   }, []);
 
   const [noLandingPage, setNoLandingPage] = useState(false);
-  const [buildModel, setBuildModel] = useState<ModelId>('opus');
+  const [buildModel, setBuildModel] = useState<ModelId>('fable');
 
   // Start build
   const handleStartBuild = async () => {

@@ -1,5 +1,5 @@
 # Campaign Chronicle: Greece Golden Visa - Turkey
-Last updated: 2026-06-02
+Last updated: 2026-06-08
 
 ## Timeline
 
@@ -26,6 +26,8 @@ Last updated: 2026-06-02
 - **May 19** — [CRO Specialist] User asked: this campaign and please update the landing page
 
 ### June 2026
+- **Jun 08** — [Agency Director] Greece GV - Turkey campaign (23758877756) reviewed: auction stable (CPC ~$4.30, no repeat of May 20 spike), but zero conversions May 25–Jun 8 and citizenship keywords (`yunanistan ev alana vatandaşlık` etc.) still stuck at QS 1. Jun 4 citizenship-pathway RSA additions unconfirmed — identified as likely root cause of stalled recovery.
+- **Jun 07** — [Analytics Analyst] User asked: why the report is about greece plan b campaign and talks about metros. - 14-day data: ~$590 spend, ~140 clicks, **0–1 conversions**, CPC band $2
 - **Jun 02** — [Agency Director] Director reconciled full audit for Greece GV Turkey (23758877756): root cause is landing-page funnel (1 form-start in 14 days per Clarity), not tracking or bidding; CVR baseline set to 0.75% (post-fix, 134 clicks), EN→Turkish budget redirect ruled a myth under Manual CPC.
 - **Jun 02** — [Creative Director] Creative Director cross-examined peer reports on Turkey campaign: flagged Search Term Hunter's recommendation to pin citizenship headlines to H1/H2 in RSA 809625956041 as a structural error that would break QS-3 oturma-izni keywords while fixing QS-1 ones; correct fix is adding citizenship variants unpinned (H3–H15) so Google's RSA rotation surfaces them on intent match.
 - **Jun 02** — [Analytics Analyst] Analytics Analyst cross-examined peer reports (PPC, Search Term Hunter, Creative Director) on 1-conv/14-days / 0.34% CVR root cause; confirmed tracking gap + form breakage as primary levers, corrected "redirect EN budget" framing (invalid under Manual CPC), and deprioritized negatives as CVR lever (spend efficiency only, not conversion rate).

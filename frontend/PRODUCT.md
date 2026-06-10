@@ -27,7 +27,7 @@ not a flashy dark dashboard.
 
 ## Surfaces (frontend)
 - **Chat panel** (`components/layout/ChatPanel.tsx`) — the primary surface:
-  persona registry, model selector (Sonnet/Opus/Haiku), Templates, Roles, Team
+  persona registry, model selector (Fable 5 default/Sonnet/Opus/Haiku), Templates, Roles, Team
   sessions, Video creator, conversation history + full-text search, export,
   the ContextBadge token-budget meter, the MemoryPanel (pinned facts +
   decision log), the action-vs-internal tool split, full-screen, resize,

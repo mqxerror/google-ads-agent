@@ -645,7 +645,7 @@ export default function ChatPanel() {
     const sendHandler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.text) {
-        handleSendRef.current(detail.text, detail.model || 'opus', detail.roleId);
+        handleSendRef.current(detail.text, detail.model || 'fable', detail.roleId);
       }
     };
     window.addEventListener('chat:display', displayHandler);

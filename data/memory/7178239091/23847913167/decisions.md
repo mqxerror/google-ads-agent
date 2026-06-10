@@ -290,3 +290,87 @@ Here's a self-contained prompt to paste to the GTM agent. It includes the hard c
 | 2026-06-04 20:14 | ### Signal #2 — One Converting Term Still Unactioned (Flagged 3rd Time) | User asked: A scheduled plan is due: "". Carry it out now on this campaign, then report what you did with concrete specifics. | pending | search_term_hunter |
 | 2026-06-04 20:14 | This was first flagged in the Jun 4 PPC daily review. It's genuine Bill C-3 application intent — exactly what AG3 is built for. **Queued for Jun 9.** | User asked: A scheduled plan is due: "". Carry it out now on this campaign, then report what you did with concrete specifics. | pending | search_term_hunter |
 | 2026-06-04 20:14 | The converting term (`canada bill c3 application`) has now been flagged three times across three sessions. Jun 9 is the right execution window — it'll be the first action I recommend when the waiting window opens. | User asked: A scheduled plan is due: "". Carry it out now on this campaign, then report what you did with concrete specifics. | pending | search_term_hunter |
+| 2026-06-07 17:58 | These are all matching loosely through `[PHRASE] bill c-3 canadian citizenship` (the 9-conv hero), but the "dropped the word *bill*" variants (`c 3 / c3`) get weak relevance. **`canada bill c3 application` has now converted and been flagged 4 sessions running.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 17:58 | Limited lane for me here — this is a search campaign with no video assets, and the LP has zero images/video (CRO flagged 0 `<img>` tags). So no script optimization to do on the live campaign today. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 17:58 | Tracking status is solid and unchanged — don't re-litigate it. Confirmed Jun 2 / May 26: | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 17:58 | - `/lp/` conversion chain verified: React form POSTs `/api/form-submit` → `gf_submit` (form_id 13) → GTM conversion tag fires. **Working.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 17:58 | The campaign-side team is converging well; my lane is the bottleneck nobody's fixed: **the LP P0 items from May 23 still haven't shipped.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:39 | / 1 / Add `[canada bill c3 application]` EXACT → AG3 @ $0.65 / The converting term flagged **4 sessions running** (1 conv, $2.82). Overdue. / | User asked: we have a 170 budget and we are spending 30 we need a whole year for the full budget spend which is 220 | pending | ppc_strategist |
+| 2026-06-07 18:43 | These are matching loosely through `[PHRASE] bill c-3 canadian citizenship` (our 9-conv hero) but the "dropped the word *bill*" variants get weak relevance. **`canada bill c3 application` has now converted and been flagged 4 sessions running — still not added.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:43 | Separately, my May 26 Clarity read still governs CVR: **97.8% mobile, 5.35% avg scroll depth.** The `/lp/` switch moved the form above fold but the **P0 fixes never shipped** (still "Submit," still 8 fields), which is why we saw no clear CVR lift. If we rebuild traffic into the same un-fixed form, w | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:43 | The c3 variants Search Term Hunter flagged are **the cheapest volume on the board**: low-competition long-tail spellings that our competitors aren't even structured for (Immigration.ca leads with a calculator; the law firms are content-led, not bidding `c 3` spellings). That's open, low-cost demand  | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:43 | Here's the blunt math on "spend the money": if the c3 keywords rebuild traffic from ~15 to ~90 clicks/day and that traffic hits the *same un-fixed form*, we've bought 6× the volume at the same CVR — we scaled the inefficiency. **Pair the Jun-9 reach work with a dev push on these 3 P0 items.** They'r | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:43 | **The team's unanimous answer to "we need to increase and spend the money": the budget number is not the lever — reach is.** We are spending **$18/day against a $130–170 budget (≈11% utilization)** not because the cap is too low, but because the Jun 2 leak fix removed our volume engine and left no k | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-07 18:48 | Clear directive — executing. Three moves: restore reach, bump budget to $150 today, and schedule the $250 step for Jun 19. Plus the new standing policy (daily search-term cleaning, keep the taps open). Let me load the write tools.Executing all moves in parallel.Done — all three writes succeeded. Now | User asked: remove the cut and the strategy from now on we clean search terms daily and keep traffic coming increase the budget to 150 today the June 19 we increa | pending | ppc_strategist |
+| 2026-06-07 18:48 | / 1 / **Removed the cut** — restored `[PHRASE] canadian citizenship through parents` → AG1 @ $0.65 / Undoes the Jun-2 PHRASE→EXACT over-correction that deleted 727 clicks of reach / ✅ / | User asked: remove the cut and the strategy from now on we clean search terms daily and keep traffic coming increase the budget to 150 today the June 19 we increa | pending | ppc_strategist |
+| 2026-06-07 18:48 | / 2 / **Reach rebuild** — 3 Bill C-3 capture keywords → AG3 @ $0.65 / `[EXACT] canada bill c3 application` (the 4×-flagged converter), `[PHRASE] c 3 canadian citizenship`, `[PHRASE] canadian citizenship bill c 3` / ✅ / | User asked: remove the cut and the strategy from now on we clean search terms daily and keep traffic coming increase the budget to 150 today the June 19 we increa | pending | ppc_strategist |
+| 2026-06-08 11:34 | / Jun 7 / 292 / 22 / $25.50 / **cut removed ~6:48pm** / | User asked: is the campaign traffic coming back ? | pending | director |
+| 2026-06-08 11:49 | **Executed — the 4 bid bumps are live as of now** (criterion IDs confirmed by the API): | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-08 11:49 | No objection to the bids — but I'll repeat the trap I flagged last session, now more urgent because we're actively *paying more* to push traffic into AG3: **the AG3 RSA needs a Bill C-3-forward pinned headline** before this higher-bid traffic lands, or those keywords feed generic descent copy and th | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-08 11:49 | 2. **Reach × CVR is still half-solved.** My May 26 Clarity read governs: **97.8% mobile, 5.35% scroll depth**, and the **P0 LP fixes never shipped** (still "Submit," still 8 fields). We're now paying *higher* bids to send *more* mobile traffic into the same un-fixed form. Every extra click the $0.90 | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-08 11:49 | I'll be the broken record because the math only gets worse as we spend more: **we're now raising bids to buy more clicks into an un-fixed form.** The 3 May-23 P0 items are *still* not shipped — | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-08 11:49 | / Analytics / ✅ cheap/reversible, but $48 CPA is only 4 conv — don't read tomorrow's clicks as proof. CVR still un-fixed. / | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-08 12:01 | The 3 LP P0 fixes (flagged May 23, still unshipped) — landing page `https://www.mercan.com/lp/canadian-citizenship-by-descent`: | User asked: remind with the 3 LP P0 fixes | pending | director |
+| 2026-06-08 12:01 | **Why these matter now:** we just bumped bids ($0.90/$0.85) to push more traffic in. Every extra click hits this same un-fixed form at ~1.2% CVR — so we're scaling reach without scaling conversion. These are minutes of dev work and compound on every new click. **Reach × CVR is the equation; we keep  | User asked: remind with the 3 LP P0 fixes | pending | director |
+| 2026-06-09 13:58 | I'll hold my line and it's directly relevant to "should we revert": **whatever we restore, it lands on an un-fixed form.** The 3 P0 items flagged May 23 are *still* unshipped — "Submit" button, 8 fields, the "Read the complete guide" leak. At ~1.2% CVR, here's the blunt math: | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-09 13:58 | So the answer to "were we converting 3–4/day and can we get back there" is: **reach alone gets you to ~2; reach × a fixed form is what gets you to 3–4.** Reverting the bid throttle is necessary but not sufficient. Push the dev fixes in parallel or we rebuild the exact same ceiling we hit before. **D | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-09 13:58 | **The honest bottom line:** you were converting **~2/day** (not 3–4) on cheap $66-CPA volume. Reviving reach gets you back to ~2. **Reach × a fixed landing page is what gets you to 3–4.** Don't revert into the same form and expect a different result. | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-09 14:30 | Flipped MapleRoots (23847913167) Manual CPC → **Maximize Clicks, $1.40 max-CPC cap** (via Google Ads UI / Chrome — no MCP tool for this strategy) | User approved "do 1 flip to maximize clicks to restore the traffic": old $0.90 cap sat below market CPC ($1.05–$1.33), starving reach after the Jun-2 PHRASE→EXACT collapse; Maximize Clicks fills the $150/day budget | ✅ verified — grid shows "Maximize clicks", "Limited by bid strategy" flag cleared | director |
+| 2026-06-09 14:13 | So the only way to flip MapleRoots to **Maximize Clicks @ $1.40 max-CPC cap** is through the Google Ads UI via Chrome. Let me load the browser tools and do it there.Browser tools loaded. Let me check if Chrome is running and what tabs are open.Chrome isn't running. Per the documented fallback, I'll  | User asked: do 1 flip to maximize clicks to restore the traffic | pending | director |
+| 2026-06-09 14:13 | **How:** the Google Ads MCP has no Maximize Clicks tool, so I made the change through the Google Ads UI via Chrome (select strategy → check "Set a maximum CPC bid limit" → enter $1.40 → Save). Verified server-side by reloading the campaigns grid — the Bid strategy type column now reads "Maximize cli | User asked: do 1 flip to maximize clicks to restore the traffic | pending | director |
+| 2026-06-09 14:13 | **One standing caveat from the team** (PPC Strategist + Analytics, repeatedly): you'll buy more clicks, but they land on the same un-fixed `/lp/` form (~1.2% CVR — still "Submit", 8 fields, the guide-link leak). Reach × a fixed form is what gets conversions back to 3–4/day; reach alone caps around ~ | User asked: do 1 flip to maximize clicks to restore the traffic | pending | director |
+| 2026-06-09 14:20 | / **Expedia** (famous case) / Removed **one** field ("Company") → **+$12M/year** in profit. One field. / | User asked: why you always keep saying reduce the form inputs and scientific studies about that ? also which field should I remove ? | pending | director |

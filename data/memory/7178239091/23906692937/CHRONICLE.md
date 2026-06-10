@@ -1,9 +1,16 @@
 # Campaign Chronicle: Build: https://www.mercan.com/greece-golden-visa/
-Last updated: 2026-06-04
+Last updated: 2026-06-07
 
 ## Timeline
 
 ### June 2026
+- **Jun 07** — [Agency Director] PPC team session on MapleRoots/GV campaign: confirmed 0 conversions on 4 clicks is statistical noise, not a conversion problem; expansion bundle (11 metros, $15 cap, 5 AGs) launched Jun 7 evening with zero post-expansion data yet; top clicked terms were `greece investor visa` ($8.94, AG2) and `second passport investment`.
+- **Jun 07** — [PPC Strategist] Diagnosed Greece GV Plan B campaign: 0 conversions means no trustworthy budget baseline; 5 conv/day target requires $2,000–$6,000/day (at 3–1% CVR, $12 CPC) — 20× current $100 budget. Identified two hard ceilings blocking scale: search volume cap (~15–40 clicks/day max across 11 metros with 36 tight keywords) and landing page conversion floor.
+- **Jun 07** — [PPC Strategist] Greece GV Plan B (23906692937) bid verification: all 5 ad groups confirmed on Manual CPC at $15.00/click — up from $9.00, covering the $11–14 SF/NYC auction clearing range.
+- **Jun 07** — [Agency Director] Greece GV Plan B (23906692937) bundle executed: geo expanded 2→11 HNW metros, ad-group CPC bids raised $9→$15 (Manual CPC confirmed), AG3 (199755301880) and AG5 (192503397770) created with keywords and RSAs live.
+- **Jun 07** — [PPC Strategist] Greece GV Plan B spend audit: identified 3 levers throttling spend to ~$15-25/day vs $100 budget — geo (2 metros only), $9 CPC cap losing SF/NYC auctions, and only 3 active ad groups/21 keywords. Recommended simultaneous expansion to 8-9 metros, $15 CPC cap, and 5 AGs/~38 keywords to close 10× volume gap.
+- **Jun 07** — [Agency Director] PPC Strategist recommended expanding from 2 → 4 metros (SF + NYC added) to fix 92% under-pace ($8/day of $100 budget, 46 impressions over 4 days); hard cap: keep "Presence" location option only. Search Term Hunter flagged citizenship-shopping leakage ("cheapest citizenship by investment", "buy citizenship countries") requiring immediate negative keywords.
+- **Jun 07** — [Agency Director] Greece GV Plan B 4-day cold-start check (Jun 4–7): 46 impressions, 4 clicks, $31.02 spend, 0 conversions — running ~92% under-pace at ~$8/day vs $100 budget; QS still mostly unset, CPC $7.76 blended (healthy). Citizenship-shopping search term leakage flagged as watch item.
 - **Jun 04** — [Agency Director] User asked: since our last changes the click dropped down and conversion drops massively down. ** It was created 2026-06-03 and has exactly one day of recorded data:
 
 | Metric | All-time (Day 1 o. ** It was created 2026-06-03 and has exactly one day of recorded data:

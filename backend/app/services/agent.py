@@ -208,6 +208,9 @@ def _get_mcp_config_path() -> Path:
 _ads_svc = GoogleAdsService()
 
 AVAILABLE_MODELS = {
+    # "fable" is the default (claude-fable-5[1m], 1M-context variant). If the
+    # bracket notation ever breaks on the CLI, fall back to plain "claude-fable-5".
+    "fable": "claude-fable-5[1m]",
     "sonnet": "claude-sonnet-4-6",
     "opus": "claude-opus-4-8",
     "haiku": "claude-haiku-4-5-20251001",

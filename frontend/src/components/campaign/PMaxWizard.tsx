@@ -173,7 +173,11 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
             portrait: bundle.portrait,
           },
           video_youtube_ids: bundle.videoIds.filter(Boolean),
-          audience_signals: null,
+          // Free-text hints become search-theme signals on the asset
+          // group (attached server-side after asset linking succeeds).
+          audience_signals: bundle.audienceSignals.length
+            ? bundle.audienceSignals.map(s => ({ search_theme: s }))
+            : null,
         }),
       });
       const json = await res.json();
@@ -423,7 +427,7 @@ function StepSignals({ bundle, setField }: { bundle: PMaxBundle; setField: <K ex
       <AiHint
         body="Audience signals tell Google's algorithm who to target initially. Optional — skip to let PMax explore from scratch. Custom-segment wiring layered in the next phase."
       />
-      <p className="text-xs text-muted-foreground">Skip this step or add free-text signal hints. The orchestrator currently accepts them as labels only; structured custom-segment wiring is a follow-up.</p>
+      <p className="text-xs text-muted-foreground">Skip this step or add free-text signal hints. Each hint is attached to the asset group as a search-theme signal; structured custom-segment wiring is a follow-up.</p>
       <TextList
         label="Signal hints (optional)"
         hint="One per row — e.g. 'high-net-worth investors', 'second-passport seekers'"

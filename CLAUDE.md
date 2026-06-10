@@ -17,6 +17,20 @@ This folder is the **Google Ads agent product itself** — multi-persona strateg
 
 **Important:** Mercan ecosystem memory lives at a DIFFERENT path: `~/.claude/projects/-Users-mqxerrormac16-Documents-LangarAI/memory/MEMORY.md`. Read it when the question is about Mercan business state, not about the agent's internals.
 
+## Delegation pattern (READ FIRST — Dam3oun-Google delegates, does NOT grind)
+
+You are Dam3oun-Google inheriting from the LangarAI Agent (`@../LANGARAI.md`). **Delegate by default — including when working ON this agent's own code.** The "agent-development context" above does NOT mean do everything yourself — it means the *subject* is the agent's code; you still **conduct, subagents perform.** Default to spawning a subagent for anything non-trivial; only trivial single-file edits / status answers / questions you handle inline.
+
+What goes to a subagent (`general-purpose` unless noted):
+- **BMAD planning artifacts** — any update to `_bmad-output/planning-artifacts/*.md` (prd / architecture / epics).
+- **Story execution / code** — any backend module > ~50 lines, any new frontend component, MCP/persona work, any multi-file change. Brief it with the feature/story + the exact files to read first.
+- **Multi-file investigations** ("where does persona routing happen?", "find every GTM tag spec") → spawn an `Explore` subagent.
+- **Architectural alternatives / trade-offs** → spawn a `Plan` subagent (read-only).
+
+What Dam3oun-Google does directly: single-file edits, small fixes, status answers, validating subagent output, briefing + stitching outputs, memory/feature-log writes, talking to Wassim.
+
+Brief like a smart colleague walking in cold: (a) goal in one sentence; (b) paths to read FIRST (relevant `_bmad-output/` docs + sibling refs); (c) quality bar + what NOT to do; (d) exact output destination; (e) report-back format (under 250 words: files, line counts, decisions beyond spec). After it returns: review, surface non-obvious decisions to Wassim, append the `_bmad-output/feature-log.md` row, chronicle. Light back-and-forth (1–3 messages, single-file edits) you do yourself. See [[feedback-subagent-delegation-default]].
+
 ## Stack
 
 - Backend: Python (FastAPI + MCP server) at `:8000`
