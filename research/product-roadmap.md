@@ -79,9 +79,9 @@ Google gates:
 ### Coverage workstream (parallel to A1–A4) — campaign-type completeness
 Rivals sell "create Search, Display, Shopping, Demand Gen, PMax drafts." We have
 Search deep; coverage gaps make the MCP a tool, not a product. **Required before A5.**
-- **PMax finalization** — ✅ code-complete 2026-06-10 (image-asset bridge,
-  signals attachment, step-aware errors; Epic 8). Pending: one human-run live
-  wizard submit to verify e2e (campaign lands PAUSED), then mark done.
+- **PMax finalization** — ✅ **DONE, live-verified 2026-06-10** (Epic 8).
+  Image-asset bridge, atomic asset-group mutate, signals, PAUSED-safe rollback;
+  test campaign 23934110143 created PAUSED e2e on the real account.
 - **Shopping campaigns** — greenfield: Merchant Center link, product feeds,
   listing groups. (Second.)
 - Later: Demand Gen / Display parity as demand shows.
