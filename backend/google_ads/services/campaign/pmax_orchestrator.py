@@ -6,19 +6,24 @@ a complete asset group. PMax requires a *recipe*, not just an API call:
     1. CampaignBudget
     2. Campaign (advertising_channel_type=PERFORMANCE_MAX)
     3. Assets (text + image + YouTube video) — one per content item
-    4. AssetGroup attached to the campaign
-    5. AssetGroupAsset link rows — assets bound to the group with a
-       field_type (HEADLINE / LONG_HEADLINE / DESCRIPTION / LOGO /
-       MARKETING_IMAGE / SQUARE_MARKETING_IMAGE / PORTRAIT_MARKETING_IMAGE
-       / YOUTUBE_VIDEO / BUSINESS_NAME)
-    6. (Optional) AssetGroupSignal[] for audience signals
+    4. AssetGroup + AssetGroupAsset link rows in ONE atomic
+       GoogleAdsService.Mutate call — the group is created under a
+       temporary resource name (`.../assetGroups/-1`) and every asset is
+       bound to that temp name with a field_type (HEADLINE /
+       LONG_HEADLINE / DESCRIPTION / LOGO / MARKETING_IMAGE /
+       SQUARE_MARKETING_IMAGE / PORTRAIT_MARKETING_IMAGE / YOUTUBE_VIDEO
+       / BUSINESS_NAME) in the same request
+    5. (Optional) AssetGroupSignal[] for audience signals
 
-Sequential calls (not a single GoogleAdsService.mutate batch) — chosen for
-debuggability and to match the rest of this codebase's per-service style.
-If any later step fails, prior creations are removed so the user never
-sees half a campaign in their Google Ads UI. Pre-flight validation
-catches Google's hard minimums before we hit the wire so users get
-clear, actionable errors instead of API exceptions.
+Steps 1-3 are sequential per-service calls — chosen for debuggability
+and to match the rest of this codebase's per-service style. Step 4 MUST
+be atomic: Google validates PMax asset minimums AT asset-group creation
+time, so an empty create followed by separate link calls is always
+rejected (asset_group_error NOT_ENOUGH_HEADLINE_ASSET et al., hit live
+2026-06-10). If any later step fails, prior creations are removed so the
+user never sees half a campaign in their Google Ads UI. Pre-flight
+validation catches Google's hard minimums before we hit the wire so
+users get clear, actionable errors instead of API exceptions.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from fastmcp import Context, FastMCP
+from google.ads.googleads.errors import GoogleAdsException
 from google.ads.googleads.v23.enums.types.advertising_channel_type import (
     AdvertisingChannelTypeEnum,
 )
@@ -35,9 +41,15 @@ from google.ads.googleads.v23.enums.types.asset_group_status import (
     AssetGroupStatusEnum,
 )
 from google.ads.googleads.v23.enums.types.campaign_status import CampaignStatusEnum
+from google.ads.googleads.v23.services.services.google_ads_service import (
+    GoogleAdsServiceClient,
+)
+from google.ads.googleads.v23.services.types.google_ads_service import (
+    MutateGoogleAdsRequest,
+    MutateOperation,
+)
 
-from google_ads.services.assets.asset_group_asset_service import AssetGroupAssetService
-from google_ads.services.assets.asset_group_service import AssetGroupService
+from google_ads.sdk_client import get_sdk_client
 from google_ads.services.assets.asset_group_signal_service import (
     AssetGroupSignalService,
 )
@@ -305,6 +317,17 @@ def _id_from_resource_name(resource_name: str) -> str:
     return resource_name.rsplit("/", 1)[-1]
 
 
+def _asset_resource_name(customer_id: str, ref: str) -> str:
+    """Normalize an asset ref to a full resource name.
+
+    Assets created in-process already carry full resource names; bundle
+    entries that passed through as bare numeric ids (MCP/agent-created
+    bundles) get expanded so the atomic mutate's link rows always
+    reference `customers/<cid>/assets/<id>`.
+    """
+    return ref if ref.startswith("customers/") else f"customers/{customer_id}/assets/{ref}"
+
+
 class PMaxOrchestrator:
     """The recipe. Holds references to each primitive service so it can
     sequence them and roll back on failure."""
@@ -313,9 +336,18 @@ class PMaxOrchestrator:
         self._budget = BudgetService()
         self._campaign = CampaignService()
         self._asset = AssetService()
-        self._asset_group = AssetGroupService()
-        self._asset_group_asset = AssetGroupAssetService()
         self._asset_group_signal = AssetGroupSignalService()
+        self._google_ads: Optional[GoogleAdsServiceClient] = None
+
+    @property
+    def google_ads_client(self) -> GoogleAdsServiceClient:
+        """GoogleAdsService client — the multi-resource Mutate endpoint
+        used for the atomic asset-group-plus-links create. Lazy, same
+        pattern as the per-resource service clients."""
+        if self._google_ads is None:
+            self._google_ads = get_sdk_client().client.get_service("GoogleAdsService")
+        assert self._google_ads is not None
+        return self._google_ads
 
     async def _resolve_image_plan(
         self,
@@ -556,57 +588,89 @@ class PMaxOrchestrator:
                 video_rns.append(_extract_resource_name(vr))
             asset_ids["videos"] = video_rns
 
-            # ── Step 4 — Asset group ──────────────────────────────────
-            failed_step = "asset group creation"
-            await ctx.log(level="info", message=f"[PMax] Creating asset group...")
-            ag_resp = await self._asset_group.create_asset_group(
-                ctx=ctx,
-                customer_id=customer_id,
-                campaign_id=campaign_id,
-                name=f"{bundle['name']} — Asset Group 1",
-                final_urls=bundle["final_urls"],
-                final_mobile_urls=bundle.get("final_mobile_urls"),
-                status=AssetGroupStatusEnum.AssetGroupStatus.PAUSED,
-            )
-            ag_rn = _extract_resource_name(ag_resp)
-            asset_group_id = _id_from_resource_name(ag_rn)
+            # ── Step 4 — Asset group + asset links (ONE atomic mutate) ─
+            # Google validates PMax asset minimums AT asset-group
+            # creation time, so creating an empty group and linking
+            # afterwards is impossible (asset_group_error
+            # NOT_ENOUGH_HEADLINE_ASSET et al., hit live 2026-06-10).
+            # The documented pattern: one GoogleAdsService.Mutate call
+            # whose first operation creates the group under a temporary
+            # resource name (-1) and whose remaining operations link
+            # every asset to that temp name — Google resolves the temp
+            # id within the request and applies it all-or-nothing.
+            failed_step = "asset group creation (atomic, with asset links)"
+            temp_ag_rn = f"customers/{customer_id}/assetGroups/-1"
+            mutate_ops: List[MutateOperation] = []
 
-            # ── Step 5 — Link each asset to the asset group ───────────
-            # All image slots now hold real Google resource names (or
-            # numeric ids) thanks to Step 3c — _link()'s id extraction
-            # is valid for every entry.
-            failed_step = "asset linking"
-            await ctx.log(level="info", message=f"[PMax] Linking {sum(len(v) for v in asset_ids.values())} assets to the group...")
+            ag_op = MutateOperation()
+            ag = ag_op.asset_group_operation.create
+            ag.resource_name = temp_ag_rn
+            ag.campaign = created_campaign_rn
+            ag.name = f"{bundle['name']} — Asset Group 1"
+            ag.final_urls.extend(bundle["final_urls"])
+            if bundle.get("final_mobile_urls"):
+                ag.final_mobile_urls.extend(bundle["final_mobile_urls"])
+            ag.status = AssetGroupStatusEnum.AssetGroupStatus.PAUSED
+            mutate_ops.append(ag_op)
 
-            async def _link(asset_rn: str, field_type) -> None:
-                aid = _id_from_resource_name(asset_rn)
-                try:
-                    await self._asset_group_asset.create_asset_group_asset(
-                        ctx=ctx,
-                        customer_id=customer_id,
-                        asset_group_id=asset_group_id,
-                        asset_id=aid,
-                        field_type=field_type,
-                    )
-                except Exception as e:
-                    # Linking failures shouldn't kill the whole flow if
-                    # the campaign is otherwise valid — log and continue.
-                    warnings.append(f"link asset {aid} as {field_type.name} failed: {e}")
+            def _link_op(asset_ref: str, field_type) -> MutateOperation:
+                op = MutateOperation()
+                link = op.asset_group_asset_operation.create
+                link.asset_group = temp_ag_rn
+                link.asset = _asset_resource_name(customer_id, asset_ref)
+                link.field_type = field_type
+                return op
 
             for field, rule in TEXT_RULES.items():
                 for rn in asset_ids[field]:
-                    await _link(rn, rule["field_type"])
+                    mutate_ops.append(_link_op(rn, rule["field_type"]))
 
             # business name uses its own field type
             for rn in asset_ids["business_name"]:
-                await _link(rn, AssetFieldTypeEnum.AssetFieldType.BUSINESS_NAME)
+                mutate_ops.append(
+                    _link_op(rn, AssetFieldTypeEnum.AssetFieldType.BUSINESS_NAME)
+                )
 
             for field, ft in IMAGE_FIELD_TYPES.items():
                 for rn in asset_ids[field]:
-                    await _link(rn, ft)
+                    mutate_ops.append(_link_op(rn, ft))
 
             for rn in asset_ids["videos"]:
-                await _link(rn, AssetFieldTypeEnum.AssetFieldType.YOUTUBE_VIDEO)
+                mutate_ops.append(
+                    _link_op(rn, AssetFieldTypeEnum.AssetFieldType.YOUTUBE_VIDEO)
+                )
+
+            await ctx.log(
+                level="info",
+                message=(
+                    f"[PMax] Creating asset group atomically with "
+                    f"{len(mutate_ops) - 1} asset link(s)..."
+                ),
+            )
+            ga_request = MutateGoogleAdsRequest()
+            ga_request.customer_id = customer_id
+            ga_request.mutate_operations.extend(mutate_ops)
+            try:
+                ga_resp = self.google_ads_client.mutate(request=ga_request)
+            except GoogleAdsException as e:
+                # Match the per-service error style so the wizard sees
+                # the readable failure detail, not a gRPC blob.
+                raise Exception(f"Google Ads API error: {e.failure}") from e
+
+            # Results come back in operation order — the first is the
+            # asset group create, carrying its REAL resource name.
+            op_responses = list(ga_resp.mutate_operation_responses)
+            if not op_responses:
+                raise RuntimeError(
+                    f"atomic mutate returned no results: {ga_resp!r}"
+                )
+            ag_rn = op_responses[0].asset_group_result.resource_name
+            if not ag_rn:
+                raise RuntimeError(
+                    f"atomic mutate's first result is not an asset group: "
+                    f"{op_responses[0]!r}"
+                )
+            asset_group_id = _id_from_resource_name(ag_rn)
 
             # ── Step 5b — Audience signals (optional, best-effort) ────
             # Signals steer PMax's initial exploration; the campaign is
@@ -805,32 +869,32 @@ class PMaxOrchestrator:
         campaign_rn: Optional[str],
         budget_rn: Optional[str],
     ) -> List[str]:
-        """Best-effort removal of the campaign we just created when
-        something downstream failed.
+        """Best-effort removal of the campaign + budget we just created
+        when something downstream failed.
 
-        Assets created along the way are intentionally left behind —
-        they're reusable from the account library and don't spend money.
-        Budgets with no campaign attached also don't spend; we don't
-        currently expose a remove-budget operation in this codebase
-        (BudgetService.update_campaign_budget has no status param), so
-        an orphan budget will appear in the account's budget list until
-        manually cleaned up. Worst case is a cosmetic entry, not a cost
-        leak — campaigns are what actually charge money, and those we
-        do remove.
+        Removal MUST use a REMOVE mutate operation (operation.remove =
+        resource name) — Google rejects `update status=REMOVED` with
+        request_error INVALID_ENUM_VALUE ("Enum value 'REMOVED' cannot
+        be used"), hit live 2026-06-10. Campaign first, then its budget
+        (a budget can only be removed once no live campaign references
+        it). Assets created along the way are intentionally left behind
+        — they're reusable from the account library and don't spend
+        money.
 
         Returns a human-readable report of what was (and wasn't) cleaned
         up, for inclusion in the PMaxStepError surfaced to the wizard.
         """
         report: List[str] = []
+        campaign_removed = campaign_rn is None
         if campaign_rn:
             cid = _id_from_resource_name(campaign_rn)
             try:
-                await self._campaign.update_campaign(
+                await self._campaign.remove_campaign(
                     ctx=ctx,
                     customer_id=customer_id,
                     campaign_id=cid,
-                    status=CampaignStatusEnum.CampaignStatus.REMOVED,
                 )
+                campaign_removed = True
                 await ctx.log(level="info", message=f"[PMax rollback] removed campaign {cid}")
                 report.append(f"Rolled back: campaign {cid} was removed.")
             except Exception as e:
@@ -842,17 +906,30 @@ class PMaxOrchestrator:
                 )
         if budget_rn:
             bid = _id_from_resource_name(budget_rn)
-            await ctx.log(
-                level="warning",
-                message=(
-                    f"[PMax rollback] orphan budget {bid} left in account "
-                    f"(no remove-budget tool wired). Safe to ignore — it won't spend."
-                ),
-            )
-            report.append(
-                f"Orphan budget {bid} left in the account (budgets without a "
-                f"campaign don't spend; safe to delete manually)."
-            )
+            try:
+                if not campaign_removed:
+                    # A budget referenced by a still-live campaign can't
+                    # be removed — don't burn an API call on it.
+                    raise RuntimeError("its campaign could not be removed first")
+                await self._budget.remove_campaign_budget(
+                    ctx=ctx,
+                    customer_id=customer_id,
+                    budget_id=bid,
+                )
+                await ctx.log(level="info", message=f"[PMax rollback] removed budget {bid}")
+                report.append(f"Rolled back: budget {bid} was removed.")
+            except Exception as e:
+                await ctx.log(
+                    level="warning",
+                    message=(
+                        f"[PMax rollback] orphan budget {bid} left in account ({e}). "
+                        f"Safe to ignore — budgets without a campaign don't spend."
+                    ),
+                )
+                report.append(
+                    f"Orphan budget {bid} left in the account ({e}) — budgets "
+                    f"without a campaign don't spend; safe to delete manually."
+                )
         if not report:
             report.append(
                 "Nothing was rolled back — no Google Ads entities had been created yet."

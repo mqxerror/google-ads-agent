@@ -30,6 +30,22 @@ router = APIRouter(prefix="/api", tags=["pmax"])
 _orchestrator = PMaxOrchestrator()
 
 
+def _ensure_sdk_client() -> None:
+    """The google_ads SDK client is normally initialised by the MCP
+    subprocess's lifespan (mcp_main.py). The REST wizard path runs in the
+    FastAPI process, which never called set_sdk_client — so the first live
+    submit failed with 'SDK client not initialized'. Lazily initialise from
+    env here (backend/.env is already loaded into os.environ by
+    app/mcp_server.py's load_dotenv at import time)."""
+    from google_ads.sdk_client import GoogleAdsSdkClient, get_sdk_client, set_sdk_client
+
+    try:
+        get_sdk_client()
+    except Exception:
+        set_sdk_client(GoogleAdsSdkClient())
+        logger.info("Initialized Google Ads SDK client for the REST PMax path")
+
+
 class PMaxMarketingImages(BaseModel):
     landscape: List[str] = Field(default_factory=list)
     square: List[str] = Field(default_factory=list)
@@ -99,6 +115,7 @@ async def create_pmax(account_id: str, body: PMaxCreateRequest) -> PMaxCreateRes
         "end_date": body.end_date,
     }
     try:
+        _ensure_sdk_client()
         result = await _orchestrator.create_pmax_campaign(
             ctx=ApiCtx(),
             customer_id=account_id,

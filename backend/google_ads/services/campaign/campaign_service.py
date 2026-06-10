@@ -78,11 +78,30 @@ class CampaignService:
             campaign = Campaign()
             campaign.name = name
             campaign.campaign_budget = budget_resource_name
-            # Set network settings
-            campaign.network_settings.target_google_search = True
-            campaign.network_settings.target_search_network = False
-            campaign.network_settings.target_content_network = False
-            campaign.network_settings.target_partner_search_network = False
+            # Set network settings — but NOT for Performance Max: Google
+            # manages networks automatically for PMax and rejects any
+            # explicit network_settings with OPERATION_NOT_PERMITTED_FOR_
+            # CONTEXT / CANNOT_TARGET_SEARCH_NETWORK (hit live 2026-06-10).
+            _channel = str(advertising_channel_type)
+            _is_pmax = "PERFORMANCE_MAX" in _channel or advertising_channel_type == 10
+            if not _is_pmax:
+                campaign.network_settings.target_google_search = True
+                campaign.network_settings.target_search_network = False
+                campaign.network_settings.target_content_network = False
+                campaign.network_settings.target_partner_search_network = False
+            else:
+                # New PMax campaigns get Brand Guidelines enabled by default,
+                # which then REQUIRES business-name + logo linked as
+                # campaign-level CampaignAssets in the same mutate
+                # (REQUIRED_BUSINESS_NAME_ASSET_NOT_LINKED, hit live
+                # 2026-06-10). Our recipe supplies those at the asset-group
+                # level instead, so explicitly disable Brand Guidelines.
+                try:
+                    campaign.brand_guidelines_enabled = False
+                except AttributeError:
+                    # Older client library without the field — Google then
+                    # defaults it off and the create succeeds anyway.
+                    pass
 
             # Set advertising channel type
             campaign.advertising_channel_type = advertising_channel_type
@@ -212,6 +231,59 @@ class CampaignService:
             raise Exception(error_msg) from e
         except Exception as e:
             error_msg = f"Failed to update campaign: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
+    async def remove_campaign(
+        self,
+        ctx: Context,
+        customer_id: str,
+        campaign_id: str,
+    ) -> Dict[str, Any]:
+        """Remove a campaign.
+
+        Removal MUST be a REMOVE operation (operation.remove = resource
+        name). Updating `status` to REMOVED is rejected by Google with
+        request_error INVALID_ENUM_VALUE ("Enum value 'REMOVED' cannot
+        be used") — hit live 2026-06-10 during PMax rollback.
+
+        Args:
+            ctx: FastMCP context
+            customer_id: The customer ID
+            campaign_id: The campaign ID to remove
+
+        Returns:
+            Removal result
+        """
+        try:
+            customer_id = format_customer_id(customer_id)
+            resource_name = f"customers/{customer_id}/campaigns/{campaign_id}"
+
+            # Create the operation
+            operation = CampaignOperation()
+            operation.remove = resource_name
+
+            # Create the request
+            request = MutateCampaignsRequest()
+            request.customer_id = customer_id
+            request.operations = [operation]
+
+            # Make the API call
+            response = self.client.mutate_campaigns(request=request)
+
+            await ctx.log(
+                level="info",
+                message=f"Removed campaign {campaign_id} for customer {customer_id}",
+            )
+
+            return serialize_proto_message(response)
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to remove campaign: {str(e)}"
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
