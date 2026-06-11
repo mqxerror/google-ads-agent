@@ -68,14 +68,32 @@ export interface CopyDraftResult {
   descriptions?: string[];
 }
 
+/** Host-pushed prefill: a preset prompt (Marketing Studio hooks), a
+ * model to preselect, and/or a Soul to lock in (Soul test-generate).
+ * Applied when the object reference changes, so hosts pass a fresh
+ * object per pick. */
+export interface StudioPanelPreset {
+  prompt?: string;
+  model?: string;
+  soulId?: string;
+}
+
 interface StudioPanelProps {
   open: boolean;
   onClose: () => void;
   mode: StudioPanelMode;
   accountId: string;
   context?: StudioPanelContext;
+  /** Hub hosts pass this to get image/video tabs in the panel header
+   * (the hub has one "Create" button, not one per mode). */
+  onModeChange?: (mode: 'image' | 'video') => void;
+  /** Prefill from presets / Soul test-generate. */
+  preset?: StudioPanelPreset;
   /** Called with the chosen asset when the operator clicks "Use in slot". */
   onUse?: (asset: StudioJobStatus) => void;
+  /** Fires whenever a watched job reaches a terminal state — hub hosts
+   * refresh the library from this. */
+  onJobSettled?: (asset: StudioJobStatus) => void;
   /** copy mode — host-injected drafter (keeps the panel decoupled). */
   onDraftCopy?: (intent: string) => Promise<CopyDraftResult>;
   onUseCopy?: (result: CopyDraftResult) => void;
@@ -85,7 +103,8 @@ const FALLBACK_ASPECTS = ['1:1', '4:5', '9:16', '16:9'];
 const CREDITS_RX = /credit|balance|insufficient|quota|top.?up/i;
 
 export default function StudioPanel({
-  open, onClose, mode, accountId, context, onUse, onDraftCopy, onUseCopy,
+  open, onClose, mode, accountId, context, onModeChange, preset,
+  onUse, onJobSettled, onDraftCopy, onUseCopy,
 }: StudioPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState('');
@@ -103,12 +122,33 @@ export default function StudioPanel({
 
   const genKind: 'image' | 'video' = mode === 'video' ? 'video' : 'image';
   const { models } = useModelCatalog(genKind);
-  const jobs = useStudioJobs();
+  const jobs = useStudioJobs(onJobSettled);
 
   // ── context-driven state ────────────────────────────────────────
   useEffect(() => {
     if (context?.aspect) setAspect(context.aspect);
   }, [context?.aspect]);
+
+  // ── preset prefill (Marketing Studio hooks / Soul test-generate) ─
+  // The model pick waits for the catalog: until then it parks in
+  // pendingModel; ModelPicker's own default-select runs first and is
+  // then overridden, which is fine — both settle on the preset.
+  const [pendingModel, setPendingModel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!preset) return;
+    if (preset.prompt) setPrompt(preset.prompt);
+    if (preset.soulId) setSoulId(preset.soulId);
+    if (preset.model) setPendingModel(preset.model);
+  }, [preset]);
+  useEffect(() => {
+    if (!pendingModel || !models.length) return;
+    const found = models.find((m) => m.id === pendingModel);
+    if (found) {
+      setModel(found.id);
+      setModelInfo(found);
+    }
+    setPendingModel(null); // unknown id → keep whatever is selected
+  }, [pendingModel, models]);
 
   // Effective aspect: locked from context, else clamped to what the
   // selected model accepts (catalog constraint).
@@ -359,14 +399,33 @@ export default function StudioPanel({
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">{title}</span>
+          {onModeChange && mode !== 'copy' ? (
+            // Hub host: one Create button outside, image/video tabs here.
+            <div className="inline-flex rounded-md border border-border p-0.5 gap-0.5">
+              {(['image', 'video'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onModeChange(m)}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-xs capitalize transition-colors',
+                    mode === m ? 'bg-accent-soft text-accent font-medium' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm font-semibold">{title}</span>
+          )}
           {context?.slot && (
             <span className="text-[10px] text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
               {context.slot}
             </span>
           )}
           {readyCount > 0 && (
-            <span className="text-[10px] text-green-600 dark:text-green-400">{readyCount} ready</span>
+            <span className="text-[10px] text-success">{readyCount} ready</span>
           )}
           <button onClick={onClose} className="ml-auto p-1 hover:bg-secondary rounded" aria-label="Close panel">
             <X className="h-4 w-4" />
@@ -400,7 +459,7 @@ export default function StudioPanel({
             </div>
           )}
           {enhanceError && (
-            <p className="text-[10px] text-red-600 dark:text-red-400 flex items-center gap-1">
+            <p className="text-[10px] text-danger flex items-center gap-1">
               <AlertCircle className="h-3 w-3 shrink-0" /> {enhanceError}
             </p>
           )}
@@ -467,7 +526,7 @@ export default function StudioPanel({
                 {copyBusy ? 'Drafting… 1-3 min (reads your landing page)' : 'Draft with Creative Director'}
               </Button>
               {copyError && (
-                <p className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1">
+                <p className="text-[11px] text-danger flex items-center gap-1">
                   <AlertCircle className="h-3 w-3 shrink-0" /> {copyError}
                 </p>
               )}
@@ -516,7 +575,7 @@ export default function StudioPanel({
                   className={cn(
                     'text-[10px] font-mono px-2 py-1 rounded border',
                     costError
-                      ? 'border-red-500/40 text-red-600 dark:text-red-400'
+                      ? 'border-danger/40 text-danger'
                       : 'border-border text-muted-foreground',
                   )}
                   title={costError ? `Model rejected the params: ${costError}` : (modelInfo?.cost_text || '')}
@@ -723,11 +782,11 @@ function ResultTile({
   // failed | nsfw — per-item retry (brief §6)
   return (
     <div
-      className={cn(frame, 'rounded border border-red-500/40 bg-red-500/5 flex flex-col items-center justify-center gap-1 p-1 text-center')}
+      className={cn(frame, 'rounded border border-danger/40 bg-danger-soft flex flex-col items-center justify-center gap-1 p-1 text-center')}
       title={variant.error_message || variant.status}
     >
-      <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-      <span className="text-[9px] font-mono text-red-600 dark:text-red-400 leading-tight line-clamp-2 break-all">
+      <AlertCircle className="h-3.5 w-3.5 text-danger" />
+      <span className="text-[9px] font-mono text-danger leading-tight line-clamp-2 break-all">
         {variant.status === 'nsfw' ? 'Content filter' : (variant.error_message || 'failed').slice(0, 60)}
       </span>
       <button

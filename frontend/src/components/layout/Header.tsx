@@ -143,7 +143,7 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
           size="sm"
           className={cn(
             'text-xs gap-1',
-            showStudio ? 'bg-pink-500/15 text-pink-300 hover:bg-pink-500/25 hover:text-pink-300' : 'text-muted-foreground'
+            showStudio ? 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent' : 'text-muted-foreground'
           )}
           onClick={() => setShowStudio(!showStudio)}
           title="Ad Studio — generate and manage creative"

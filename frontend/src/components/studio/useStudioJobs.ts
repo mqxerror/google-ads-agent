@@ -1,14 +1,13 @@
 /**
  * useStudioJobs — shared generation-job watcher.
  *
- * Extracted from HiggsfieldGenerator's inline SSE logic so StudioPanel
- * (and future hosts) reuse one implementation instead of duplicating
- * it. Watches /api/studio/jobs/:id/stream per asset with a one-shot
- * poll fallback when SSE drops; the DB row stays the single source of
- * truth (the worker keeps writing whether or not anyone is watching).
- *
- * HiggsfieldGenerator itself is left untouched for now — it retires in
- * the Studio hub redesign (Phase B).
+ * Extracted from the old HiggsfieldGenerator's inline SSE logic so
+ * StudioPanel (and future hosts) reuse one implementation instead of
+ * duplicating it. Watches /api/studio/jobs/:id/stream per asset with a
+ * one-shot poll fallback when SSE drops; the DB row stays the single
+ * source of truth (the worker keeps writing whether or not anyone is
+ * watching). HiggsfieldGenerator itself retired in Phase B — the
+ * Studio hub now routes everything through StudioPanel.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

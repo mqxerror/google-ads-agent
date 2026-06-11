@@ -100,10 +100,10 @@ export default function ScriptGenerator({ accountId, campaignId, campaignName, o
     <div className="border border-border rounded-lg bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/30">
-        <Wand2 className="h-3.5 w-3.5 text-pink-400" />
+        <Wand2 className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium">Script Generator</span>
         {campaignName && (
-          <span className="text-[10px] text-pink-400 bg-pink-500/10 px-1.5 py-0.5 rounded">
+          <span className="text-[10px] text-accent bg-accent-soft px-1.5 py-0.5 rounded">
             using {campaignName} context
           </span>
         )}
@@ -128,7 +128,7 @@ export default function ScriptGenerator({ accountId, campaignId, campaignName, o
                 disabled={generating}
                 className={cn(
                   'px-2 py-1 text-[10px] transition-colors',
-                  length === l ? 'bg-pink-500/20 text-pink-400' : 'text-muted-foreground hover:bg-secondary/50'
+                  length === l ? 'bg-accent-soft text-accent' : 'text-muted-foreground hover:bg-secondary/50'
                 )}
                 title={LENGTH_HINTS[l]}
               >
@@ -156,7 +156,7 @@ export default function ScriptGenerator({ accountId, campaignId, campaignName, o
           <button
             onClick={handleGenerate}
             disabled={!brief.trim() || generating}
-            className="ml-auto flex items-center gap-1 px-3 py-1 rounded text-xs bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="ml-auto flex items-center gap-1 px-3 py-1 rounded text-xs bg-primary text-primary-foreground hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {generating ? `Generating… ${elapsed}s` : 'Generate'}
@@ -164,7 +164,7 @@ export default function ScriptGenerator({ accountId, campaignId, campaignName, o
         </div>
 
         {error && (
-          <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1">
+          <div className="text-[10px] text-danger bg-danger-soft border border-danger/30 rounded px-2 py-1">
             ⚠ {error}
           </div>
         )}
@@ -180,13 +180,13 @@ export default function ScriptGenerator({ accountId, campaignId, campaignName, o
                   {spoken && (
                     <div className="flex items-start gap-2 text-[10px] border-t border-border pt-1.5">
                       <div className="flex-1">
-                        <div className="text-emerald-400 font-medium mb-0.5">Spoken ({spoken.split(/\s+/).length} words):</div>
+                        <div className="text-success font-medium mb-0.5">Spoken ({spoken.split(/\s+/).length} words):</div>
                         <div className="italic text-foreground/80">"{spoken}"</div>
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
                         <button
                           onClick={() => onUseScript(block)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-pink-500/20 text-pink-400 hover:bg-pink-500/30"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-accent-soft text-accent hover:bg-accent-soft/80"
                         >
                           <Film className="h-2.5 w-2.5" /> Use for video
                         </button>

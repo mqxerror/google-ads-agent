@@ -4,8 +4,8 @@
  * Hooks are pre-engineered ad concepts (Product Hit, Spicy, Interview,
  * Random Object Mic, etc.) shipped by Higgsfield with prompt + preview
  * video. The operator browses the grid, picks one, and the prompt
- * flows into HiggsfieldGenerator with `marketing_studio_video` model
- * pre-selected — much faster than writing prompts from scratch.
+ * flows into the shared StudioPanel as a preset — much faster than
+ * writing prompts from scratch.
  */
 
 import { useState, useEffect } from 'react';
@@ -19,7 +19,7 @@ import {
 
 interface MarketingPresetsPanelProps {
   /** Called when the operator picks a hook. Caller (StudioPage) opens
-   * HiggsfieldGenerator with the prompt + suggested model. */
+   * the StudioPanel with the prompt + suggested model preset. */
   onUseHook?: (hook: MarketingHook) => void;
 }
 
@@ -63,7 +63,7 @@ export default function MarketingPresetsPanel({ onUseHook }: MarketingPresetsPan
               className={cn(
                 'px-2 py-0.5 capitalize transition-colors',
                 filter === t
-                  ? 'bg-violet-500/20 text-violet-600 dark:text-violet-300'
+                  ? 'bg-accent-soft text-accent'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -80,7 +80,7 @@ export default function MarketingPresetsPanel({ onUseHook }: MarketingPresetsPan
       )}
 
       {error && (
-        <div className="text-[11px] text-red-600 dark:text-red-400 py-2">
+        <div className="text-[11px] text-danger py-2">
           {error}
         </div>
       )}
@@ -106,7 +106,7 @@ function HookTile({ hook, onUse }: { hook: MarketingHook; onUse?: (hook: Marketi
 
   return (
     <div
-      className="border border-border rounded-md overflow-hidden bg-secondary/20 hover:border-violet-500/40 hover:shadow-sm transition-all flex flex-col group"
+      className="border border-border rounded-md overflow-hidden bg-secondary/20 hover:border-primary/40 hover:shadow-sm transition-all flex flex-col group"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -133,7 +133,7 @@ function HookTile({ hook, onUse }: { hook: MarketingHook; onUse?: (hook: Marketi
           </div>
         )}
         {hook.is_pinned && (
-          <div className="absolute top-1 right-1 bg-amber-500/80 text-white rounded-full p-0.5">
+          <div className="absolute top-1 right-1 bg-warning-soft text-warning rounded-full p-0.5" title="Pinned by Higgsfield">
             <Pin className="h-3 w-3" />
           </div>
         )}

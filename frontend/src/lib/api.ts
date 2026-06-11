@@ -387,8 +387,8 @@ export function studioListMarketingHooks(): Promise<MarketingHook[]> {
 
 // Landing-page brief extraction. Operator pastes a campaign's landing
 // URL → backend fetches the page, Claude drafts on-brand creative
-// prompts (3 angle variants). The picked variant flows into
-// HiggsfieldGenerator as initialPrompt.
+// prompts (3 angle variants). The picked variant flows into the
+// StudioPanel prompt field.
 export interface BriefVariant {
   angle: 'problem-led' | 'aspirational' | 'social-proof' | string;
   prompt: string;

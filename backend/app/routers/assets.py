@@ -60,6 +60,20 @@ class AssetResponse(BaseModel):
     voice_id: Optional[str] = None
     avatar_id: Optional[str] = None
     created_at: str
+    # Generation metadata (V13 higgsfield columns) — null for uploads
+    # and pre-V13 renders. Surfaced so the library's expand view can
+    # show prompt / model / cost without a second request.
+    prompt: Optional[str] = None
+    model: Optional[str] = None
+    aspect_ratio: Optional[str] = None
+    generation_cost_credits: Optional[int] = None
+    status: Optional[str] = None
+
+
+def _row_to_asset(row) -> AssetResponse:
+    d = dict(row)
+    d["model"] = d.get("higgsfield_model")
+    return AssetResponse(**d)
 
 
 @router.get("", response_model=list[AssetResponse])
@@ -68,8 +82,11 @@ async def list_assets(
     campaign_id: Optional[str] = None,
     asset_type: Optional[str] = None,
     source: Optional[str] = None,            # "uploaded" | "generated"
+    model: Optional[str] = None,             # higgsfield model id
+    since: Optional[str] = None,             # ISO UTC floor on created_at
     q: Optional[str] = None,
     limit: int = 100,
+    offset: int = 0,
 ):
     """List assets, newest first. All filters are optional."""
     where: list[str] = []
@@ -86,20 +103,28 @@ async def list_assets(
     if source:
         where.append("source = ?")
         params.append(source)
+    if model:
+        where.append("higgsfield_model = ?")
+        params.append(model)
+    if since:
+        # created_at is 'YYYY-MM-DD HH:MM:SS' UTC; normalize the ISO
+        # input to the same shape so string comparison works.
+        where.append("created_at >= ?")
+        params.append(since.replace("T", " ").replace("Z", "")[:19])
     if q:
-        where.append("(filename LIKE ? OR script LIKE ?)")
-        params.extend([f"%{q}%", f"%{q}%"])
+        where.append("(filename LIKE ? OR script LIKE ? OR prompt LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
     sql = "SELECT * FROM ad_assets"
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
+    sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, max(0, offset)])
 
     db = await get_db()
     try:
         cur = await db.execute(sql, params)
         rows = await cur.fetchall()
-        return [AssetResponse(**dict(r)) for r in rows]
+        return [_row_to_asset(r) for r in rows]
     finally:
         await db.close()
 
