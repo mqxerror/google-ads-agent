@@ -69,3 +69,11 @@ Becomes **Epic 12: Studio Engine** (pass 1 stories: 12.1 StudioPanel core,
 12.2 Library redesign, 12.3 Soul Creator, 12.4 PMax integration) — pending
 Wassim's brief confirmation; video-engine plan (Epic 11) P1 folds its model
 picker INTO StudioPanel rather than shipping separately.
+
+## Addendum (Wassim, 2026-06-11) — Creative QA gate before submit
+Server-side auto-crop (added for ASPECT_RATIO_NOT_ALLOWED) can destroy text
+baked into images. REQUIREMENT for Epic 12 / immediate next: the wizard's
+Images/Review step must show each image AS GOOGLE WILL RECEIVE IT (post-crop
+preview, mismatches flagged), and Studio's generators should produce at the
+slot's exact aspect by default. Stretch: text-safe-margin warning when text
+sits in the crop zone. No silent cropping at submit.

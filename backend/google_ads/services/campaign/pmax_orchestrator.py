@@ -116,6 +116,22 @@ GOOGLE_IMAGE_MIME_BY_EXT = {
 # up the create mid-recipe.
 MAX_GOOGLE_IMAGE_BYTES = 5 * 1024 * 1024
 
+# Google enforces the slot's EXACT aspect ratio (±1% tolerance) and a
+# hard minimum pixel size per PMax image field type. A near-miss — a
+# 16:9 image in the 1.91:1 MARKETING_IMAGE slot — fails the whole
+# atomic create with ASPECT_RATIO_NOT_ALLOWED at the asset_group_asset
+# op (hit live 2026-06; campaign + budget rolled back correctly but the
+# user got a Google error blob instead of a campaign). Local images are
+# therefore center-cropped to the exact aspect pre-flight; images that
+# sit below the minimum get a clean 422 instead. `aspect` is w/h.
+IMAGE_SLOT_SPECS = {
+    "logos":     {"aspect": 1.0,  "min_w": 128, "min_h": 128, "label": "1:1"},
+    "landscape": {"aspect": 1.91, "min_w": 600, "min_h": 314, "label": "1.91:1"},
+    "square":    {"aspect": 1.0,  "min_w": 300, "min_h": 300, "label": "1:1"},
+    "portrait":  {"aspect": 0.8,  "min_w": 480, "min_h": 600, "label": "4:5"},
+}
+ASPECT_TOLERANCE = 0.01  # Google allows ±1% off the exact ratio
+
 
 class PMaxValidationError(Exception):
     """Raised when the input bundle doesn't meet Google's PMax minimums.
@@ -163,34 +179,112 @@ def _is_google_asset_ref(ref: str) -> bool:
     return ref.isdigit() or (ref.startswith("customers/") and "/assets/" in ref)
 
 
-def _transcode_for_google(path: Path) -> tuple[bytes, str]:
-    """Convert an image to a (bytes, mime) pair Google Ads accepts.
-
-    Studio's Higgsfield generations land on disk as .webp, which Google
-    Ads rejects — without this, the wizard's generate-inline path would
-    always dead-end. PNG first (lossless, keeps alpha); falls back to
-    JPEG when the PNG would bust Google's 5MB asset cap (Higgsfield
-    Soul/4K outputs routinely do). Pillow is already a backend
-    dependency (Brand Reel text/composite rendering)."""
+def _encode_for_google(img) -> Optional[tuple[bytes, str]]:
+    """Encode a Pillow image to a (bytes, mime) pair under Google's 5MB
+    cap, or None when even a JPEG re-encode busts it (caller downscales
+    and retries). PNG first (lossless, keeps alpha — Studio .webp and
+    logo transparency); JPEG q90 fallback for the Higgsfield Soul/4K
+    outputs whose PNGs routinely exceed 5MB."""
     from io import BytesIO
 
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    data = buf.getvalue()
+    if len(data) <= MAX_GOOGLE_IMAGE_BYTES:
+        return data, "image/png"
+    buf = BytesIO()
+    img.convert("RGB").save(buf, format="JPEG", quality=90)
+    data = buf.getvalue()
+    if len(data) <= MAX_GOOGLE_IMAGE_BYTES:
+        return data, "image/jpeg"
+    return None
+
+
+def _fit_image_for_slot(
+    path: Path, slot: str, mime: Optional[str] = None
+) -> Optional[tuple[bytes, str]]:
+    """Make a local image Google-acceptable for `slot`, or reject it.
+
+    Google enforces the slot's EXACT aspect (±1%) and a minimum pixel
+    size — see IMAGE_SLOT_SPECS. The pipeline:
+
+      1. Center-crop to the slot's exact aspect when off by more than
+         the ±1% tolerance (crop, never letterbox/stretch).
+      2. Reject anything below the slot minimum after cropping — we
+         never upscale; Google would just serve a blurry ad.
+      3. Re-encode (PNG first, JPEG fallback), downscaling at the same
+         aspect until under the 5MB cap — but never below the minimum.
+
+    Returns None when the on-disk file is already fully compliant
+    (Google-OK format per `mime`, exact aspect, ≥ minimum, ≤ 5MB) so
+    the caller can pass the original bytes through untouched — this
+    keeps e.g. animated GIFs intact. Otherwise returns (bytes, mime).
+
+    Raises ValueError with a user-actionable message phrased to read
+    naturally after "<slot>[i] ('<ref>') ..."; the caller folds it into
+    the pre-flight PMaxValidationError (HTTP 422), so a bad image fails
+    BEFORE anything is created in Google.
+    """
     from PIL import Image  # local import — keeps module import light
 
-    with Image.open(path) as img:
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        data = buf.getvalue()
-        if len(data) <= MAX_GOOGLE_IMAGE_BYTES:
-            return data, "image/png"
-        buf = BytesIO()
-        img.convert("RGB").save(buf, format="JPEG", quality=90)
-        data = buf.getvalue()
-        if len(data) > MAX_GOOGLE_IMAGE_BYTES:
-            raise ValueError(
-                f"even a JPEG re-encode is {len(data) // 1024}KB "
-                f"(Google's cap is 5120KB) — downscale the image"
+    spec = IMAGE_SLOT_SPECS[slot]
+    target = spec["aspect"]
+
+    with Image.open(path) as opened:
+        opened.load()
+        img = opened
+        w, h = img.size
+        if not w or not h:
+            raise ValueError("has zero width/height — re-export and re-upload")
+
+        # 1 — center-crop to the exact aspect when off by more than 1%.
+        aspect_ok = abs((w / h) - target) <= target * ASPECT_TOLERANCE
+        if not aspect_ok:
+            if (w / h) > target:  # too wide — trim left/right
+                new_w, new_h = max(1, round(h * target)), h
+            else:  # too tall — trim top/bottom
+                new_w, new_h = w, max(1, round(w / target))
+            left = (w - new_w) // 2
+            top = (h - new_h) // 2
+            img = img.crop((left, top, left + new_w, top + new_h))
+            w, h = img.size
+
+        # 2 — minimum size (post-crop; cropping only ever shrinks).
+        if w < spec["min_w"] or h < spec["min_h"]:
+            crop_note = (
+                "" if aspect_ok
+                else f" after center-cropping to {spec['label']}"
             )
-        return data, "image/jpeg"
+            raise ValueError(
+                f"is {w}x{h}{crop_note} — below Google's "
+                f"{spec['min_w']}x{spec['min_h']} minimum for this slot "
+                f"({spec['label']}); use a larger source image"
+            )
+
+        # Fully compliant on disk → pass original bytes through.
+        if (
+            aspect_ok
+            and mime is not None
+            and path.stat().st_size <= MAX_GOOGLE_IMAGE_BYTES
+        ):
+            return None
+
+        # 3 — encode under the 5MB cap, downscaling (same aspect) as
+        # needed but never below the slot minimum.
+        while True:
+            encoded = _encode_for_google(img)
+            if encoded is not None:
+                return encoded
+            scaled_w = int(w * 0.8)
+            scaled_h = max(1, round(scaled_w / target))
+            if scaled_w < spec["min_w"] or scaled_h < spec["min_h"]:
+                raise ValueError(
+                    f"can't be compressed under Google's 5120KB cap without "
+                    f"dropping below the {spec['min_w']}x{spec['min_h']} "
+                    f"minimum — re-export a lighter PNG/JPEG and re-upload"
+                )
+            img = img.resize((scaled_w, scaled_h), Image.LANCZOS)
+            w, h = img.size
 
 
 async def _locate_local_image(ref: str) -> tuple[Path, Optional[str]]:
@@ -395,20 +489,30 @@ class PMaxOrchestrator:
                 entry: Dict[str, Any] = {
                     "kind": "local", "ref": ref, "path": path, "mime": mime,
                 }
-                if mime is None or path.stat().st_size > MAX_GOOGLE_IMAGE_BYTES:
-                    # Not a format Google accepts (Studio outputs .webp)
-                    # or over the 5MB asset cap — transcode now so a
-                    # corrupt/oversized file fails as a clean validation
-                    # error here instead of a rolled-back campaign later.
-                    try:
-                        entry["data"], entry["mime"] = _transcode_for_google(path)
-                    except Exception as exc:
-                        errs.append(
-                            f"{slot}[{i}] ('{ref[:40]}') is a {path.suffix} file "
-                            f"that couldn't be converted for Google Ads ({exc}) — "
-                            f"re-export as PNG/JPEG under 5MB and re-upload"
-                        )
-                        continue
+                # Every local image goes through the slot fitter: it
+                # center-crops to the slot's EXACT Google aspect (±1%),
+                # transcodes non-Google formats (Studio .webp), enforces
+                # the 5MB cap, and rejects below-minimum images — all
+                # pre-flight, so a bad image fails as a clean 422 here
+                # instead of ASPECT_RATIO_NOT_ALLOWED rolling back the
+                # whole campaign mid-recipe (hit live 2026-06).
+                try:
+                    fitted = _fit_image_for_slot(path, slot, mime)
+                except ValueError as exc:
+                    errs.append(f"{slot}[{i}] ('{ref[:40]}') {exc}")
+                    continue
+                except Exception as exc:
+                    errs.append(
+                        f"{slot}[{i}] ('{ref[:40]}') is a {path.suffix} file "
+                        f"that couldn't be processed for Google Ads ({exc}) — "
+                        f"re-export as PNG/JPEG under 5MB and re-upload"
+                    )
+                    continue
+                if fitted is not None:
+                    entry["data"], entry["mime"] = fitted
+                # fitted is None → file is already fully compliant
+                # (format + exact aspect + size); original bytes pass
+                # through untouched at upload time.
                 entries.append(entry)
             plan[slot] = entries
         if errs:

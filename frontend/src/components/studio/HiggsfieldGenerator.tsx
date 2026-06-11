@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader2, AlertCircle, Check, ImageIcon, Video as VideoIcon, Image as ImageGlyph, LinkIcon, Wand2 } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Check, Copy, ImageIcon, Video as VideoIcon, Image as ImageGlyph, LinkIcon, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -932,25 +932,56 @@ function VariantCard({ variant, onPick }: { variant: BriefVariant; onPick: () =>
     'social-proof':  'border-blue-500/40 bg-blue-500/5',
   };
   const accent = angleColors[variant.angle] || 'border-border bg-secondary/30';
+  const [copied, setCopied] = useState(false);
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(variant.prompt);
+    } catch {
+      // Clipboard API needs a secure context; localhost qualifies, but
+      // keep a textarea fallback for plain-http LAN access.
+      const ta = document.createElement('textarea');
+      ta.value = variant.prompt;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   return (
     <div className={cn('border rounded p-2 flex flex-col gap-1.5 text-xs', accent)}>
       <div className="flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase font-semibold">{variant.angle}</span>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onPick}
-          className="h-5 text-[10px] px-2"
-        >
-          Use
-        </Button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={copyPrompt}
+            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Copy prompt"
+            title="Copy prompt to clipboard"
+          >
+            {copied
+              ? <Check className="h-3 w-3 text-green-500" />
+              : <Copy className="h-3 w-3" />}
+          </button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onPick}
+            className="h-5 text-[10px] px-2"
+          >
+            Use
+          </Button>
+        </div>
       </div>
       {variant.rationale && (
-        <p className="text-[10px] text-muted-foreground italic line-clamp-2" title={variant.rationale}>
+        <p className="text-[10px] text-muted-foreground italic line-clamp-2 select-text cursor-text" title={variant.rationale}>
           {variant.rationale}
         </p>
       )}
-      <p className="text-[11px] leading-snug line-clamp-6" title={variant.prompt}>
+      <p className="text-[11px] leading-snug line-clamp-6 select-text cursor-text" title={variant.prompt}>
         {variant.prompt}
       </p>
     </div>

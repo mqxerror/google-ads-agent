@@ -210,8 +210,10 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           video_youtube_ids: bundle.videoIds.filter(Boolean),
           // Free-text hints become search-theme signals on the asset
           // group (attached server-side after asset linking succeeds).
-          audience_signals: bundle.audienceSignals.length
-            ? bundle.audienceSignals.map(s => ({ search_theme: s }))
+          // State keeps raw rows (incl. blank "Add another" rows), so
+          // trim + drop empties here.
+          audience_signals: bundle.audienceSignals.map(s => s.trim()).filter(Boolean).length
+            ? bundle.audienceSignals.map(s => s.trim()).filter(Boolean).map(s => ({ search_theme: s }))
             : null,
         }),
       });
@@ -503,7 +505,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       />
       <ImageGroup
         label="Logos"
-        spec="Any aspect, transparent background preferred"
+        spec="Auto-cropped to 1:1 at submit · min 128×128 · transparent bg preferred"
         slotAspect="1:1"
         items={bundle.logos}
         onChange={v => setField('logos', v)}
@@ -514,7 +516,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       />
       <ImageGroup
         label="Landscape marketing image (1.91:1)"
-        spec="1200×628 recommended"
+        spec="Any aspect works — auto-cropped to 1.91:1 at submit · min 600×314 · 1200×628 recommended"
         slotAspect="16:9"
         items={bundle.landscape}
         onChange={v => setField('landscape', v)}
@@ -525,7 +527,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       />
       <ImageGroup
         label="Square marketing image (1:1)"
-        spec="1200×1200 recommended"
+        spec="Any aspect works — auto-cropped to 1:1 at submit · min 300×300 · 1200×1200 recommended"
         slotAspect="1:1"
         items={bundle.square}
         onChange={v => setField('square', v)}
@@ -536,7 +538,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       />
       <ImageGroup
         label="Portrait marketing image (4:5)"
-        spec="Optional · 960×1200 recommended"
+        spec="Optional · auto-cropped to 4:5 at submit · min 480×600 · 960×1200 recommended"
         slotAspect="4:5"
         items={bundle.portrait}
         onChange={v => setField('portrait', v)}
@@ -1394,7 +1396,11 @@ function StepSignals({ bundle, setField }: { bundle: PMaxBundle; setField: <K ex
         label="Signal hints (optional)"
         hint="One per row — e.g. 'high-net-worth investors', 'second-passport seekers'"
         items={bundle.audienceSignals.length ? bundle.audienceSignals : ['']}
-        onChange={v => setField('audienceSignals', v.filter(Boolean))}
+        // Store raw rows (same as the text-asset lists) — filtering
+        // empties here made "Add another" a no-op: the freshly appended
+        // '' row was stripped before it could render. Empties are
+        // dropped at submit/review time instead.
+        onChange={v => setField('audienceSignals', v)}
         maxChars={120}
         minItems={0}
         maxItems={10}
@@ -1413,7 +1419,7 @@ function StepReview({ bundle, submitResult, submitting }: { bundle: PMaxBundle; 
       <ReviewRow label="Text assets" value={`${bundle.headlines.filter(Boolean).length} headlines · ${bundle.longHeadlines.filter(Boolean).length} long · ${bundle.descriptions.filter(Boolean).length} descriptions`} />
       <ReviewRow label="Image assets" value={`${bundle.logos.length} logo · ${bundle.landscape.length} landscape · ${bundle.square.length} square · ${bundle.portrait.length} portrait`} />
       <ReviewRow label="Videos" value={`${bundle.videoIds.filter(Boolean).length} YouTube video(s)`} />
-      <ReviewRow label="Audience signals" value={bundle.audienceSignals.length ? bundle.audienceSignals.join(', ') : '— (Google explores from scratch)'} />
+      <ReviewRow label="Audience signals" value={bundle.audienceSignals.filter(s => s.trim()).length ? bundle.audienceSignals.filter(s => s.trim()).join(', ') : '— (Google explores from scratch)'} />
       <div className="mt-4 border border-amber-500/30 bg-amber-500/5 rounded-md p-3 text-xs">
         <strong>Campaign will be created PAUSED.</strong> Review the asset group in Google Ads UI before enabling — once enabled, it starts spending immediately.
       </div>
@@ -1724,8 +1730,9 @@ interface LibraryAsset {
 /** Inline expanding panel listing the account's existing image assets
  * (Higgsfield generations + uploads), newest first. Clicking a tile
  * toggles its ad_asset id in/out of the slot. Aspect mismatches are
- * allowed — Google crops marketing images to fit — so the target
- * aspect is shown as guidance, not a filter. */
+ * allowed — the orchestrator center-crops local images to the slot's
+ * exact Google aspect at submit — so the target aspect is shown as
+ * guidance, not a filter. */
 function LibraryPicker({
   accountId, items, onToggle, slotAspect, maxItems, onClose,
 }: {
@@ -1758,7 +1765,7 @@ function LibraryPicker({
     <div className="mt-2 border border-border rounded-md bg-secondary/20 p-3">
       <div className="flex items-center gap-2 mb-2">
         <p className="text-[10px] text-muted-foreground flex-1">
-          Target aspect <span className="font-mono">{slotAspect}</span> — other aspects still work; Google crops to fit.
+          Target aspect <span className="font-mono">{slotAspect}</span> — any aspect works; we center-crop to the slot's exact Google ratio at submit (image just needs to be big enough).
           {' '}{items.length}/{maxItems} selected{atMax ? ' (slot full)' : ''}.
         </p>
         <div className="relative">
