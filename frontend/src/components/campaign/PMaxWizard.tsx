@@ -99,9 +99,23 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   const [bundle, setBundle] = useState<PMaxBundle>(() => {
     try {
       const saved = sessionStorage.getItem('pmax-wizard-bundle');
+      if (!saved) return EMPTY_BUNDLE;
       // Merge over defaults so bundles saved before new fields (e.g. `brief`)
       // were added don't come back with undefined keys.
-      return saved ? { ...EMPTY_BUNDLE, ...JSON.parse(saved) } : EMPTY_BUNDLE;
+      const parsed: PMaxBundle = { ...EMPTY_BUNDLE, ...JSON.parse(saved) };
+      // Sanitize image slots on restore: the wizard's own flows (upload /
+      // generate / library) only ever produce LOCAL asset UUIDs. A Google
+      // resource name (customers/.../assets/...) or bare numeric asset id
+      // in a saved bundle means a prior attempt's server-side UUID→resource
+      // swap leaked into sessionStorage — those refs bypass the server's
+      // aspect crop on resubmit (the live ASPECT_RATIO_NOT_ALLOWED), so
+      // drop them and let the operator re-pick from local sources.
+      const isLocalRef = (r: string) => !!r && !/^\d+$/.test(r) && !r.includes('/');
+      parsed.logos = (parsed.logos || []).filter(isLocalRef);
+      parsed.landscape = (parsed.landscape || []).filter(isLocalRef);
+      parsed.square = (parsed.square || []).filter(isLocalRef);
+      parsed.portrait = (parsed.portrait || []).filter(isLocalRef);
+      return parsed;
     } catch { return EMPTY_BUNDLE; }
   });
   const [submitting, setSubmitting] = useState(false);
@@ -576,7 +590,20 @@ interface VideoPanelState {
   scenes: StoryScene[] | null;
   imageLookup: Record<string, string>;
   renderedAsset: { asset_id: string; url: string; duration?: number } | null;
+  // YouTube sub-panel — persisted too so a page refresh mid-flow doesn't
+  // wipe the typed title/description, the chosen thumbnail, or the fact
+  // that the video was already uploaded (re-uploading made duplicates).
+  ytTitle: string;
+  ytDescription: string;
+  titleOptions: string[];
+  thumb: { id: string; url: string } | null;
+  uploadedId: string | null;
 }
+
+const EMPTY_PANEL: VideoPanelState = {
+  imageIds: [], scenes: null, imageLookup: {}, renderedAsset: null,
+  ytTitle: '', ytDescription: '', titleOptions: [], thumb: null, uploadedId: null,
+};
 
 const VIDEO_PANEL_KEY = 'pmax-video-state';
 
@@ -586,13 +613,15 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   const [panel, setPanelRaw] = useState<VideoPanelState>(() => {
     try {
       const saved = sessionStorage.getItem(VIDEO_PANEL_KEY);
-      if (saved) return JSON.parse(saved);
+      // Merge over defaults so panels saved before the YouTube fields were
+      // persisted don't come back with undefined keys.
+      if (saved) return { ...EMPTY_PANEL, ...JSON.parse(saved) };
     } catch { /* fall through to seed */ }
     const seeded = Array.from(new Set(
       [...bundle.logos, ...bundle.landscape, ...bundle.square, ...bundle.portrait]
         .filter(id => id && !id.includes('/')),
     )).slice(0, 8);
-    return { imageIds: seeded, scenes: null, imageLookup: {}, renderedAsset: null };
+    return { ...EMPTY_PANEL, imageIds: seeded };
   });
   const setPanel = useCallback((updater: (p: VideoPanelState) => VideoPanelState) => {
     setPanelRaw(prev => {
@@ -612,22 +641,31 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   // YouTube connect + upload
   const [ytConnected, setYtConnected] = useState<boolean | null>(null);
   const [connectPolling, setConnectPolling] = useState(false);
-  const [ytTitle, setYtTitle] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
-  const [uploadedId, setUploadedId] = useState<string | null>(null);
 
-  // YouTube metadata (AI title options + description) + thumbnail choice
-  const [ytDescription, setYtDescription] = useState('');
-  const [titleOptions, setTitleOptions] = useState<string[]>([]);
+  // YouTube title/description/thumbnail/uploadedId live in the persisted
+  // panel (refresh-proof); these setters keep the existing call sites
+  // reading naturally. Transient UI state (loaders, errors, toggles)
+  // stays in plain useState below.
+  const { ytTitle, ytDescription, titleOptions, thumb, uploadedId } = panel;
+  const setYtTitle = useCallback((v: string) => setPanel(p => ({ ...p, ytTitle: v })), [setPanel]);
+  const setYtDescription = useCallback((v: string) => setPanel(p => ({ ...p, ytDescription: v })), [setPanel]);
+  const setTitleOptions = useCallback((v: string[]) => setPanel(p => ({ ...p, titleOptions: v })), [setPanel]);
+  const setThumb = useCallback(
+    (v: VideoPanelState['thumb'] | ((prev: VideoPanelState['thumb']) => VideoPanelState['thumb'])) =>
+      setPanel(p => ({ ...p, thumb: typeof v === 'function' ? v(p.thumb) : v })),
+    [setPanel],
+  );
+  const setUploadedId = useCallback((v: string | null) => setPanel(p => ({ ...p, uploadedId: v })), [setPanel]);
+
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [frames, setFrames] = useState<{ id: string; url: string; t: number }[] | null>(null);
   const [framesLoading, setFramesLoading] = useState(false);
   const [framesError, setFramesError] = useState<string | null>(null);
   const [showFrames, setShowFrames] = useState(false);
-  const [thumb, setThumb] = useState<{ id: string; url: string } | null>(null);
   const [showThumbLib, setShowThumbLib] = useState(false);
   const [showThumbGen, setShowThumbGen] = useState(false);
 
@@ -840,7 +878,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       }
     }
     throw new Error('Metadata draft timed out after 6 minutes — try again.');
-  }, []);
+  }, [setTitleOptions, setYtTitle, setYtDescription]);
 
   const generateMetadata = async () => {
     setMetaLoading(true);

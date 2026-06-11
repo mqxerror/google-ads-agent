@@ -443,8 +443,37 @@ class PMaxOrchestrator:
         assert self._google_ads is not None
         return self._google_ads
 
+    def _fetch_image_asset_dims(
+        self, customer_id: str, resource_names: List[str]
+    ) -> Dict[str, tuple[int, int]]:
+        """GAQL lookup: full-size pixel dimensions for existing image
+        assets, keyed by resource name. Assets that aren't found, or
+        aren't IMAGE assets, simply don't appear in the result — the
+        caller treats "missing" as "aspect can't be verified" and
+        rejects pre-flight. Isolated as a method so unit tests can stub
+        it without a live SDK client."""
+        if not resource_names:
+            return {}
+        quoted = ", ".join(f"'{rn}'" for rn in resource_names)
+        query = (
+            "SELECT asset.resource_name, "
+            "asset.image_asset.full_size.width_pixels, "
+            "asset.image_asset.full_size.height_pixels "
+            f"FROM asset WHERE asset.resource_name IN ({quoted})"
+        )
+        dims: Dict[str, tuple[int, int]] = {}
+        for row in self.google_ads_client.search(
+            customer_id=customer_id, query=query
+        ):
+            w = int(row.asset.image_asset.full_size.width_pixels or 0)
+            h = int(row.asset.image_asset.full_size.height_pixels or 0)
+            if w and h:
+                dims[row.asset.resource_name] = (w, h)
+        return dims
+
     async def _resolve_image_plan(
         self,
+        customer_id: str,
         bundle: Dict[str, Any],
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Classify every image ref in the bundle BEFORE touching Google.
@@ -454,8 +483,13 @@ class PMaxOrchestrator:
         resource names (the original Epic-8 blocker: _link() extracted
         garbage ids from them and Google rejected the create, rolling
         the whole campaign back). Entries that already look like Google
-        asset refs pass through unchanged so MCP/agent-created bundles
-        keep working.
+        asset refs (resource names / bare numeric ids — MCP/agent
+        bundles, or a wizard bundle poisoned by a prior attempt) are
+        NOT trusted blindly: their stored dimensions are fetched via
+        GAQL and the slot's exact aspect is verified pre-flight. An
+        off-aspect or unverifiable pre-uploaded asset fails as a clean
+        422 naming slot + asset — never as ASPECT_RATIO_NOT_ALLOWED
+        rolling back the whole campaign mid-recipe (hit live 2026-06).
 
         Returns {slot: [{"kind": "google"|"local", ...}]} for
         logos/landscape/square/portrait. Raises PMaxValidationError
@@ -471,6 +505,7 @@ class PMaxOrchestrator:
         }
         plan: Dict[str, List[Dict[str, Any]]] = {}
         errs: List[str] = []
+        google_entries: List[tuple[str, int, str, str]] = []  # (slot, i, ref, rn)
         for slot, refs in slots.items():
             entries: List[Dict[str, Any]] = []
             for i, raw_ref in enumerate(refs):
@@ -479,6 +514,8 @@ class PMaxOrchestrator:
                     errs.append(f"{slot}[{i}] is empty")
                     continue
                 if _is_google_asset_ref(ref):
+                    rn = _asset_resource_name(customer_id, ref)
+                    google_entries.append((slot, i, ref, rn))
                     entries.append({"kind": "google", "ref": ref})
                     continue
                 try:
@@ -515,6 +552,49 @@ class PMaxOrchestrator:
                 # through untouched at upload time.
                 entries.append(entry)
             plan[slot] = entries
+
+        # Pre-uploaded Google assets: verify the stored aspect via GAQL.
+        # A pre-existing asset can't be cropped — its bytes already live
+        # in Google — so an off-aspect one is rejected here with the
+        # slot + asset named, and "can't verify" counts as a rejection
+        # (never link an asset whose aspect is unknown; that's exactly
+        # the resubmit path that produced ASPECT_RATIO_NOT_ALLOWED at
+        # the atomic mutate, hit live 2026-06-11).
+        if google_entries:
+            try:
+                dims = self._fetch_image_asset_dims(
+                    customer_id, sorted({rn for _, _, _, rn in google_entries})
+                )
+            except Exception as exc:
+                dims = None
+                errs.append(
+                    f"could not verify {len(google_entries)} pre-uploaded Google "
+                    f"asset(s) (asset metadata query failed: {exc}) — pass local "
+                    f"upload ids instead so the image can be re-fitted, or retry"
+                )
+            if dims is not None:
+                for slot, i, ref, rn in google_entries:
+                    spec = IMAGE_SLOT_SPECS[slot]
+                    wh = dims.get(rn)
+                    if wh is None:
+                        errs.append(
+                            f"{slot}[{i}] ('{ref[:60]}') is a pre-uploaded Google "
+                            f"asset whose image dimensions could not be verified "
+                            f"(not found in this account, or not an image asset) — "
+                            f"pass a local upload id instead so the image can be "
+                            f"re-fitted to {spec['label']}"
+                        )
+                        continue
+                    w, h = wh
+                    target = spec["aspect"]
+                    if abs((w / h) - target) > target * ASPECT_TOLERANCE:
+                        errs.append(
+                            f"{slot}[{i}] ('{ref[:60]}') is a pre-uploaded Google "
+                            f"asset at {w}x{h} — not the {spec['label']} aspect this "
+                            f"slot requires, and an existing Google asset can't be "
+                            f"cropped in place. Re-upload the original image (the "
+                            f"upload path auto-crops to {spec['label']})"
+                        )
         if errs:
             raise PMaxValidationError(errs)
         return plan
@@ -576,10 +656,11 @@ class PMaxOrchestrator:
         customer_id = format_customer_id(customer_id)
 
         # Pre-flight: classify every image ref (Google asset ref vs local
-        # upload UUID) and verify local files exist BEFORE creating
-        # anything in Google — a bad ref fails as a clean validation
-        # error instead of a created-then-rolled-back campaign.
-        image_plan = await self._resolve_image_plan(bundle)
+        # upload UUID), verify local files exist, and aspect-check
+        # pre-uploaded Google assets BEFORE creating anything in Google —
+        # a bad ref fails as a clean validation error instead of a
+        # created-then-rolled-back campaign.
+        image_plan = await self._resolve_image_plan(customer_id, bundle)
 
         created_budget_rn: Optional[str] = None
         created_campaign_rn: Optional[str] = None
@@ -647,22 +728,30 @@ class PMaxOrchestrator:
             #     created bundles keep working.
             #   • "local" — a UUID from /api/assets/upload or a Studio
             #     generation; push its bytes to Google as an image asset
-            #     and swap the UUID for the returned resource name.
-            # A repeated local UUID (same image filling two slots)
-            # uploads once.
+            #     and swap the UUID for the returned resource name. The
+            #     swap stays server-side only (asset_ids in the result);
+            #     the client bundle keeps its local UUIDs so a resubmit
+            #     always re-fits from the local source.
+            # Dedupe is keyed by (uuid, slot aspect) — NOT uuid alone.
+            # The same source image filling two different-aspect slots
+            # MUST upload once per crop: keying by uuid alone reused the
+            # first slot's crop for every later slot (the 1:1 logo crop
+            # got linked as the 1.91:1 MARKETING_IMAGE), which is exactly
+            # the ASPECT_RATIO_NOT_ALLOWED that killed the atomic create
+            # despite the pre-flight crop (hit live 2026-06-11).
             failed_step = "image asset upload"
-            uploaded: Dict[str, str] = {}  # local uuid → google resource name
+            uploaded: Dict[tuple[str, float], str] = {}  # (uuid, aspect) → google rn
             for slot, entries in image_plan.items():
                 rns = []
                 for n, entry in enumerate(entries):
                     if entry["kind"] == "google":
                         rns.append(entry["ref"])
                         continue
-                    local_id = entry["ref"]
-                    if local_id not in uploaded:
-                        # "data" is set when pre-flight transcoded the
-                        # file (e.g. Studio .webp → PNG); otherwise the
-                        # bytes come straight off disk.
+                    dedupe_key = (entry["ref"], IMAGE_SLOT_SPECS[slot]["aspect"])
+                    if dedupe_key not in uploaded:
+                        # "data" is set when pre-flight cropped/transcoded
+                        # the file for THIS slot (e.g. Studio .webp → PNG);
+                        # otherwise the bytes come straight off disk.
                         img_resp = await self._asset.create_image_asset(
                             ctx=ctx,
                             customer_id=customer_id,
@@ -670,8 +759,8 @@ class PMaxOrchestrator:
                             name=f"{bundle['name']} — {slot} {n + 1}",
                             mime_type=entry["mime"],
                         )
-                        uploaded[local_id] = _extract_resource_name(img_resp)
-                    rns.append(uploaded[local_id])
+                        uploaded[dedupe_key] = _extract_resource_name(img_resp)
+                    rns.append(uploaded[dedupe_key])
                 asset_ids[slot] = rns
             if uploaded:
                 await ctx.log(
