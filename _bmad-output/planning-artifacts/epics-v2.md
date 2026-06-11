@@ -982,6 +982,46 @@ files read from the assets.py upload storage path; rollback pattern preserved.
 autonomous-execution authorization; pending a human-run live wizard submit for
 final e2e verification (no live mutations were run autonomously).
 
+### Story 8.4: PMax video generator + YouTube upload
+
+As an operator on the wizard's Video step,
+I want a slideshow ad video generated from my chosen images with an
+agent-written script, uploaded straight to YouTube,
+So that the "≥1 YouTube video" PMax requirement never blocks campaign creation.
+
+**Acceptance Criteria:**
+
+**Given** 3-8 source images picked from the library (StepImages selections preseeded)
+**When** I click "Write script & preview storyboard"
+**Then** the script_generator role drafts a 20-30s storyboard (6-8 scenes:
+logo/hero/broll/stat/cta) grounded in the brief + fetched landing page
+**And** every scene shows its caption AND spoken line, both editable, via job+poll
+**And** broll scenes only reference the operator's images (invalid refs round-robin recovered)
+
+**Given** an approved storyboard
+**When** I click "Render video"
+**Then** generate_storyboard_reel (Hyperframes) renders in a background job with
+progress polling, per-scene TTS sync on by default
+**And** the MP4 lands in ad_assets with account_id set and previews inline
+
+**Given** a rendered asset
+**When** YouTube is not yet connected
+**Then** "Connect YouTube" opens a one-time Google consent (youtube.upload scope,
+localhost callback) and the refresh token persists to data/youtube_token.json
+(chmod 600, gitignored)
+**And** once connected, "Upload to YouTube" pushes the video as UNLISTED via
+resumable videos.insert (worker thread) and the returned video id auto-appends
+to the wizard's videoIds — manual ID paste stays available.
+
+**Status note (2026-06-11):** implemented. Endpoints: POST/GET
+/api/pmax/video/draft[/{id}], POST/GET /api/pmax/video/render[/{id}],
+GET /api/youtube/{status,auth-url,oauth-callback}, POST /api/youtube/upload.
+Live-verified: draft (grounded scenes off goldenvisas.mercan.com) + render
+(asset 30f99346, 12.8s, account_id set). YouTube upload mock-tested only — no
+refresh token exists until Wassim runs the one-time connect; OAuth client may
+need http://localhost:8000/api/youtube/oauth-callback registered if it is a
+Web (not Desktop) client, and the YouTube Data API enabled on the project.
+
 ---
 
 ## Epic 9: MCP Plan Tools (Phase 1.5)

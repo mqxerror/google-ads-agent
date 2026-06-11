@@ -16,6 +16,9 @@ dependencies = [
     "claude-code-sdk>=0.0.25",
     "Pillow>=10.0.0",            # Brand Reel — text + composite rendering
     "python-multipart>=0.0.9",   # Avatar Snap photo upload
+    "google-api-python-client>=2.197.0",
+    "google-auth>=2.49.1",
+    "google-auth-httplib2>=0.4.0",
 ]
 
 [tool.ruff]

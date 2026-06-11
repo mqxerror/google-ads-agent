@@ -26,7 +26,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, Plus, X,
   Upload, Image as ImageIcon, Video, Sparkles, Loader2, AlertCircle,
-  FolderOpen, Search, Check,
+  FolderOpen, Search, Check, Clapperboard, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -274,7 +274,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         {stepId === 'brief'    && <StepBrief    bundle={bundle} setField={setField} />}
         {stepId === 'text'     && <StepText     bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'images'   && <StepImages   bundle={bundle} setField={setField} accountId={accountId} />}
-        {stepId === 'videos'   && <StepVideos   bundle={bundle} setField={setField} />}
+        {stepId === 'videos'   && <StepVideos   bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'signals'  && <StepSignals  bundle={bundle} setField={setField} />}
         {stepId === 'review'   && <StepReview   bundle={bundle} submitResult={submitResult} submitting={submitting} />}
       </div>
@@ -549,13 +549,435 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   );
 }
 
-function StepVideos({ bundle, setField }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void }) {
+// ── Step 4: Videos — agent-made slideshow ad + YouTube upload ───────
+
+interface StoryScene {
+  type: 'logo' | 'hero' | 'broll' | 'stat' | 'cta';
+  headline?: string;
+  caption?: string;
+  scene_label?: string;
+  image_filename?: string;
+  logo_filename?: string;
+  brand_name?: string;
+  tagline?: string;
+  stat_value?: string;
+  stat_label?: string;
+  cta?: string;
+  composition?: string;
+  motion?: string;
+  text_treatment?: string;
+  _speak_text?: string;
+}
+
+interface VideoPanelState {
+  imageIds: string[];
+  scenes: StoryScene[] | null;
+  imageLookup: Record<string, string>;
+  renderedAsset: { asset_id: string; url: string; duration?: number } | null;
+}
+
+const VIDEO_PANEL_KEY = 'pmax-video-state';
+
+function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  // Seed source images from what the operator already picked in StepImages
+  // (library/upload UUIDs only — Google resource names can't feed the renderer).
+  const [panel, setPanelRaw] = useState<VideoPanelState>(() => {
+    try {
+      const saved = sessionStorage.getItem(VIDEO_PANEL_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch { /* fall through to seed */ }
+    const seeded = Array.from(new Set(
+      [...bundle.logos, ...bundle.landscape, ...bundle.square, ...bundle.portrait]
+        .filter(id => id && !id.includes('/')),
+    )).slice(0, 8);
+    return { imageIds: seeded, scenes: null, imageLookup: {}, renderedAsset: null };
+  });
+  const setPanel = useCallback((updater: (p: VideoPanelState) => VideoPanelState) => {
+    setPanelRaw(prev => {
+      const next = updater(prev);
+      try { sessionStorage.setItem(VIDEO_PANEL_KEY, JSON.stringify(next)); } catch { /* quota */ }
+      return next;
+    });
+  }, []);
+
+  const [showPicker, setShowPicker] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderMsg, setRenderMsg] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+
+  // YouTube connect + upload
+  const [ytConnected, setYtConnected] = useState<boolean | null>(null);
+  const [connectPolling, setConnectPolling] = useState(false);
+  const [ytTitle, setYtTitle] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedId, setUploadedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/youtube/status')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setYtConnected(!!d.connected); })
+      .catch(() => { if (!cancelled) setYtConnected(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Prefill the YouTube title from the campaign name once a render exists.
+  useEffect(() => {
+    if (panel.renderedAsset && !ytTitle) setYtTitle(bundle.name || 'PMax ad video');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel.renderedAsset]);
+
+  // ── Draft job ──
+  const pollDraft = useCallback(async (jobId: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 6 * 60_000) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/pmax/video/draft/${jobId}`);
+        const job = await res.json();
+        if (job.status === 'done') {
+          sessionStorage.removeItem('pmax-video-draft-id');
+          setPanel(p => ({ ...p, scenes: job.scenes, imageLookup: job.image_lookup || {}, renderedAsset: null }));
+          return;
+        }
+        if (job.status === 'error') {
+          sessionStorage.removeItem('pmax-video-draft-id');
+          throw new Error(job.message || 'draft failed');
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
+      }
+    }
+    throw new Error('Script draft timed out after 6 minutes — try again.');
+  }, [setPanel]);
+
+  const startDraft = async () => {
+    setDrafting(true);
+    setDraftError(null);
+    try {
+      const res = await fetch('/api/pmax/video/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          brief: bundle.brief,
+          business_name: bundle.businessName,
+          final_url: bundle.finalUrl,
+          campaign_name: bundle.name,
+          image_ids: panel.imageIds,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
+      sessionStorage.setItem('pmax-video-draft-id', data.job_id);
+      await pollDraft(data.job_id);
+    } catch (e) {
+      setDraftError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  // ── Render job ──
+  const pollRender = useCallback(async (jobId: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 15 * 60_000) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/pmax/video/render/${jobId}`);
+        const job = await res.json();
+        if (job.status === 'done') {
+          sessionStorage.removeItem('pmax-video-render-id');
+          setPanel(p => ({ ...p, renderedAsset: { asset_id: job.asset_id, url: job.url, duration: job.duration } }));
+          return;
+        }
+        if (job.status === 'error') {
+          sessionStorage.removeItem('pmax-video-render-id');
+          throw new Error(job.message || 'render failed');
+        }
+        if (job.message) setRenderMsg(job.message);
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
+      }
+    }
+    throw new Error('Render timed out after 15 minutes — check the Studio library; it may still finish.');
+  }, [setPanel]);
+
+  const startRender = async () => {
+    if (!panel.scenes?.length) return;
+    setRendering(true);
+    setRenderError(null);
+    setRenderMsg('Starting render…');
+    try {
+      const res = await fetch('/api/pmax/video/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          scenes: panel.scenes,
+          sync_audio_to_scenes: true,
+          quality: 'draft',
+          brief: `PMax ad video — ${bundle.name || 'campaign'}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
+      sessionStorage.setItem('pmax-video-render-id', data.job_id);
+      await pollRender(data.job_id);
+    } catch (e) {
+      setRenderError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRendering(false);
+      setRenderMsg(null);
+    }
+  };
+
+  // Resume in-flight jobs after a page refresh (same pattern as StepText).
+  useEffect(() => {
+    const draftId = sessionStorage.getItem('pmax-video-draft-id');
+    if (draftId) {
+      setDrafting(true);
+      pollDraft(draftId)
+        .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setDrafting(false));
+    }
+    const renderId = sessionStorage.getItem('pmax-video-render-id');
+    if (renderId) {
+      setRendering(true);
+      setRenderMsg('Resuming render…');
+      pollRender(renderId)
+        .catch(e => setRenderError(e instanceof Error ? e.message : String(e)))
+        .finally(() => { setRendering(false); setRenderMsg(null); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── YouTube connect + upload ──
+  const connectYouTube = async () => {
+    setUploadError(null);
+    try {
+      const res = await fetch('/api/youtube/auth-url');
+      const data = await res.json();
+      if (!res.ok || !data.auth_url) throw new Error(data.detail || `HTTP ${res.status}`);
+      window.open(data.auth_url, '_blank', 'noopener');
+      setConnectPolling(true);
+      const started = Date.now();
+      while (Date.now() - started < 5 * 60_000) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const s = await (await fetch('/api/youtube/status')).json();
+          if (s.connected) { setYtConnected(true); break; }
+        } catch { /* transient — keep polling */ }
+      }
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConnectPolling(false);
+    }
+  };
+
+  const uploadToYouTube = async () => {
+    if (!panel.renderedAsset) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch('/api/youtube/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: panel.renderedAsset.asset_id,
+          title: ytTitle.trim() || bundle.name || 'PMax ad video',
+          description: `${bundle.businessName ? bundle.businessName + ' — ' : ''}${bundle.finalUrl}`.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.video_id) throw new Error(data.detail || `HTTP ${res.status}`);
+      setUploadedId(data.video_id);
+      const existing = bundle.videoIds.filter(Boolean);
+      if (!existing.includes(data.video_id)) setField('videoIds', [...existing, data.video_id]);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const setScene = (i: number, patch: Partial<StoryScene>) =>
+    setPanel(p => ({ ...p, scenes: (p.scenes || []).map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
+
+  const nImages = panel.imageIds.length;
+  const canDraft = nImages >= 3 && nImages <= 8 && !drafting && !rendering;
+  const renderEta = panel.scenes ? Math.round((panel.scenes.length / 2) * 75 + 30) : 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── Create-a-video panel ── */}
+      <div className="border border-border rounded-md bg-secondary/20">
+        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+          <Clapperboard className="h-4 w-4 text-primary" />
+          <div className="flex-1">
+            <p className="text-xs font-medium">Create a video</p>
+            <p className="text-[10px] text-muted-foreground">
+              Slideshow ad from your images — the agent writes the script, renders the video, and uploads it to YouTube as unlisted.
+            </p>
+          </div>
+        </div>
+        <div className="p-4 space-y-4">
+          {/* 1 — source images */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium">1 · Source images</span>
+              <span className={cn('text-[10px]', nImages < 3 ? 'text-amber-500' : 'text-muted-foreground')}>
+                {nImages}/8 selected · pick 3-8
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPicker(v => !v)}
+              className={cn(
+                'cursor-pointer border border-dashed border-border rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
+                showPicker && 'bg-secondary/50 border-solid',
+              )}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              {nImages ? `Change images (${nImages})` : 'Pick from library'}
+            </button>
+            {showPicker && (
+              <LibraryPicker
+                accountId={accountId}
+                items={panel.imageIds}
+                onToggle={id => setPanel(p => ({
+                  ...p,
+                  imageIds: p.imageIds.includes(id)
+                    ? p.imageIds.filter(x => x !== id)
+                    : p.imageIds.length < 8 ? [...p.imageIds, id] : p.imageIds,
+                }))}
+                slotAspect="16:9"
+                maxItems={8}
+                onClose={() => setShowPicker(false)}
+              />
+            )}
+          </div>
+
+          {/* 2 — script draft */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium">2 · Script &amp; storyboard</span>
+              {panel.scenes && <span className="text-[10px] text-muted-foreground">{panel.scenes.length} scenes · everything editable</span>}
+            </div>
+            <Button size="sm" onClick={startDraft} disabled={!canDraft} className="gap-1.5">
+              {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {drafting ? 'Writing script… 1-3 min (reads your landing page)' : panel.scenes ? 'Rewrite script' : 'Write script & preview storyboard'}
+            </Button>
+            {draftError && (
+              <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3 shrink-0" /> {draftError}
+              </p>
+            )}
+            {panel.scenes && (
+              <div className="mt-2 space-y-1.5">
+                {panel.scenes.map((s, i) => (
+                  <SceneRow key={i} index={i} scene={s} imageLookup={panel.imageLookup} onChange={patch => setScene(i, patch)} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3 — render */}
+          {panel.scenes && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium">3 · Render</span>
+                {!panel.renderedAsset && <span className="text-[10px] text-muted-foreground">~{Math.ceil(renderEta / 60)} min, with voiceover</span>}
+              </div>
+              <Button size="sm" onClick={startRender} disabled={rendering || drafting} className="gap-1.5">
+                {rendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
+                {rendering ? 'Rendering…' : panel.renderedAsset ? 'Re-render video' : 'Render video'}
+              </Button>
+              {rendering && renderMsg && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">{renderMsg}</p>
+              )}
+              {renderError && (
+                <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" /> {renderError}
+                </p>
+              )}
+              {panel.renderedAsset && (
+                <div className="mt-2">
+                  <video
+                    controls
+                    src={panel.renderedAsset.url}
+                    className="w-full max-w-md rounded-md border border-border bg-black"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {panel.renderedAsset.duration ? `${Math.round(panel.renderedAsset.duration)}s · ` : ''}saved to the Studio library
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4 — YouTube */}
+          {panel.renderedAsset && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium">4 · YouTube</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {ytConnected === null ? 'checking…' : ytConnected ? 'channel connected' : 'one-time connect needed'}
+                </span>
+              </div>
+              {ytConnected === false && (
+                <div className="space-y-1.5">
+                  <Button size="sm" variant="outline" onClick={connectYouTube} disabled={connectPolling} className="gap-1.5">
+                    {connectPolling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5 text-red-500" />}
+                    {connectPolling ? 'Waiting for Google approval…' : 'Connect YouTube'}
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground">
+                    Opens Google consent in a new tab. Approve once with the channel's Google account — this page updates by itself.
+                  </p>
+                </div>
+              )}
+              {ytConnected && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={ytTitle}
+                      onChange={e => setYtTitle(e.target.value.slice(0, 100))}
+                      placeholder="Video title"
+                      className="flex-1 text-sm h-8"
+                    />
+                    <Button size="sm" onClick={uploadToYouTube} disabled={uploading || !ytTitle.trim()} className="gap-1.5 shrink-0">
+                      {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      {uploading ? 'Uploading…' : 'Upload to YouTube'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Uploaded as unlisted — PMax accepts unlisted videos.</p>
+                  {uploadedId && (
+                    <p className="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      Uploaded — video ID <code className="font-mono">{uploadedId}</code> added below.
+                    </p>
+                  )}
+                </div>
+              )}
+              {uploadError && (
+                <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" /> {uploadError}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Manual entry stays available ── */}
       <p className="text-xs text-muted-foreground">
         PMax requires at least one YouTube video. Paste the video ID (the
-        bit after <code>?v=</code> in the YouTube URL) — the video must
-        already be uploaded to a YouTube channel.
+        bit after <code>?v=</code> in the YouTube URL) — or use the panel
+        above to create and upload one.
       </p>
       <TextList
         label="YouTube video IDs"
@@ -575,6 +997,67 @@ function StepVideos({ bundle, setField }: { bundle: PMaxBundle; setField: <K ext
           </a>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** One editable storyboard scene: type badge + thumbnail + on-screen text +
+ * spoken line. Field shown depends on type; everything writes back into the
+ * scenes array that the render endpoint consumes unchanged. */
+function SceneRow({ index, scene, imageLookup, onChange }: {
+  index: number;
+  scene: StoryScene;
+  imageLookup: Record<string, string>;
+  onChange: (patch: Partial<StoryScene>) => void;
+}) {
+  const thumb = scene.image_filename ? imageLookup[scene.image_filename] : scene.logo_filename ? imageLookup[scene.logo_filename] : null;
+  return (
+    <div className="border border-border rounded-md bg-background p-2 flex gap-2">
+      {thumb ? (
+        <img src={thumb} alt="" className="h-14 w-14 rounded object-cover shrink-0 border border-border" loading="lazy" />
+      ) : (
+        <div className="h-14 w-14 rounded bg-secondary/50 shrink-0 flex items-center justify-center text-[9px] uppercase text-muted-foreground border border-border">
+          {scene.type}
+        </div>
+      )}
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] uppercase tracking-wide font-medium text-muted-foreground shrink-0 w-8">{index + 1} · {scene.type}</span>
+          {scene.type === 'broll' && scene.composition && (
+            <span className="text-[9px] text-muted-foreground/70 font-mono truncate">{scene.composition} · {scene.motion}</span>
+          )}
+        </div>
+        {scene.type === 'hero' && (
+          <Input value={scene.headline || ''} onChange={e => onChange({ headline: e.target.value })} placeholder="Headline" className="h-7 text-xs" />
+        )}
+        {scene.type === 'broll' && (
+          <Input value={scene.caption || ''} onChange={e => onChange({ caption: e.target.value })} placeholder="On-screen caption" className="h-7 text-xs" />
+        )}
+        {scene.type === 'cta' && (
+          <Input value={scene.cta || ''} onChange={e => onChange({ cta: e.target.value })} placeholder="Call to action" className="h-7 text-xs" />
+        )}
+        {scene.type === 'stat' && (
+          <div className="flex gap-1.5">
+            <Input value={scene.stat_value || ''} onChange={e => onChange({ stat_value: e.target.value })} placeholder="37" className="h-7 text-xs w-20" />
+            <Input value={scene.stat_label || ''} onChange={e => onChange({ stat_label: e.target.value })} placeholder="years of experience" className="h-7 text-xs flex-1" />
+          </div>
+        )}
+        {scene.type === 'logo' && (
+          <div className="flex gap-1.5">
+            <Input value={scene.brand_name || ''} onChange={e => onChange({ brand_name: e.target.value })} placeholder="Brand name" className="h-7 text-xs flex-1" />
+            <Input value={scene.tagline || ''} onChange={e => onChange({ tagline: e.target.value })} placeholder="Tagline" className="h-7 text-xs flex-1" />
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] text-muted-foreground shrink-0">Spoken</span>
+          <Input
+            value={scene._speak_text || ''}
+            onChange={e => onChange({ _speak_text: e.target.value })}
+            placeholder="Voiceover line for this scene (blank = silent)"
+            className="h-7 text-xs flex-1"
+          />
+        </div>
+      </div>
     </div>
   );
 }
