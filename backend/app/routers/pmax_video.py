@@ -15,6 +15,17 @@ same lesson as /api/pmax/draft-copy):
 
 The rendered asset is then uploaded to YouTube via /api/youtube/upload and the
 returned video id auto-fills the wizard's videoIds list.
+
+Two YouTube-metadata helpers round the panel out:
+
+  POST /api/pmax/video/metadata → creative_director drafts 3 title options
+                                  (≤95 chars) + a grounded description
+                                  (job+poll, same reason as above)
+  GET  /api/pmax/video/metadata/{job_id}
+
+  POST /api/pmax/video/frames   → ffmpeg pulls 4 stills (10/35/60/85% of
+                                  duration) from a rendered video into
+                                  ad_assets so one can be the YT thumbnail
 """
 
 from __future__ import annotations
@@ -415,3 +426,217 @@ async def get_video_render(job_id: str) -> Dict[str, Any]:
     if not job:
         return {"status": "error", "message": "unknown render job (server restarted?) — start a new render"}
     return job
+
+
+# ── Metadata: creative_director drafts YouTube title + description ──
+
+_meta_jobs: Dict[str, Dict[str, Any]] = {}
+
+_TITLE_MAX_CHARS = 95     # YouTube's hard cap is 100; 95 leaves headroom
+_DESC_MAX_CHARS = 5000    # YouTube's hard cap
+
+
+class PMaxVideoMetadataRequest(BaseModel):
+    account_id: str
+    brief: str = ""
+    business_name: str = ""
+    final_url: str = ""
+    campaign_name: str = ""
+    scenes: List[dict] = Field(default_factory=list)   # storyboard, for grounding
+
+
+def _metadata_prompt(body: PMaxVideoMetadataRequest) -> str:
+    spoken = " ".join(
+        (s.get("_speak_text") or s.get("speak") or "").strip()
+        for s in body.scenes if isinstance(s, dict)
+    ).strip()
+    return (
+        "Write YouTube metadata for a 20-30 second Performance Max video ad. "
+        "First fetch the landing page to ground every claim — never invent offers, numbers, or program names.\n\n"
+        f"Landing page: {body.final_url or '(none — use the brief only)'}\n"
+        f"Business name: {body.business_name or '-'}\n"
+        f"Campaign name: {body.campaign_name or '-'}\n"
+        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n"
+        + (f"Spoken script of the video: {spoken}\n" if spoken else "")
+        + "\nDELIVERABLES:\n"
+        f"1. `titles` — exactly 3 options, each ≤{_TITLE_MAX_CHARS} characters. Vary the angles "
+        "(benefit, specificity, question). No clickbait, no ALL CAPS, no third-party brand names.\n"
+        "2. `description` — 2-3 SHORT paragraphs (plain text, blank line between paragraphs). "
+        "Grounded in the landing page; end with a clear call to action followed by the landing page URL "
+        "on its own line. No em dashes. No invented stats. No hashtag spam.\n\n"
+        "Respond with ONLY this JSON, no prose:\n"
+        '{"titles": ["...", "...", "..."], "description": "..."}'
+    )
+
+
+async def _run_metadata_job(job_id: str, body: PMaxVideoMetadataRequest) -> None:
+    try:
+        from app.services.agent import stream_agent_response
+
+        parts: list[str] = []
+        async for ev in stream_agent_response(
+            user_message=_metadata_prompt(body),
+            account_id=body.account_id,
+            active_role="creative_director",
+            tool_allowlist=[],  # no Google Ads tools; built-in web fetch still grounds the landing page
+        ):
+            if ev.get("type") == "text":
+                parts.append(ev.get("content", ""))
+        raw = "".join(parts)
+
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            _meta_jobs[job_id] = {"status": "error", "message": "Creative Director returned no JSON — try again."}
+            return
+        try:
+            data = json.loads(m.group(0))
+        except Exception:
+            _meta_jobs[job_id] = {"status": "error", "message": "Could not parse the metadata draft — try again."}
+            return
+
+        # Server-side enforcement: the model's promises aren't a contract.
+        titles = [
+            t.strip()[:_TITLE_MAX_CHARS]
+            for t in (data.get("titles") or [])
+            if isinstance(t, str) and t.strip()
+        ][:3]
+        if not titles:
+            _meta_jobs[job_id] = {"status": "error", "message": "Draft produced no usable titles — try again."}
+            return
+
+        desc = (data.get("description") or "").strip()
+        # House rule: no em dashes in ad copy (applies to YT descriptions too).
+        desc = desc.replace("—", "-").replace("–", "-")
+        if body.final_url and body.final_url not in desc:
+            desc = f"{desc}\n\n{body.final_url}".strip()
+        desc = desc[:_DESC_MAX_CHARS]
+
+        _meta_jobs[job_id] = {"status": "done", "titles": titles, "description": desc}
+    except Exception as e:
+        logger.exception("pmax video metadata job %s failed", job_id)
+        _meta_jobs[job_id] = {"status": "error", "message": str(e)[:300]}
+
+
+@router.post("/metadata")
+async def start_video_metadata(body: PMaxVideoMetadataRequest) -> Dict[str, str]:
+    """Start a YouTube title+description draft; poll GET /api/pmax/video/metadata/{id}."""
+    if not body.account_id:
+        raise HTTPException(status_code=400, detail="account_id is required")
+    job_id = str(uuid.uuid4())
+    _meta_jobs[job_id] = {"status": "running"}
+    asyncio.create_task(_run_metadata_job(job_id, body))
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.get("/metadata/{job_id}")
+async def get_video_metadata(job_id: str) -> Dict[str, Any]:
+    job = _meta_jobs.get(job_id)
+    if not job:
+        return {"status": "error", "message": "unknown metadata job (server restarted?) — start a new draft"}
+    return job
+
+
+# ── Frames: ffmpeg stills from a rendered video → thumbnail candidates ──
+
+_FRAME_POSITIONS = (0.10, 0.35, 0.60, 0.85)   # fraction of duration
+
+
+class PMaxVideoFramesRequest(BaseModel):
+    asset_id: str               # ad_assets row id of a rendered video
+    account_id: str = ""        # owner of the new image rows (falls back to the video's)
+
+
+async def _probe_duration(path) -> Optional[float]:
+    """ffprobe the container duration; None when it can't be read."""
+    proc = await asyncio.create_subprocess_exec(
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+    )
+    out, _ = await proc.communicate()
+    try:
+        return float(out.decode().strip())
+    except Exception:
+        return None
+
+
+@router.post("/frames")
+async def extract_video_frames(body: PMaxVideoFramesRequest) -> Dict[str, Any]:
+    """Extract 4 stills (10/35/60/85% of duration) from a rendered video.
+
+    Each still becomes an ad_assets image row (account_id set) served from
+    the normal assets path, so any of them can be picked as the YouTube
+    thumbnail — or reused anywhere else the library reaches. Fast enough
+    (4 keyframe seeks on a ≤60s mp4) to run inline, no job needed.
+    """
+    import shutil as _shutil
+    if _shutil.which("ffmpeg") is None:
+        raise HTTPException(status_code=500, detail="ffmpeg not on PATH")
+
+    from app.database import get_db
+    from app.routers.assets import ASSETS_DIR
+
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT filename, url, type, duration, account_id FROM ad_assets WHERE id = ?",
+            (body.asset_id,),
+        )
+        row = await cur.fetchone()
+    finally:
+        await db.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"asset {body.asset_id} not found")
+    if row["type"] != "video":
+        raise HTTPException(status_code=400, detail=f"asset {body.asset_id} is not a video")
+
+    stored = (row["url"] or "").rsplit("/", 1)[-1] or row["filename"]
+    src = ASSETS_DIR / stored
+    if not src.is_file():
+        raise HTTPException(status_code=404, detail=f"video file missing on disk: {stored}")
+
+    duration = row["duration"] or await _probe_duration(src)
+    if not duration or duration <= 0:
+        raise HTTPException(status_code=422, detail="could not determine video duration")
+
+    account_id = body.account_id or row["account_id"]
+    frames: list[dict] = []
+    for frac in _FRAME_POSITIONS:
+        t = round(duration * frac, 2)
+        frame_id = str(uuid.uuid4())
+        out_path = ASSETS_DIR / f"{frame_id}.jpg"
+        # -ss before -i = fast keyframe seek; -q:v 2 = high-quality JPEG.
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-ss", str(t), "-i", str(src),
+            "-frames:v", "1", "-q:v", "2", str(out_path),
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+        )
+        _, err = await proc.communicate()
+        if proc.returncode != 0 or not out_path.is_file():
+            logger.warning("frame extraction at %.2fs failed: %s", t, (err or b"").decode()[-200:])
+            continue
+        try:
+            from PIL import Image as _PILImage
+            with _PILImage.open(out_path) as im:
+                w, h = im.size
+        except Exception:
+            w = h = None
+        url = f"/api/assets/file/{frame_id}.jpg"
+        db = await get_db()
+        try:
+            await db.execute(
+                """INSERT INTO ad_assets
+                   (id, account_id, type, filename, url, width, height, size_bytes, script, source)
+                   VALUES (?, ?, 'image', ?, ?, ?, ?, ?, ?, 'generated')""",
+                (frame_id, account_id, f"frame-{t:g}s-{row['filename']}.jpg", url,
+                 w, h, out_path.stat().st_size,
+                 f"Video frame at {t:g}s from {row['filename']} (thumbnail candidate)"),
+            )
+            await db.commit()
+        finally:
+            await db.close()
+        frames.append({"id": frame_id, "url": url, "t": t})
+
+    if not frames:
+        raise HTTPException(status_code=500, detail="frame extraction produced no images")
+    return {"frames": frames, "duration": duration}

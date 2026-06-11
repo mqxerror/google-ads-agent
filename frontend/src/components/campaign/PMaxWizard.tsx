@@ -613,7 +613,21 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   const [ytTitle, setYtTitle] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [uploadedId, setUploadedId] = useState<string | null>(null);
+
+  // YouTube metadata (AI title options + description) + thumbnail choice
+  const [ytDescription, setYtDescription] = useState('');
+  const [titleOptions, setTitleOptions] = useState<string[]>([]);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [frames, setFrames] = useState<{ id: string; url: string; t: number }[] | null>(null);
+  const [framesLoading, setFramesLoading] = useState(false);
+  const [framesError, setFramesError] = useState<string | null>(null);
+  const [showFrames, setShowFrames] = useState(false);
+  const [thumb, setThumb] = useState<{ id: string; url: string } | null>(null);
+  const [showThumbLib, setShowThumbLib] = useState(false);
+  const [showThumbGen, setShowThumbGen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -752,6 +766,13 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         .catch(e => setRenderError(e instanceof Error ? e.message : String(e)))
         .finally(() => { setRendering(false); setRenderMsg(null); });
     }
+    const metaId = sessionStorage.getItem('pmax-video-meta-id');
+    if (metaId) {
+      setMetaLoading(true);
+      pollMetadata(metaId)
+        .catch(e => setMetaError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setMetaLoading(false));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -792,10 +813,94 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
     }
   };
 
+  // ── YouTube metadata draft (job+poll, same pattern as the script draft) ──
+  const pollMetadata = useCallback(async (jobId: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 6 * 60_000) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/pmax/video/metadata/${jobId}`);
+        const job = await res.json();
+        if (job.status === 'done') {
+          sessionStorage.removeItem('pmax-video-meta-id');
+          const titles: string[] = job.titles || [];
+          setTitleOptions(titles);
+          if (titles[0]) setYtTitle(titles[0]);          // first option preselected
+          if (job.description) setYtDescription(job.description);
+          return;
+        }
+        if (job.status === 'error') {
+          sessionStorage.removeItem('pmax-video-meta-id');
+          throw new Error(job.message || 'metadata draft failed');
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
+      }
+    }
+    throw new Error('Metadata draft timed out after 6 minutes — try again.');
+  }, []);
+
+  const generateMetadata = async () => {
+    setMetaLoading(true);
+    setMetaError(null);
+    try {
+      const res = await fetch('/api/pmax/video/metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          brief: bundle.brief,
+          business_name: bundle.businessName,
+          final_url: bundle.finalUrl,
+          campaign_name: bundle.name,
+          scenes: panel.scenes || [],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
+      sessionStorage.setItem('pmax-video-meta-id', data.job_id);
+      await pollMetadata(data.job_id);
+    } catch (e) {
+      setMetaError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMetaLoading(false);
+    }
+  };
+
+  // ── Thumbnail: extract 4 frames from the rendered video ──
+  const pickFrames = async () => {
+    if (frames) { setShowFrames(v => !v); return; }      // already extracted — just toggle
+    if (!panel.renderedAsset) return;
+    setFramesLoading(true);
+    setFramesError(null);
+    try {
+      const res = await fetch('/api/pmax/video/frames', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: panel.renderedAsset.asset_id, account_id: accountId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.frames?.length) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
+      setFrames(data.frames);
+      setShowFrames(true);
+    } catch (e) {
+      setFramesError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFramesLoading(false);
+    }
+  };
+
+  // A re-render invalidates the extracted frames (they belong to the old cut).
+  useEffect(() => {
+    setFrames(null);
+    setShowFrames(false);
+  }, [panel.renderedAsset?.asset_id]);
+
   const uploadToYouTube = async () => {
     if (!panel.renderedAsset) return;
     setUploading(true);
     setUploadError(null);
+    setUploadWarning(null);
     try {
       const res = await fetch('/api/youtube/upload', {
         method: 'POST',
@@ -803,12 +908,15 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         body: JSON.stringify({
           asset_id: panel.renderedAsset.asset_id,
           title: ytTitle.trim() || bundle.name || 'PMax ad video',
-          description: `${bundle.businessName ? bundle.businessName + ' — ' : ''}${bundle.finalUrl}`.trim(),
+          description: ytDescription.trim()
+            || `${bundle.businessName ? bundle.businessName + ' — ' : ''}${bundle.finalUrl}`.trim(),
+          thumbnail_asset_id: thumb?.id || '',
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.video_id) throw new Error(data.detail || `HTTP ${res.status}`);
       setUploadedId(data.video_id);
+      if (data.warning) setUploadWarning(data.warning);
       const existing = bundle.videoIds.filter(Boolean);
       if (!existing.includes(data.video_id)) setField('videoIds', [...existing, data.video_id]);
     } catch (e) {
@@ -954,14 +1062,148 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
                 </div>
               )}
               {ytConnected && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2.5">
+                  {/* AI metadata draft — fills title options + description below */}
+                  <div>
+                    <Button size="sm" variant="outline" onClick={generateMetadata} disabled={metaLoading || uploading} className="gap-1.5">
+                      {metaLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      {metaLoading ? 'Drafting title & description… 1-2 min' : 'Generate title & description'}
+                    </Button>
+                    {metaError && (
+                      <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {metaError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Title + clickable options */}
+                  <div className="space-y-1.5">
                     <Input
                       value={ytTitle}
                       onChange={e => setYtTitle(e.target.value.slice(0, 100))}
                       placeholder="Video title"
-                      className="flex-1 text-sm h-8"
+                      className="text-sm h-8"
                     />
+                    {titleOptions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {titleOptions.map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setYtTitle(t)}
+                            title={t}
+                            className={cn(
+                              'text-[10px] border rounded-full px-2 py-0.5 max-w-full truncate transition-colors',
+                              ytTitle === t
+                                ? 'border-primary bg-primary/10 text-foreground'
+                                : 'border-border text-muted-foreground hover:border-primary/50',
+                            )}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description — editable; falls back to business + URL when empty */}
+                  <textarea
+                    value={ytDescription}
+                    onChange={e => setYtDescription(e.target.value.slice(0, 5000))}
+                    rows={4}
+                    placeholder="Video description (optional — Generate fills this; stays editable)"
+                    className="w-full text-xs rounded-md border border-border bg-background p-2 resize-y placeholder:text-muted-foreground/60"
+                  />
+
+                  {/* Thumbnail: video frame · library image · generated 16:9 */}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Thumbnail</span>
+                      {thumb && (
+                        <span className="relative inline-flex shrink-0">
+                          <img src={thumb.url} alt="Selected thumbnail" className="h-9 w-16 rounded border border-border object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setThumb(null)}
+                            className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-secondary"
+                            aria-label="Clear thumbnail"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={pickFrames}
+                        disabled={framesLoading}
+                        className={cn(
+                          'cursor-pointer border border-dashed border-border rounded-md px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-secondary/50 transition-colors disabled:opacity-60',
+                          showFrames && 'bg-secondary/50 border-solid',
+                        )}
+                      >
+                        {framesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
+                        Pick frame
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowThumbLib(v => !v)}
+                        className={cn(
+                          'cursor-pointer border border-dashed border-border rounded-md px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
+                          showThumbLib && 'bg-secondary/50 border-solid',
+                        )}
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        From library
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowThumbGen(true)}
+                        className="cursor-pointer border border-dashed border-violet-500/50 rounded-md px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-violet-500/10 transition-colors text-violet-600 dark:text-violet-300"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        Generate
+                      </button>
+                    </div>
+                    {framesError && (
+                      <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {framesError}
+                      </p>
+                    )}
+                    {showFrames && frames && (
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        {frames.map(f => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => { setThumb({ id: f.id, url: f.url }); setShowFrames(false); }}
+                            className={cn(
+                              'relative h-14 aspect-video rounded border overflow-hidden bg-secondary/30 transition-colors',
+                              thumb?.id === f.id ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50',
+                            )}
+                            title={`Frame at ${f.t}s`}
+                          >
+                            <img src={f.url} alt={`Frame at ${f.t}s`} className="w-full h-full object-cover" loading="lazy" />
+                            <span className="absolute bottom-0.5 right-1 text-[9px] text-white/90 bg-black/50 rounded px-1">{Math.round(f.t)}s</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showThumbLib && (
+                      <LibraryPicker
+                        accountId={accountId}
+                        items={thumb ? [thumb.id] : []}
+                        onToggle={(id, asset) => {
+                          setThumb(prev => prev?.id === id ? null : { id, url: asset?.thumbnail_url || asset?.url || '' });
+                          setShowThumbLib(false);
+                        }}
+                        slotAspect="16:9"
+                        maxItems={1}
+                        onClose={() => setShowThumbLib(false)}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <Button size="sm" onClick={uploadToYouTube} disabled={uploading || !ytTitle.trim()} className="gap-1.5 shrink-0">
                       {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                       {uploading ? 'Uploading…' : 'Upload to YouTube'}
@@ -978,6 +1220,11 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
                     <p className="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1.5">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       Uploaded — video ID <code className="font-mono">{uploadedId}</code> added below.
+                    </p>
+                  )}
+                  {uploadWarning && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {uploadWarning}
                     </p>
                   )}
                 </div>
@@ -1016,6 +1263,61 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
           </a>
         </div>
       ))}
+
+      {/* Thumbnail generation modal — same shell as the image-slot modal;
+          16:9 locked (YouTube thumbnails are 1280×720), first completed
+          asset becomes the selected thumbnail. */}
+      {showThumbGen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
+          onClick={() => setShowThumbGen(false)}
+        >
+          <div
+            className="w-full max-w-2xl bg-background border border-border rounded-lg shadow-xl overflow-hidden max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  Generate YouTube thumbnail
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Aspect locked to 16:9 — YouTube renders thumbnails at 1280×720.
+                </p>
+              </div>
+              <button onClick={() => setShowThumbGen(false)} className="p-1 hover:bg-secondary rounded" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <HiggsfieldGenerator
+                accountId={accountId}
+                lockAspect="16:9"
+                onSettled={asset => {
+                  if (asset.status === 'completed' && asset.asset_id) {
+                    setThumb({ id: asset.asset_id, url: asset.thumbnail_url || asset.url || '' });
+                  }
+                }}
+                caption="Slot: YouTube thumbnail"
+                promptContext={{
+                  brief: bundle.brief,
+                  businessName: bundle.businessName,
+                  finalUrl: bundle.finalUrl,
+                  slotLabel: 'YouTube thumbnail',
+                  slotAspect: '16:9',
+                }}
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
+              <p className="text-[10px] text-muted-foreground">
+                {thumb ? 'Thumbnail selected · close when done' : 'First completed image becomes the thumbnail'}
+              </p>
+              <Button size="sm" onClick={() => setShowThumbGen(false)}>Done</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1427,7 +1729,10 @@ interface LibraryAsset {
 function LibraryPicker({
   accountId, items, onToggle, slotAspect, maxItems, onClose,
 }: {
-  accountId: string; items: string[]; onToggle: (assetId: string) => void;
+  accountId: string; items: string[];
+  // Second arg carries the full asset so single-select callers (YouTube
+  // thumbnail) can keep the URL for a preview without re-fetching.
+  onToggle: (assetId: string, asset?: LibraryAsset) => void;
   slotAspect: SlotAspect; maxItems: number; onClose: () => void;
 }) {
   const [assets, setAssets] = useState<LibraryAsset[] | null>(null);
@@ -1494,7 +1799,7 @@ function LibraryPicker({
               <button
                 key={a.id}
                 type="button"
-                onClick={() => onToggle(a.id)}
+                onClick={() => onToggle(a.id, a)}
                 disabled={disabled}
                 title={a.filename}
                 className={cn(

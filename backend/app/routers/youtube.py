@@ -91,6 +91,30 @@ class YouTubeUploadRequest(BaseModel):
     title: str
     description: str = ""
     privacy_status: str = "unlisted"
+    thumbnail_asset_id: str = ""  # optional ad_assets image to set as the YT thumbnail
+
+
+async def _resolve_asset_path(asset_id: str, expected_type: str) -> Path:
+    """ad_assets id → on-disk Path, 4xx when the row or file is missing."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT filename, url, type FROM ad_assets WHERE id = ?", (asset_id,)
+        )
+        row = await cur.fetchone()
+    finally:
+        await db.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"asset {asset_id} not found")
+    if row["type"] != expected_type:
+        raise HTTPException(status_code=400, detail=f"asset {asset_id} is not a {expected_type}")
+
+    from app.routers.assets import ASSETS_DIR
+    stored = (row["url"] or "").rsplit("/", 1)[-1] or row["filename"]
+    path: Path = ASSETS_DIR / stored
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"{expected_type} file missing on disk: {stored}")
+    return path
 
 
 @router.post("/upload")
@@ -100,6 +124,11 @@ async def youtube_upload(body: YouTubeUploadRequest) -> dict:
     Files are small (5-15 MB) so a single request with a generous timeout is
     fine; the blocking google-api client runs in a worker thread so the event
     loop is never starved.
+
+    When thumbnail_asset_id is set, thumbnails.set() runs after the insert.
+    A thumbnail refusal (channel not phone-verified → 403) NEVER fails the
+    request — the video id still comes back, plus a `warning` string the UI
+    shows so the human can set it manually.
     """
     if not yt.is_connected():
         raise HTTPException(status_code=409, detail="YouTube not connected — run the connect flow first")
@@ -108,24 +137,12 @@ async def youtube_upload(body: YouTubeUploadRequest) -> dict:
     if not body.title.strip():
         raise HTTPException(status_code=400, detail="title is required")
 
-    db = await get_db()
-    try:
-        cur = await db.execute(
-            "SELECT filename, url, type FROM ad_assets WHERE id = ?", (body.asset_id,)
-        )
-        row = await cur.fetchone()
-    finally:
-        await db.close()
-    if not row:
-        raise HTTPException(status_code=404, detail=f"asset {body.asset_id} not found")
-    if row["type"] != "video":
-        raise HTTPException(status_code=400, detail=f"asset {body.asset_id} is not a video")
-
-    from app.routers.assets import ASSETS_DIR
-    stored = (row["url"] or "").rsplit("/", 1)[-1] or row["filename"]
-    path: Path = ASSETS_DIR / stored
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"video file missing on disk: {stored}")
+    path = await _resolve_asset_path(body.asset_id, "video")
+    # Resolve the thumbnail BEFORE the (expensive) upload so a bad id fails
+    # fast instead of after minutes of video transfer.
+    thumb_path: Path | None = None
+    if body.thumbnail_asset_id.strip():
+        thumb_path = await _resolve_asset_path(body.thumbnail_asset_id.strip(), "image")
 
     try:
         video_id = await asyncio.wait_for(
@@ -146,4 +163,20 @@ async def youtube_upload(body: YouTubeUploadRequest) -> dict:
         logger.exception("YouTube upload failed for asset %s", body.asset_id)
         raise HTTPException(status_code=502, detail=f"YouTube upload failed: {str(e)[:400]}")
 
-    return {"video_id": video_id, "watch_url": f"https://youtube.com/watch?v={video_id}"}
+    warning = ""
+    if thumb_path is not None:
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(yt.set_thumbnail_sync, video_id, thumb_path),
+                timeout=120.0,
+            )
+        except yt.YouTubeThumbnailRejected as e:
+            warning = str(e)
+        except Exception as e:
+            logger.exception("YouTube thumbnail set failed for video %s", video_id)
+            warning = f"thumbnail could not be set ({str(e)[:160]}) — set it manually in YouTube Studio"
+
+    out = {"video_id": video_id, "watch_url": f"https://youtube.com/watch?v={video_id}"}
+    if warning:
+        out["warning"] = warning
+    return out

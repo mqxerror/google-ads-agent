@@ -55,6 +55,11 @@ class YouTubeNotConnected(RuntimeError):
     """No refresh token on disk — run the connect flow first."""
 
 
+class YouTubeThumbnailRejected(RuntimeError):
+    """thumbnails.set refused (usually: channel not phone-verified → 403).
+    The video itself uploaded fine — callers surface this as a warning."""
+
+
 def _client_creds() -> tuple[str, str]:
     cid = settings.GOOGLE_ADS_CLIENT_ID
     csec = settings.GOOGLE_ADS_CLIENT_SECRET
@@ -156,6 +161,30 @@ def is_connected() -> bool:
 # ── Upload (synchronous — run via asyncio.to_thread) ───────────────
 
 
+def _build_service():
+    """Authenticated YouTube Data API v3 client from the stored refresh token.
+    BLOCKING (discovery build) — only call from worker threads."""
+    refresh = load_refresh_token()
+    if not refresh:
+        raise YouTubeNotConnected("YouTube not connected — run the connect flow first")
+    cid, csec = _client_creds()
+
+    # Imports kept local so the module imports cleanly even before
+    # `uv add google-api-python-client` lands in an environment.
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    creds = Credentials(
+        token=None,
+        refresh_token=refresh,
+        token_uri=TOKEN_ENDPOINT,
+        client_id=cid,
+        client_secret=csec,
+        scopes=[SCOPE],
+    )
+    return build("youtube", "v3", credentials=creds, cache_discovery=False)
+
+
 def upload_video_sync(
     file_path: Path,
     *,
@@ -169,30 +198,13 @@ def upload_video_sync(
     Returns the YouTube video id. Raises YouTubeNotConnected when no refresh
     token exists, RuntimeError on API failures. BLOCKING — wrap in a thread.
     """
-    refresh = load_refresh_token()
-    if not refresh:
-        raise YouTubeNotConnected("YouTube not connected — run the connect flow first")
     if not file_path.is_file():
         raise RuntimeError(f"video file not found: {file_path}")
 
-    cid, csec = _client_creds()
-
-    # Imports kept local so the module imports cleanly even before
-    # `uv add google-api-python-client` lands in an environment.
-    from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
 
-    creds = Credentials(
-        token=None,
-        refresh_token=refresh,
-        token_uri=TOKEN_ENDPOINT,
-        client_id=cid,
-        client_secret=csec,
-        scopes=[SCOPE],
-    )
-    service = build("youtube", "v3", credentials=creds, cache_discovery=False)
+    service = _build_service()
 
     body = {
         "snippet": {
@@ -232,3 +244,69 @@ def upload_video_sync(
         raise RuntimeError(f"upload finished but no video id in response: {response}")
     logger.info("YouTube upload done: %s → https://youtube.com/watch?v=%s", file_path.name, video_id)
     return video_id
+
+
+# ── Thumbnail (synchronous — run via asyncio.to_thread) ────────────
+
+THUMB_MAX_BYTES = 2 * 1024 * 1024   # YouTube rejects custom thumbnails >2MB
+THUMB_MAX_WIDTH = 1280              # YouTube's recommended max resolution
+
+
+def _prepare_thumbnail_jpg(image_path: Path) -> tuple[Path, bool]:
+    """Return (jpg_path, is_temp). Re-encodes to JPEG when the source is
+    another format, oversized (>2MB), or wider than 1280px. Quality steps
+    down 90→60 until the byte budget fits."""
+    if (
+        image_path.suffix.lower() in (".jpg", ".jpeg")
+        and image_path.stat().st_size < THUMB_MAX_BYTES
+    ):
+        return image_path, False
+
+    import tempfile
+
+    from PIL import Image
+
+    with Image.open(image_path) as im:
+        img = im.convert("RGB")    # drops alpha (PNG/WebP logos etc.)
+        if img.width > THUMB_MAX_WIDTH:
+            ratio = THUMB_MAX_WIDTH / img.width
+            img = img.resize((THUMB_MAX_WIDTH, max(1, round(img.height * ratio))))
+        fd, tmp_name = tempfile.mkstemp(suffix=".jpg", prefix="yt-thumb-")
+        os.close(fd)
+        tmp = Path(tmp_name)
+        for quality in (90, 80, 70, 60):
+            img.save(tmp, "JPEG", quality=quality, optimize=True)
+            if tmp.stat().st_size < THUMB_MAX_BYTES:
+                break
+    return tmp, True
+
+
+def set_thumbnail_sync(video_id: str, image_path: Path) -> None:
+    """thumbnails.set on an uploaded video. Raises YouTubeThumbnailRejected
+    on a 4xx policy refusal (channel not phone-verified is the common one)
+    so callers can degrade to a warning instead of failing the upload.
+    BLOCKING — wrap in a thread."""
+    if not image_path.is_file():
+        raise RuntimeError(f"thumbnail image not found: {image_path}")
+
+    from googleapiclient.errors import HttpError
+    from googleapiclient.http import MediaFileUpload
+
+    jpg_path, is_temp = _prepare_thumbnail_jpg(image_path)
+    try:
+        service = _build_service()
+        service.thumbnails().set(
+            videoId=video_id,
+            media_body=MediaFileUpload(str(jpg_path), mimetype="image/jpeg"),
+        ).execute()
+        logger.info("YouTube thumbnail set on %s (%s)", video_id, image_path.name)
+    except HttpError as e:
+        status = getattr(getattr(e, "resp", None), "status", None)
+        if status in (401, 403):
+            raise YouTubeThumbnailRejected(
+                "thumbnail needs a phone-verified channel — set it manually in YouTube Studio"
+            ) from e
+        raise RuntimeError(f"YouTube rejected the thumbnail: {e}") from e
+    finally:
+        if is_temp:
+            jpg_path.unlink(missing_ok=True)
