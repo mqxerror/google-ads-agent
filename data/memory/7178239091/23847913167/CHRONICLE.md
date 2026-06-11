@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/canadian-citizenship-by-descent
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 
 ## Timeline
 
@@ -58,6 +58,7 @@ Last updated: 2026-06-09
 - **May 15** — [Competitor Intel] Competitor Intel ran Stage 2 for Canadian Citizenship by Descent campaign: researched competitive landscape, scanned competitor ads, and performed keyword research for new product (distinct from golden visa campaigns).
 
 ### June 2026
+- **Jun 10** — [PPC Strategist] MapleRoots MaxClicks flip confirmed working: Jun 9 saw 87 clicks (+164% vs 7-day avg of 33) and $117.91 spend (+198%), with Jun 10 on pace to fill the $150 daily budget for the first time since Jun 2. CPC at $1.36–$1.38 approaching $1.40 cap flagged as new throttle risk.
 - **Jun 09** — [Agency Director] User asked: why you always keep saying reduce the form inputs and scientific studies about that ? also which fie
 - **Jun 09** — [Agency Director] Attempted to flip MapleRoots to Maximize Clicks @ $1.40 max-CPC cap to restore traffic; MCP has no Maximize Clicks tool, fell back to Chrome automation via browser tools.
 - **Jun 09** — [Agency Director] EXECUTED user-approved bid-strategy flip: MapleRoots (23847913167) switched Manual CPC → **Maximize Clicks with $1.40 max-CPC cap** via Google Ads UI (Chrome automation; MCP has no Maximize Clicks tool). Verified server-side: grid Bid strategy type = "Maximize clicks" and the "Limited by bid strategy" status flag dropped off. Goal: fill the $150/day budget and restore the -77% traffic collapse since the Jun 2 PHRASE→EXACT change, since the old $0.90 cap sat below market CPC ($1.05–$1.33).

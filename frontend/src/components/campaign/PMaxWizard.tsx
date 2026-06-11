@@ -67,6 +67,7 @@ interface PMaxBundle {
   dailyBudget: string;   // user types in dollars; convert to micros on submit
   finalUrl: string;
   businessName: string;
+  brief: string;          // optional — fuel for the Creative Director draft
   headlines: string[];
   longHeadlines: string[];
   descriptions: string[];
@@ -79,7 +80,7 @@ interface PMaxBundle {
 }
 
 const EMPTY_BUNDLE: PMaxBundle = {
-  name: '', dailyBudget: '', finalUrl: '', businessName: '',
+  name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   headlines: [''], longHeadlines: [''], descriptions: ['', ''],
   logos: [], landscape: [], square: [], portrait: [],
   videoIds: [''], audienceSignals: [],
@@ -96,7 +97,9 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   const [bundle, setBundle] = useState<PMaxBundle>(() => {
     try {
       const saved = sessionStorage.getItem('pmax-wizard-bundle');
-      return saved ? JSON.parse(saved) : EMPTY_BUNDLE;
+      // Merge over defaults so bundles saved before new fields (e.g. `brief`)
+      // were added don't come back with undefined keys.
+      return saved ? { ...EMPTY_BUNDLE, ...JSON.parse(saved) } : EMPTY_BUNDLE;
     } catch { return EMPTY_BUNDLE; }
   });
   const [submitting, setSubmitting] = useState(false);
@@ -111,6 +114,36 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   }, []);
 
   const stepId = STEPS[stepIdx].id;
+
+  // Human-readable "why is Next disabled" — the validation itself lives in
+  // stepValid below; this just narrates the unmet minimums so a disabled
+  // button never reads as a bug.
+  const stepHint = useMemo(() => {
+    const missing: string[] = [];
+    if (stepId === 'brief') {
+      if (!bundle.name.trim()) missing.push('campaign name');
+      if (!(parseFloat(bundle.dailyBudget) > 0)) missing.push('daily budget');
+      if (!bundle.finalUrl.trim()) missing.push('final URL');
+      if (!bundle.businessName.trim()) missing.push('business name');
+    } else if (stepId === 'text') {
+      const h = bundle.headlines.filter(Boolean);
+      const lh = bundle.longHeadlines.filter(Boolean);
+      const d = bundle.descriptions.filter(Boolean);
+      if (h.length < RULES.headlines.min) missing.push(`${RULES.headlines.min - h.length} more headline${RULES.headlines.min - h.length > 1 ? 's' : ''}`);
+      if (lh.length < RULES.longHeadlines.min) missing.push(`${RULES.longHeadlines.min - lh.length} long headline`);
+      if (d.length < RULES.descriptions.min) missing.push(`${RULES.descriptions.min - d.length} more description${RULES.descriptions.min - d.length > 1 ? 's' : ''}`);
+      if (h.some(s => s.length > RULES.headlines.maxChars)) missing.push('a headline is over 30 chars');
+      if (lh.some(s => s.length > RULES.longHeadlines.maxChars)) missing.push('a long headline is over 90 chars');
+      if (d.some(s => s.length > RULES.descriptions.maxChars)) missing.push('a description is over 90 chars');
+    } else if (stepId === 'images') {
+      if (bundle.logos.length < RULES.logos.min) missing.push('a logo');
+      if (bundle.landscape.length < RULES.landscape.min) missing.push('a landscape image');
+      if (bundle.square.length < RULES.square.min) missing.push('a square image');
+    } else if (stepId === 'videos') {
+      if (bundle.videoIds.filter(Boolean).length < RULES.videos.min) missing.push('a YouTube video ID');
+    }
+    return missing.length ? `To continue: ${missing.join(' · ')}` : null;
+  }, [stepId, bundle]);
 
   // ── Per-step validation: gates Next/Submit so a user never reaches the
   // server with an invalid bundle. Same rules as the orchestrator's
@@ -237,7 +270,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
 
       <div className="border border-border rounded-lg p-6 bg-card mb-4">
         {stepId === 'brief'    && <StepBrief    bundle={bundle} setField={setField} />}
-        {stepId === 'text'     && <StepText     bundle={bundle} setField={setField} />}
+        {stepId === 'text'     && <StepText     bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'images'   && <StepImages   bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'videos'   && <StepVideos   bundle={bundle} setField={setField} />}
         {stepId === 'signals'  && <StepSignals  bundle={bundle} setField={setField} />}
@@ -255,13 +288,18 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           {stepIdx === 0 ? 'Type' : 'Back'}
         </button>
         {stepId !== 'review' ? (
-          <Button
-            onClick={() => setStepIdx(stepIdx + 1)}
-            disabled={!stepValid}
-            className="gap-1.5"
-          >
-            Next <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-3">
+            {!stepValid && stepHint && (
+              <p className="text-[11px] text-warning max-w-[360px] text-right">{stepHint}</p>
+            )}
+            <Button
+              onClick={() => setStepIdx(stepIdx + 1)}
+              disabled={!stepValid}
+              className="gap-1.5"
+            >
+              Next <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         ) : submitResult?.ok ? (
           <Button onClick={onClose} className="gap-1.5">
             <CheckCircle2 className="h-4 w-4" /> Done
@@ -304,16 +342,75 @@ function StepBrief({ bundle, setField }: { bundle: PMaxBundle; setField: <K exte
         <Input value={bundle.businessName} onChange={e => setField('businessName', e.target.value)} placeholder="Mercan" />
         <p className="text-[10px] text-muted-foreground mt-1">Shown in auto-generated layouts; keep it short and brand-faithful.</p>
       </div>
+      <div>
+        <label className="text-xs font-medium mb-1.5 block">Campaign brief (optional)</label>
+        <textarea
+          value={bundle.brief}
+          onChange={e => setField('brief', e.target.value)}
+          rows={3}
+          placeholder="Who is this for, what's the offer, what makes it different? The Creative Director uses this (plus your landing page) to draft headlines and descriptions in the next step."
+          className="w-full text-sm rounded-md border border-border bg-background p-2.5 resize-none placeholder:text-muted-foreground/60"
+        />
+      </div>
     </div>
   );
 }
 
-function StepText({ bundle, setField }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void }) {
+function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const draftWithAI = async () => {
+    setDrafting(true);
+    setDraftError(null);
+    try {
+      const res = await fetch(`/api/accounts/${accountId}/pmax/draft-copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brief: bundle.brief,
+          final_url: bundle.finalUrl,
+          business_name: bundle.businessName,
+          campaign_name: bundle.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
+      if (data.headlines?.length) setField('headlines', data.headlines);
+      if (data.long_headlines?.length) setField('longHeadlines', data.long_headlines);
+      if (data.descriptions?.length) setField('descriptions', data.descriptions);
+    } catch (e) {
+      setDraftError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDrafting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <AiHint
-        body="Inline copy generation via the Creative Director role is wired in the next phase. For now, paste or type your headlines below — the Creative Director role in chat can draft them and you copy them across."
-      />
+      {/* Creative Director draft — fills all three lists from the brief +
+          landing page; everything stays editable below. */}
+      <div className="border border-blue-500/20 bg-blue-500/5 rounded-md p-3 text-xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <p className="text-muted-foreground leading-relaxed">
+              Let the <b>Creative Director</b> draft headlines and descriptions from your
+              brief and landing page ({bundle.finalUrl || 'set the Final URL in step 1'}).
+              Replaces what's typed below — everything stays editable.
+            </p>
+          </div>
+          <Button size="sm" onClick={draftWithAI} disabled={drafting || !bundle.finalUrl} className="gap-1.5 shrink-0">
+            {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {drafting ? 'Drafting… 1–3 min (reads your landing page)' : 'Draft with Creative Director'}
+          </Button>
+        </div>
+        {draftError && (
+          <p className="mt-2 flex items-center gap-1.5 text-red-500">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {draftError}
+          </p>
+        )}
+      </div>
       <TextList
         label="Headlines"
         hint={`≥${RULES.headlines.min}, each ≤${RULES.headlines.maxChars} chars · up to ${RULES.headlines.max}`}

@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-08 11:37
+**Last updated:** 2026-06-10 16:09
 
 **Task:** Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
 
@@ -496,4 +496,42 @@ That pushes volume immediately while QS rebuilds, no strategy-change instability
 **Daily cleanup stays on regardless of bid strategy** — it's independent of Manual vs Max Clicks.
 Net: **Max Clicks is the right "spend it fast" engine — but it's a Jun 9–10 move, capped at $1.20, after the restored keyword finishes its QS rebuild.** Today, a quick bid bump on the reach keywords gets traffic climbing without the learning-phase hit.
 Want me to apply the bid bumps now ($0.90 / $0.85), and pencil the Maximize Clicks + $1.20 cap switch for Jun 9?
+— *PPC Strategist*
+
+### 2026-06-10 16:09 — Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterd
+
+**Task:** Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace for monthly budget? Any pacing issues?
+3. Any key
+# Daily Review — MapleRoots (Jun 10, 2026)
+## 1. Yesterday (Jun 9) vs. 7-Day Average
+|--------|-------|---------------------|---|
+**The Maximize Clicks flip worked — traffic exploded on Jun 9.** 87 clicks vs. a 7-day avg of 33 is the sharpest single-day jump since May 26. Jun 10 is tracking identically (82 clicks, $113.48 already on a partial day).
+**Anomaly to flag: CPC jumped to $1.36–$1.38.** That's approaching the $1.40 cap. Google is bidding to the ceiling, which means if traffic demand exceeds supply at $1.40, we could hit the cap as a new throttle. Watch it.
+## 2. Budget Pacing
+| Metric | Value |
+|--------|-------|
+| Jun spend (Jun 1–9) | $485.13 |
+| Jun 9 spend | $117.91 (79% of $150 budget) |
+| Jun 10 partial | $113.48 (already 76%, ~4h remaining in day) |
+| Projected Jun 10 | ~$145–155 — first day to actually fill budget |
+| Monthly projection | ~$3,400 vs $4,500 budget (low days Jun 3–8 drag avg down) |
+**Pacing is fixed.** The MaxClicks flip is delivering the budget utilization we've been trying to restore since Jun 2. No pacing action needed.
+## 3. High-Spend, Zero-Conversion Keywords
+Based on lifetime data — flagging the ones with meaningful spend and no return:
+| Keyword | Clicks | Est. Spend | Conv | Status |
+|---------|--------|------------|------|--------|
+These are AG2 keywords — AG2 has the worst economics in the campaign ($104 CPA, 3 conv). **No action yet** — the MaxClicks flip just changed the traffic mix. Give these 5–7 days of new-volume data before cutting.
+## 4. Top Converting Search Terms (last 7 days)
+| Term | Clicks | Conv | Added? |
+|------|--------|------|--------|
+Only 2 visible converters in last 7 days (low-volume window). `canada law c3` has been flagged twice before — now has 2 conversions total and still no keyword.
+## 5. Immediate Actions
+| # | Action | Priority | Type |
+|---|--------|----------|------|
+**Want me to add `canada law c3` to AG3 now?** It's a low-impact keyword add, clean converter, no approval needed per our standing policy.
 — *PPC Strategist*

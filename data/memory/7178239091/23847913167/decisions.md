@@ -374,3 +374,11 @@ Here's a self-contained prompt to paste to the GTM agent. It includes the hard c
 | 2026-06-09 14:13 | **How:** the Google Ads MCP has no Maximize Clicks tool, so I made the change through the Google Ads UI via Chrome (select strategy → check "Set a maximum CPC bid limit" → enter $1.40 → Save). Verified server-side by reloading the campaigns grid — the Bid strategy type column now reads "Maximize cli | User asked: do 1 flip to maximize clicks to restore the traffic | pending | director |
 | 2026-06-09 14:13 | **One standing caveat from the team** (PPC Strategist + Analytics, repeatedly): you'll buy more clicks, but they land on the same un-fixed `/lp/` form (~1.2% CVR — still "Submit", 8 fields, the guide-link leak). Reach × a fixed form is what gets conversions back to 3–4/day; reach alone caps around ~ | User asked: do 1 flip to maximize clicks to restore the traffic | pending | director |
 | 2026-06-09 14:20 | / **Expedia** (famous case) / Removed **one** field ("Company") → **+$12M/year** in profit. One field. / | User asked: why you always keep saying reduce the form inputs and scientific studies about that ? also which field should I remove ? | pending | director |
+| 2026-06-10 16:09 | **Pacing is fixed.** The MaxClicks flip is delivering the budget utilization we've been trying to restore since Jun 2. No pacing action needed. | User asked: Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace | pending | ppc_strategist |
+| 2026-06-10 16:09 | Only 2 visible converters in last 7 days (low-volume window). `canada law c3` has been flagged twice before — now has 2 conversions total and still no keyword. | User asked: Daily review for "MapleRoots — Citizenship by Descent (US)":
+
+1. How did yesterday compare to the 7-day average? Flag any anomalies.
+2. Are we on pace | pending | ppc_strategist |

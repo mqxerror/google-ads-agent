@@ -81,6 +81,102 @@ class PMaxCreateResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
+class PMaxDraftRequest(BaseModel):
+    brief: str = ""
+    final_url: str = ""
+    business_name: str = ""
+    campaign_name: str = ""
+
+
+class PMaxDraftResponse(BaseModel):
+    headlines: List[str]
+    long_headlines: List[str]
+    descriptions: List[str]
+
+
+# Google's hard limits, enforced server-side on whatever the model returns.
+_DRAFT_LIMITS = {
+    "headlines": (3, 15, 30),
+    "long_headlines": (1, 5, 90),
+    "descriptions": (2, 5, 90),
+}
+
+
+@router.post(
+    "/accounts/{account_id}/pmax/draft-copy",
+    response_model=PMaxDraftResponse,
+)
+async def draft_pmax_copy(account_id: str, body: PMaxDraftRequest) -> PMaxDraftResponse:
+    """Draft PMax text assets with the Creative Director role from the
+    campaign brief + landing page. Analysis-only (no Google Ads tools);
+    the agent may fetch the landing page to ground the copy. Limits are
+    re-enforced here so the wizard never receives over-length lines."""
+    import json as _json
+    import re as _re
+
+    from app.services.agent import stream_agent_response
+
+    prompt = (
+        "Draft Performance Max ad copy for this campaign. First fetch the "
+        "landing page to ground every claim — never invent offers or numbers.\n\n"
+        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
+        f"Business name: {body.business_name or '-'}\n"
+        f"Campaign name: {body.campaign_name or '-'}\n"
+        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
+        "HARD LIMITS (Google rejects violations): headlines ≤30 chars each, "
+        "long_headlines ≤90, descriptions ≤90. No em dashes. No third-party "
+        "brand names. Vary the angles: benefit, urgency, social proof, "
+        "question, specificity.\n\n"
+        "Respond with ONLY this JSON, no prose:\n"
+        '{"headlines": [8-12 strings ≤30 chars], '
+        '"long_headlines": [3-5 strings ≤90 chars], '
+        '"descriptions": [4-5 strings ≤90 chars]}'
+    )
+
+    parts: list[str] = []
+    async for ev in stream_agent_response(
+        user_message=prompt,
+        account_id=account_id,
+        active_role="creative_director",
+        tool_allowlist=[],  # no Google Ads tools; built-in web fetch still works
+    ):
+        if ev.get("type") == "text":
+            parts.append(ev.get("content", ""))
+    raw = "".join(parts)
+
+    m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+    if not m:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "DRAFT_FAILED", "message": "Creative Director returned no JSON — try again."},
+        )
+    try:
+        parsed = _json.loads(m.group(0))
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "DRAFT_FAILED", "message": "Could not parse the draft — try again."},
+        )
+
+    out: Dict[str, List[str]] = {}
+    for field, (min_n, max_n, max_chars) in _DRAFT_LIMITS.items():
+        items = [
+            s.strip() for s in (parsed.get(field) or [])
+            if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars
+        ]
+        out[field] = items[:max_n]
+        if len(out[field]) < min_n:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": "DRAFT_FAILED",
+                    "message": f"Draft produced too few valid {field.replace('_', ' ')} "
+                               f"({len(out[field])}/{min_n}) — try again.",
+                },
+            )
+    return PMaxDraftResponse(**out)
+
+
 @router.post(
     "/accounts/{account_id}/campaigns/pmax",
     response_model=PMaxCreateResponse,
