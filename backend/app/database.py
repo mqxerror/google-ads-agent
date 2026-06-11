@@ -896,7 +896,26 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V17 migration complete (scheduled_plans + scheduled_plan_runs).")
 
-        if version >= 17:
-            logger.info("Database schema is V17 (up to date).")
+        # V18: `ad_assets.prompt_hash` — cache key for higgsfield clips
+        # used as storyboard scenes (Epic 11 P1). A re-render of the
+        # same storyboard must NOT re-burn credits: the renderer hashes
+        # (model | prompt | duration | aspect) and reuses any completed
+        # row with the same hash whose local file still exists.
+        if version < 18:
+            try:
+                await db.execute("ALTER TABLE ad_assets ADD COLUMN prompt_hash TEXT")
+            except aiosqlite.OperationalError:
+                pass  # idempotent
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ad_assets_prompt_hash
+                    ON ad_assets(prompt_hash)
+                    WHERE prompt_hash IS NOT NULL
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (18)")
+            await db.commit()
+            logger.info("V18 migration complete (ad_assets.prompt_hash for clip reuse).")
+
+        if version >= 18:
+            logger.info("Database schema is V18 (up to date).")
     finally:
         await db.close()

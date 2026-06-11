@@ -24,7 +24,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional
 
 from app.config import settings
 from app.services.video import ASSETS_DIR, elevenlabs_tts
@@ -176,6 +176,14 @@ class StoryboardReelRequest:
     # (set by the verbatim splitter) and stretch each scene to match its
     # audio length. Audio + visual stay in sync; no mid-sentence cuts.
     sync_audio_to_scenes: bool = False
+    # Epic 11 P1: `type:"higgsfield"` scenes generate a clip via the
+    # higgsfield CLI and splice it into the stitch. These fields tag the
+    # cached clip's ad_assets row (library visibility + prompt-hash
+    # reuse) and pick the generation aspect. Renders without higgsfield
+    # scenes never touch any of this.
+    account_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    aspect: str = "16:9"            # mezzanine target is 1920x1080 (16:9)
 
 
 async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[dict]:
@@ -265,9 +273,35 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
                        "message": f"⚠ Got TTS for {n_ok}/{len(req.scenes)} scenes — missing scenes will play silent."}
 
         # ── 1. Prepare every scene (cheap — file IO + string substitution) ──
-        prepared: list[tuple[int, str, Path, float]] = []  # (idx, type, scene_dir, duration)
+        # Entry shape: (idx, type, payload, duration). payload is the
+        # prepared template dir for hyperframes types, or the raw scene
+        # dict for `higgsfield` scenes (clip generation happens in the
+        # render phase so it can run inside the same batched gather).
+        prepared: list[tuple[int, str, Any, float]] = []
+        n_higgsfield = 0
         for i, scene in enumerate(req.scenes):
             stype = (scene.get("type") or "").lower()
+            if stype == "higgsfield":
+                # Epic 11 P1 — generative clip spliced into the stitch.
+                # Cap per render: credit-burn guard (defense in depth
+                # with pmax_video._clean_scenes; this path also covers
+                # hand-edited storyboards).
+                from app.services.higgsfield_scene import MAX_HIGGSFIELD_SCENES
+                if not (scene.get("prompt") or "").strip():
+                    logger.warning("storyboard scene %d higgsfield without prompt — skipping", i)
+                    continue
+                if n_higgsfield >= MAX_HIGGSFIELD_SCENES:
+                    yield {"type": "status", "stage": "higgsfield-capped",
+                           "message": f"Scene {i+1} skipped — max {MAX_HIGGSFIELD_SCENES} AI clips per render (credit guard)."}
+                    continue
+                n_higgsfield += 1
+                hf_dur = 5.0
+                try:
+                    hf_dur = max(1.5, float(scene.get("duration") or 5.0))
+                except Exception:
+                    pass
+                prepared.append((i, "higgsfield", dict(scene), hf_dur))
+                continue
             if stype not in TYPE_TO_TEMPLATE:
                 logger.warning("storyboard scene %d unknown type %r — skipping", i, stype)
                 continue
@@ -295,16 +329,50 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
             return
 
         # ── 2. Render in batches of `parallel_workers` ──
+        async def _render_one(idx: int, stype: str, payload: Any) -> Path:
+            """Render a single prepared entry to a local MP4. Hyperframes
+            types go through headless Chrome; higgsfield scenes generate
+            (or cache-hit) a clip and mezzanine-normalize it so the
+            xfade chain accepts it next to the 1920x1080/30fps HTML
+            scenes."""
+            if stype == "higgsfield":
+                from app.services.higgsfield_scene import (
+                    normalize_clip,
+                    resolve_higgsfield_clip,
+                )
+                raw_clip, was_cached = await resolve_higgsfield_clip(
+                    payload,
+                    aspect=req.aspect,
+                    account_id=req.account_id,
+                    campaign_id=req.campaign_id,
+                )
+                if was_cached:
+                    logger.info("scene %d reusing cached higgsfield clip", idx)
+                # Spoken line longer than the fixed-length clip → freeze
+                # the last frame so the VO fits (generative clips can't
+                # stretch to audio like HTML scenes do).
+                min_dur: Optional[float] = None
+                if sync_active and per_scene_duration[idx]:
+                    min_dur = per_scene_duration[idx] + 0.3
+                dest = work_root / f"s{idx:02d}_higgsfield_norm.mp4"
+                return await normalize_clip(raw_clip, dest, min_duration=min_dur)
+            return await _render_with_hyperframes(payload, quality=req.quality)
+
         scene_mp4s: list[Path] = [None] * len(prepared)  # type: ignore
         total = len(prepared)
         for batch_start in range(0, total, req.parallel_workers):
             batch = prepared[batch_start:batch_start + req.parallel_workers]
+            n_hf_batch = sum(1 for (_, t, _, _) in batch if t == "higgsfield")
             yield {
                 "type": "status", "stage": f"render-batch-{batch_start//req.parallel_workers + 1}",
-                "message": f"Rendering scenes {batch_start+1}-{batch_start+len(batch)}/{total} (Hyperframes · GSAP · headless Chrome)…",
+                "message": (
+                    f"Rendering scenes {batch_start+1}-{batch_start+len(batch)}/{total}"
+                    + (" (includes an AI clip — can take several minutes)…"
+                       if n_hf_batch else " (Hyperframes · GSAP · headless Chrome)…")
+                ),
             }
             results = await asyncio.gather(
-                *[_render_with_hyperframes(d, quality=req.quality) for (_, _, d, _) in batch],
+                *[_render_one(idx, t, payload) for (idx, t, payload, _) in batch],
                 return_exceptions=True,
             )
             for (rel_idx, (idx, stype, _d, _dur)), res in zip(enumerate(batch), results):

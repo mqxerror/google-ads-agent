@@ -396,6 +396,47 @@ class HiggsfieldClient:
             return parsed
         return [parsed] if isinstance(parsed, dict) else []
 
+    async def model_list(self, *, kind: str = "video") -> list[dict[str, Any]]:
+        """List models via `higgsfield --json model list --image|--video`.
+
+        Returns the raw item list: `[{display_name, job_set_type,
+        type}, ...]` (verified against CLI June 2026). Used by the
+        server-side model catalog to mark curated entries available —
+        NOT as the catalog itself (the list carries no param
+        contracts, costs, or tiers)."""
+        if kind not in ("image", "video"):
+            raise HiggsfieldError(
+                message=f"model_list kind must be 'image' or 'video', got {kind!r}",
+                code="cli",
+            )
+        bin_path = shutil.which("higgsfield")
+        if bin_path is None:
+            raise HiggsfieldError(message="higgsfield CLI not on PATH", code="cli")
+        argv = [bin_path, "--json", "model", "list", f"--{kind}"]
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=30.0,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message="model list timed out after 30s", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or "model list failed",
+                code=_classify_cli_error(err),
+            )
+        try:
+            parsed = json.loads(stdout.strip()) if stdout.strip() else []
+        except json.JSONDecodeError as e:
+            raise HiggsfieldError(
+                message=f"model list returned non-JSON: {stdout[:120]!r}", code="shape",
+            ) from e
+        if isinstance(parsed, dict) and "items" in parsed:
+            parsed = parsed["items"]
+        return parsed if isinstance(parsed, list) else []
+
     async def get_balance(self) -> dict[str, Any]:
         """Read the operator's current Higgsfield credit balance via
         `higgsfield account status --json`. The CLI subcommand is

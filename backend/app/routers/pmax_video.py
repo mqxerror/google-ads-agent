@@ -52,7 +52,7 @@ _render_jobs: Dict[str, Dict[str, Any]] = {}
 _COMPOSITIONS = ["letterbox", "split", "lowerthird", "fullbleed"]
 _MOTIONS = ["kenburns-zoom-in", "pan-right", "kenburns-zoom-out", "parallax-tilt", "pan-left", "dolly-in"]
 _TREATMENTS = ["blur-stagger", "slide-up", "mask-reveal", "scale-bounce", "typewriter"]
-_VALID_TYPES = {"logo", "hero", "broll", "stat", "cta"}
+_VALID_TYPES = {"logo", "hero", "broll", "stat", "cta", "higgsfield"}
 _MAX_SCENES = 8
 
 _LOGO_RX = re.compile(r"(^|[^a-z])logo([^a-z]|$)", re.IGNORECASE)
@@ -68,6 +68,11 @@ class PMaxVideoDraftRequest(BaseModel):
     final_url: str = ""
     campaign_name: str = ""
     image_ids: List[str] = Field(default_factory=list)   # ad_assets row ids
+    # Epic 11 P1 engine prefs. Off by default — drafts stay pure
+    # hyperframes (free, local) unless the operator opts into AI clips.
+    allow_higgsfield: bool = False
+    video_model: str = "veo3_1_lite"                     # cheapest verified clip model
+    max_higgsfield_scenes: int = Field(default=2, ge=0, le=2)
 
 
 async def _resolve_images(image_ids: List[str]) -> tuple[list[dict], dict[str, str]]:
@@ -136,6 +141,16 @@ def _draft_prompt(body: PMaxVideoDraftRequest, library: list[dict]) -> str:
         "AVAILABLE IMAGES (the operator picked these — use ONLY these, one per broll scene; "
         "copy the backtick-quoted storage id verbatim into image_filename):\n"
         + "\n".join(img_lines)
+        + (
+            (
+                f"\n\nAI VIDEO CLIPS (optional): up to {body.max_higgsfield_scenes} broll beats MAY instead be a "
+                'generated clip: {"type": "higgsfield", "prompt": "<one cinematic shot description — '
+                "subject, setting, camera move, lighting; no on-screen text>\", \"duration\": 6, "
+                '"speak": "..."}. Use ONLY when no library image fits the beat — each clip costs real '
+                "credits. Keep prompts to a single continuous shot."
+            )
+            if body.allow_higgsfield and body.max_higgsfield_scenes > 0 else ""
+        )
         + "\n\nSTRUCTURE — 6 to 8 scenes total:\n"
         "1. Open with a `logo` scene IF an image is tagged [LOGO] (set logo_filename to its storage id, "
         "brand_name, short tagline); otherwise open with a `hero` scene (headline 4-7 words).\n"
@@ -168,14 +183,32 @@ def _draft_prompt(body: PMaxVideoDraftRequest, library: list[dict]) -> str:
     )
 
 
-def _clean_scenes(raw_scenes: list, library: list[dict]) -> list[dict]:
+def _clean_scenes(
+    raw_scenes: list,
+    library: list[dict],
+    *,
+    allow_higgsfield: bool = False,
+    video_model: str = "veo3_1_lite",
+    max_higgsfield: int = 2,
+) -> list[dict]:
     """Validate + normalise the model's storyboard into scenes that
     generate_storyboard_reel accepts. Round-robins unassigned/unknown broll
-    images, fills palette defaults, maps speak→_speak_text, forces cta last."""
+    images, fills palette defaults, maps speak→_speak_text, forces cta last.
+
+    Higgsfield scenes (Epic 11 P1): kept only when `allow_higgsfield`,
+    capped at `max_higgsfield` (credit-burn guard), model FORCED to the
+    operator's pick (never trust the LLM with a spend decision), and
+    duration snapped to the model's legal values (Veo enum 4/6/8 vs
+    Kling int) via the server-side catalog."""
+    from app.services.higgsfield_scene import MAX_HIGGSFIELD_SCENES
+    from app.services.model_catalog import clamp_duration
+
+    max_hf = max(0, min(int(max_higgsfield), MAX_HIGGSFIELD_SCENES))
     valid = {img["filename"] for img in library}
     non_logo = [img["filename"] for img in library if not img["is_logo"]]
     logo_fns = [img["filename"] for img in library if img["is_logo"]]
     rr = 0  # round-robin pointer for image recovery
+    n_hf = 0
 
     cleaned: list[dict] = []
     used_images: set[str] = set()
@@ -186,6 +219,43 @@ def _clean_scenes(raw_scenes: list, library: list[dict]) -> list[dict]:
         if t not in _VALID_TYPES:
             continue
         speak = (s.get("speak") or s.get("_speak_text") or "").strip()
+        if t == "higgsfield":
+            prompt = (s.get("prompt") or "").strip()
+            if not allow_higgsfield or not prompt or n_hf >= max_hf:
+                # Not allowed / over cap / no prompt — degrade to image
+                # broll when an unused image exists, else drop the beat.
+                pool = [f for f in non_logo if f not in used_images]
+                if not pool:
+                    continue
+                fn = pool[rr % len(pool)]
+                rr += 1
+                used_images.add(fn)
+                n_broll = sum(1 for c in cleaned if c["type"] == "broll")
+                out = {
+                    "type": "broll", "image_filename": fn,
+                    "caption": (s.get("caption") or "").strip(),
+                    "scene_label": (s.get("scene_label") or "").strip(),
+                    "composition": _COMPOSITIONS[n_broll % len(_COMPOSITIONS)],
+                    "motion": _MOTIONS[n_broll % len(_MOTIONS)],
+                    "text_treatment": _TREATMENTS[n_broll % len(_TREATMENTS)],
+                }
+            else:
+                n_hf += 1
+                try:
+                    req_dur = int(s.get("duration")) if s.get("duration") is not None else None
+                except (TypeError, ValueError):
+                    req_dur = None
+                out = {
+                    "type": "higgsfield",
+                    "prompt": prompt[:1000],
+                    "model": video_model,           # operator's pick, always
+                }
+                snapped = clamp_duration(video_model, req_dur)
+                if snapped is not None:
+                    out["duration"] = snapped
+            out["_speak_text"] = speak or (out.get("caption") or "")
+            cleaned.append(out)
+            continue
         if t == "hero":
             out = {"type": "hero", "headline": (s.get("headline") or "").strip()}
             if not out["headline"]:
@@ -300,7 +370,12 @@ async def _run_draft_job(job_id: str, body: PMaxVideoDraftRequest) -> None:
             _draft_jobs[job_id] = {"status": "error", "message": "Script Generator returned no parseable JSON — try again."}
             return
 
-        scenes = _clean_scenes(data.get("scenes") or [], library)
+        scenes = _clean_scenes(
+            data.get("scenes") or [], library,
+            allow_higgsfield=body.allow_higgsfield,
+            video_model=body.video_model,
+            max_higgsfield=body.max_higgsfield_scenes,
+        )
         if len(scenes) < 3:
             _draft_jobs[job_id] = {"status": "error", "message": f"Draft produced only {len(scenes)} usable scenes — try again."}
             return
@@ -362,6 +437,10 @@ async def _run_render_job(job_id: str, body: PMaxVideoRenderRequest) -> None:
             quality=body.quality,
             parallel_workers=2,
             sync_audio_to_scenes=body.sync_audio_to_scenes,
+            # Epic 11 P1 — lets `type:"higgsfield"` scenes tag their
+            # cached clip rows (prompt-hash reuse + library visibility).
+            account_id=body.account_id,
+            campaign_id=body.campaign_id,
         )
         async for event in generate_storyboard_reel(req):
             et = event.get("type")

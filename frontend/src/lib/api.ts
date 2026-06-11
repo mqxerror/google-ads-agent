@@ -305,6 +305,47 @@ export function studioBalance(): Promise<BalanceResponse> {
   return request<BalanceResponse>('/studio/balance');
 }
 
+// ── Server-side model catalog (Epic 11 P1) ─────────────────────
+// Single source of truth for models + per-model param contracts.
+// Ends the FE-hardcoded-list drift; the StudioPanel ModelPicker is
+// fed exclusively from this.
+
+export interface StudioModelConstraints {
+  aspect_ratios?: string[];
+  /** 'enum' = only `durations` values legal (Veo); 'int' = integer
+   * seconds up to max_duration (Kling); absent/null = no --duration. */
+  duration_type?: 'enum' | 'int' | null;
+  durations?: number[];
+  max_duration?: number;
+  modes?: string[];          // Kling: std / pro / 4k
+  qualities?: string[];      // Veo: basic / high / ultra
+  submodels?: string[];
+  sound?: string[];
+  supports_soul?: boolean;
+  requires_input_image?: boolean;
+}
+
+export interface StudioModelInfo {
+  id: string;
+  label: string;
+  kind: 'image' | 'video' | string;
+  tier: 'Best quality' | 'Fast' | 'Budget' | string;
+  cost_text: string;
+  available: boolean;
+  default: boolean;
+  constraints: StudioModelConstraints;
+}
+
+export interface ModelCatalogResponse {
+  models: StudioModelInfo[];
+  source: 'live' | 'static' | string;
+}
+
+export function studioListModels(kind?: 'image' | 'video'): Promise<ModelCatalogResponse> {
+  const qs = kind ? `?kind=${kind}` : '';
+  return request<ModelCatalogResponse>(`/studio/models${qs}`);
+}
+
 export interface SoulCharacter {
   id: string;
   account_id: string;

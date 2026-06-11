@@ -32,8 +32,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import HiggsfieldGenerator from '@/components/studio/HiggsfieldGenerator';
-import type { PromptContext } from '@/components/studio/HiggsfieldGenerator';
+import StudioPanel, {
+  type CopyDraftResult,
+  type StudioPanelContext,
+} from '@/components/studio/StudioPanel';
 import type { StudioJobStatus } from '@/lib/api';
 
 // Map a wizard slot to the higgsfield aspect that fits best.
@@ -375,19 +377,22 @@ function StepBrief({ bundle, setField }: { bundle: PMaxBundle; setField: <K exte
 }
 
 function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
-  const [drafting, setDrafting] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
 
-  // Poll-based: the draft takes 1-3 min and a single long request died
-  // whenever the dev proxy or a server blipped. Start a job, poll every 3s;
-  // the job id is kept in localStorage so even a page refresh resumes it.
-  const applyDraft = useCallback((result: { headlines?: string[]; long_headlines?: string[]; descriptions?: string[] }) => {
+  const applyDraft = useCallback((result: CopyDraftResult) => {
     if (result.headlines?.length) setField('headlines', result.headlines);
     if (result.long_headlines?.length) setField('longHeadlines', result.long_headlines);
     if (result.descriptions?.length) setField('descriptions', result.descriptions);
   }, [setField]);
 
-  const pollDraft = useCallback(async (draftId: string) => {
+  // Poll-based: the draft takes 1-3 min and a single long request died
+  // whenever the dev proxy or a server blipped. Job id lives in
+  // localStorage so a page refresh resumes it. Returns the result so
+  // StudioPanel can PREVIEW it before the operator applies (copy-mode
+  // contract); the refresh-resume path applies directly.
+  const pollDraftResult = useCallback(async (draftId: string): Promise<CopyDraftResult> => {
     const started = Date.now();
     while (Date.now() - started < 6 * 60_000) {
       await new Promise(r => setTimeout(r, 3000));
@@ -395,9 +400,8 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         const res = await fetch(`/api/pmax/draft-copy/${draftId}`);
         const job = await res.json();
         if (job.status === 'done') {
-          applyDraft(job.result || {});
           localStorage.removeItem('pmax-draft-id');
-          return;
+          return (job.result || {}) as CopyDraftResult;
         }
         if (job.status === 'error') {
           localStorage.removeItem('pmax-draft-id');
@@ -409,61 +413,61 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
       }
     }
     throw new Error('Draft timed out after 6 minutes — try again.');
-  }, [applyDraft]);
+  }, []);
 
-  const draftWithAI = async () => {
-    setDrafting(true);
-    setDraftError(null);
-    try {
-      const res = await fetch(`/api/accounts/${accountId}/pmax/draft-copy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brief: bundle.brief,
-          final_url: bundle.finalUrl,
-          business_name: bundle.businessName,
-          campaign_name: bundle.name,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
-      localStorage.setItem('pmax-draft-id', data.draft_id);
-      await pollDraft(data.draft_id);
-    } catch (e) {
-      setDraftError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDrafting(false);
-    }
-  };
+  // Host-injected drafter for StudioPanel copy mode — the panel itself
+  // never calls PMax endpoints (decoupling rule). The operator's extra
+  // intent from the panel's input rides along inside the brief.
+  const draftForPanel = useCallback(async (intent: string): Promise<CopyDraftResult> => {
+    const brief = intent.trim()
+      ? `${bundle.brief}\n\nOperator emphasis for this draft: ${intent.trim()}`.trim()
+      : bundle.brief;
+    const res = await fetch(`/api/accounts/${accountId}/pmax/draft-copy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        brief,
+        final_url: bundle.finalUrl,
+        business_name: bundle.businessName,
+        campaign_name: bundle.name,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
+    localStorage.setItem('pmax-draft-id', data.draft_id);
+    return pollDraftResult(data.draft_id);
+  }, [accountId, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name, pollDraftResult]);
 
-  // Resume polling a draft that was in flight when the page was refreshed.
+  // Resume polling a draft that was in flight when the page was
+  // refreshed — applies directly (the panel may not be open).
   useEffect(() => {
     const pending = localStorage.getItem('pmax-draft-id');
     if (!pending) return;
-    setDrafting(true);
-    pollDraft(pending)
+    setResuming(true);
+    pollDraftResult(pending)
+      .then(applyDraft)
       .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setDrafting(false));
+      .finally(() => setResuming(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="space-y-5">
-      {/* Creative Director draft — fills all three lists from the brief +
-          landing page; everything stays editable below. */}
-      <div className="border border-blue-500/20 bg-blue-500/5 rounded-md p-3 text-xs">
+      {/* Creative Director draft — opens the shared Studio panel; the
+          result previews there before it replaces the lists below. */}
+      <div className="border border-border bg-secondary/20 rounded-md p-3 text-xs">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <p className="text-muted-foreground leading-relaxed">
               Let the <b>Creative Director</b> draft headlines and descriptions from your
               brief and landing page ({bundle.finalUrl || 'set the Final URL in step 1'}).
-              Replaces what's typed below — everything stays editable.
+              You preview the draft before it replaces what's typed below.
             </p>
           </div>
-          <Button size="sm" onClick={draftWithAI} disabled={drafting || !bundle.finalUrl} className="gap-1.5 shrink-0">
-            {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {drafting ? 'Drafting… 1–3 min (reads your landing page)' : 'Draft with Creative Director'}
+          <Button size="sm" onClick={() => setPanelOpen(true)} disabled={resuming || !bundle.finalUrl} className="gap-1.5 shrink-0">
+            {resuming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {resuming ? 'Resuming draft…' : 'Draft with Creative Director'}
           </Button>
         </div>
         {draftError && (
@@ -472,6 +476,21 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
           </p>
         )}
       </div>
+
+      <StudioPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        mode="copy"
+        accountId={accountId}
+        context={{
+          brief: bundle.brief,
+          businessName: bundle.businessName,
+          finalUrl: bundle.finalUrl,
+          slot: 'Text assets',
+        }}
+        onDraftCopy={draftForPanel}
+        onUseCopy={applyDraft}
+      />
       <TextList
         label="Headlines"
         hint={`≥${RULES.headlines.min}, each ≤${RULES.headlines.maxChars} chars · up to ${RULES.headlines.max}`}
@@ -503,63 +522,107 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
   );
 }
 
+/** Per-asset preview metadata for the post-crop preview (no-silent-crop
+ * addendum). The actual aspect comes from the loaded image's natural
+ * dimensions client-side — DB width/height is null for older uploads. */
+interface SlotAssetMeta { url: string; filename: string }
+
 function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
-  // Shared campaign context for the Visual Director enhance affordance
-  // inside each slot's generator. Slot label/aspect get appended per
-  // slot in ImageGroup.
-  const baseContext: Omit<PromptContext, 'slotLabel' | 'slotAspect'> = {
+  // Shared campaign context for the StudioPanel each slot opens. Slot
+  // label/aspect get appended per slot in ImageGroup.
+  const baseContext: StudioPanelContext = {
     brief: bundle.brief,
     businessName: bundle.businessName,
     finalUrl: bundle.finalUrl,
   };
+  // id → preview url for every slot item, sourced from the library
+  // list and merged with fresh generations/uploads as they land.
+  const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const qs = new URLSearchParams({ asset_type: 'image', limit: '500' });
+    if (accountId) qs.set('account_id', accountId);
+    fetch(`/api/assets?${qs}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((rows: { id: string; url: string; filename: string }[]) => {
+        if (cancelled) return;
+        setAssetMeta(prev => {
+          const next = { ...prev };
+          rows.forEach(r => { next[r.id] = { url: r.url, filename: r.filename }; });
+          return next;
+        });
+      })
+      .catch(() => { /* previews degrade to id chips */ });
+    return () => { cancelled = true; };
+  }, [accountId]);
+  const registerAsset = useCallback((id: string, meta: SlotAssetMeta) => {
+    setAssetMeta(prev => ({ ...prev, [id]: meta }));
+  }, []);
+
   return (
     <div className="space-y-5">
       <AiHint
-        body="Upload your assets, pick from the Studio library, OR click ‘Generate (Higgsfield)’ to create them inline — the generator opens with the correct aspect locked to the slot, and any successful image lands here automatically."
+        body="Upload assets, pick from the Studio library, or click Generate to open the Studio panel with the slot's aspect locked. Every slot shows the image exactly as Google will receive it — mismatched aspects get center-cropped and are flagged below."
       />
       <ImageGroup
         label="Logos"
         spec="Auto-cropped to 1:1 at submit · min 128×128 · transparent bg preferred"
         slotAspect="1:1"
+        googleAspect={1}
+        googleAspectLabel="1:1"
         items={bundle.logos}
         onChange={v => setField('logos', v)}
         accountId={accountId}
         minItems={RULES.logos.min}
         maxItems={5}
         promptContext={baseContext}
+        assetMeta={assetMeta}
+        onAssetKnown={registerAsset}
       />
       <ImageGroup
         label="Landscape marketing image (1.91:1)"
         spec="Any aspect works — auto-cropped to 1.91:1 at submit · min 600×314 · 1200×628 recommended"
         slotAspect="16:9"
+        googleAspect={1.91}
+        googleAspectLabel="1.91:1"
         items={bundle.landscape}
         onChange={v => setField('landscape', v)}
         accountId={accountId}
         minItems={RULES.landscape.min}
         maxItems={20}
         promptContext={baseContext}
+        assetMeta={assetMeta}
+        onAssetKnown={registerAsset}
       />
       <ImageGroup
         label="Square marketing image (1:1)"
         spec="Any aspect works — auto-cropped to 1:1 at submit · min 300×300 · 1200×1200 recommended"
         slotAspect="1:1"
+        googleAspect={1}
+        googleAspectLabel="1:1"
         items={bundle.square}
         onChange={v => setField('square', v)}
         accountId={accountId}
         minItems={RULES.square.min}
         maxItems={20}
         promptContext={baseContext}
+        assetMeta={assetMeta}
+        onAssetKnown={registerAsset}
       />
       <ImageGroup
         label="Portrait marketing image (4:5)"
         spec="Optional · auto-cropped to 4:5 at submit · min 480×600 · 960×1200 recommended"
         slotAspect="4:5"
+        googleAspect={0.8}
+        googleAspectLabel="4:5"
         items={bundle.portrait}
         onChange={v => setField('portrait', v)}
         accountId={accountId}
         minItems={0}
         maxItems={20}
         promptContext={baseContext}
+        assetMeta={assetMeta}
+        onAssetKnown={registerAsset}
       />
     </div>
   );
@@ -568,7 +631,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
 // ── Step 4: Videos — agent-made slideshow ad + YouTube upload ───────
 
 interface StoryScene {
-  type: 'logo' | 'hero' | 'broll' | 'stat' | 'cta';
+  type: 'logo' | 'hero' | 'broll' | 'stat' | 'cta' | 'higgsfield';
   headline?: string;
   caption?: string;
   scene_label?: string;
@@ -583,6 +646,11 @@ interface StoryScene {
   motion?: string;
   text_treatment?: string;
   _speak_text?: string;
+  // higgsfield scenes (Epic 11 P1): an AI-generated clip spliced into
+  // the slideshow. Server forces the model + snaps the duration.
+  prompt?: string;
+  model?: string;
+  duration?: number;
 }
 
 interface VideoPanelState {
@@ -634,6 +702,9 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   const [showPicker, setShowPicker] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  // Epic 11 P1 — opt-in for AI-generated clips inside the slideshow.
+  // Off by default: pure hyperframes is free; each clip costs credits.
+  const [allowHiggsfield, setAllowHiggsfield] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -722,6 +793,11 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
           final_url: bundle.finalUrl,
           campaign_name: bundle.name,
           image_ids: panel.imageIds,
+          // Epic 11 P1 engine prefs — server caps at 2 and forces the
+          // model regardless of what the script agent asks for.
+          allow_higgsfield: allowHiggsfield,
+          video_model: 'veo3_1_lite',
+          max_higgsfield_scenes: 2,
         }),
       });
       const data = await res.json();
@@ -1029,10 +1105,24 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
               <span className="text-[11px] font-medium">2 · Script &amp; storyboard</span>
               {panel.scenes && <span className="text-[10px] text-muted-foreground">{panel.scenes.length} scenes · everything editable</span>}
             </div>
-            <Button size="sm" onClick={startDraft} disabled={!canDraft} className="gap-1.5">
-              {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {drafting ? 'Writing script… 1-3 min (reads your landing page)' : panel.scenes ? 'Rewrite script' : 'Write script & preview storyboard'}
-            </Button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button size="sm" onClick={startDraft} disabled={!canDraft} className="gap-1.5">
+                {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {drafting ? 'Writing script… 1-3 min (reads your landing page)' : panel.scenes ? 'Rewrite script' : 'Write script & preview storyboard'}
+              </Button>
+              <label
+                className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] text-muted-foreground"
+                title="Lets the script use up to 2 AI-generated clips (Veo Lite, about 8 credits each) when no library image fits a beat. Clips are cached — re-renders reuse them for free."
+              >
+                <input
+                  type="checkbox"
+                  checked={allowHiggsfield}
+                  onChange={e => setAllowHiggsfield(e.target.checked)}
+                  disabled={drafting || rendering}
+                />
+                Allow up to 2 AI clips (costs credits)
+              </label>
+            </div>
             {draftError && (
               <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3 shrink-0" /> {draftError}
@@ -1304,60 +1394,27 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         </div>
       ))}
 
-      {/* Thumbnail generation modal — same shell as the image-slot modal;
-          16:9 locked (YouTube thumbnails are 1280×720), first completed
-          asset becomes the selected thumbnail. */}
-      {showThumbGen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
-          onClick={() => setShowThumbGen(false)}
-        >
-          <div
-            className="w-full max-w-2xl bg-background border border-border rounded-lg shadow-xl overflow-hidden max-h-[80vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div>
-                <div className="text-sm font-semibold flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
-                  Generate YouTube thumbnail
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Aspect locked to 16:9 — YouTube renders thumbnails at 1280×720.
-                </p>
-              </div>
-              <button onClick={() => setShowThumbGen(false)} className="p-1 hover:bg-secondary rounded" aria-label="Close">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="p-4">
-              <HiggsfieldGenerator
-                accountId={accountId}
-                lockAspect="16:9"
-                onSettled={asset => {
-                  if (asset.status === 'completed' && asset.asset_id) {
-                    setThumb({ id: asset.asset_id, url: asset.thumbnail_url || asset.url || '' });
-                  }
-                }}
-                caption="Slot: YouTube thumbnail"
-                promptContext={{
-                  brief: bundle.brief,
-                  businessName: bundle.businessName,
-                  finalUrl: bundle.finalUrl,
-                  slotLabel: 'YouTube thumbnail',
-                  slotAspect: '16:9',
-                }}
-              />
-            </div>
-            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
-              <p className="text-[10px] text-muted-foreground">
-                {thumb ? 'Thumbnail selected · close when done' : 'First completed image becomes the thumbnail'}
-              </p>
-              <Button size="sm" onClick={() => setShowThumbGen(false)}>Done</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Thumbnail generation — shared Studio panel, 16:9 locked
+          (YouTube renders thumbnails at 1280×720). "Use in slot"
+          pins the chosen image as the thumbnail. */}
+      <StudioPanel
+        open={showThumbGen}
+        onClose={() => setShowThumbGen(false)}
+        mode="image"
+        accountId={accountId}
+        context={{
+          brief: bundle.brief,
+          businessName: bundle.businessName,
+          finalUrl: bundle.finalUrl,
+          slot: 'YouTube thumbnail',
+          aspect: '16:9',
+        }}
+        onUse={asset => {
+          if (asset.status === 'completed' && asset.asset_id) {
+            setThumb({ id: asset.asset_id, url: asset.thumbnail_url || asset.url || '' });
+          }
+        }}
+      />
     </div>
   );
 }
@@ -1378,7 +1435,7 @@ function SceneRow({ index, scene, imageLookup, onChange }: {
         <img src={thumb} alt="" className="h-14 w-14 rounded object-cover shrink-0 border border-border" loading="lazy" />
       ) : (
         <div className="h-14 w-14 rounded bg-secondary/50 shrink-0 flex items-center justify-center text-[9px] uppercase text-muted-foreground border border-border">
-          {scene.type}
+          {scene.type === 'higgsfield' ? 'AI clip' : scene.type}
         </div>
       )}
       <div className="flex-1 min-w-0 space-y-1">
@@ -1408,6 +1465,29 @@ function SceneRow({ index, scene, imageLookup, onChange }: {
             <Input value={scene.brand_name || ''} onChange={e => onChange({ brand_name: e.target.value })} placeholder="Brand name" className="h-7 text-xs flex-1" />
             <Input value={scene.tagline || ''} onChange={e => onChange({ tagline: e.target.value })} placeholder="Tagline" className="h-7 text-xs flex-1" />
           </div>
+        )}
+        {scene.type === 'higgsfield' && (
+          <>
+            <Input
+              value={scene.prompt || ''}
+              onChange={e => onChange({ prompt: e.target.value })}
+              placeholder="Cinematic shot description for the AI clip"
+              className="h-7 text-xs"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-muted-foreground shrink-0">Clip</span>
+              <Input
+                type="number" min={2} max={15}
+                value={scene.duration ?? 6}
+                onChange={e => onChange({ duration: Math.max(2, Math.min(15, Number(e.target.value) || 6)) })}
+                className="h-7 w-14 text-xs font-mono"
+                title="Seconds. Veo snaps to 4/6/8 server-side."
+              />
+              <span className="text-[9px] text-warning">
+                s · {scene.model || 'veo3_1_lite'} · costs credits at render (cached on re-render)
+              </span>
+            </div>
+          </>
         )}
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] text-muted-foreground shrink-0">Spoken</span>
@@ -1558,22 +1638,31 @@ function TextList({
 }
 
 function ImageGroup({
-  label, spec, slotAspect, items, onChange, accountId, minItems, maxItems = 20, promptContext,
+  label, spec, slotAspect, googleAspect, googleAspectLabel,
+  items, onChange, accountId, minItems, maxItems = 20, promptContext,
+  assetMeta, onAssetKnown,
 }: {
-  label: string; spec: string; slotAspect: SlotAspect; items: string[]; onChange: (v: string[]) => void;
+  label: string; spec: string; slotAspect: SlotAspect;
+  /** Google's EXACT target ratio for this slot (1.91, 1, 0.8) — the
+   * post-crop preview frames every item at this ratio. */
+  googleAspect: number; googleAspectLabel: string;
+  items: string[]; onChange: (v: string[]) => void;
   accountId: string; minItems: number; maxItems?: number;
-  promptContext?: Omit<PromptContext, 'slotLabel' | 'slotAspect'>;
+  promptContext?: StudioPanelContext;
+  assetMeta: Record<string, SlotAssetMeta>;
+  onAssetKnown: (id: string, meta: SlotAssetMeta) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showGen, setShowGen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [showLib, setShowLib] = useState(false);
 
-  const handleGenerated = (asset: StudioJobStatus) => {
-    // Only completed assets count toward the slot; failed/nsfw stay
-    // surfaced inside the generator's own per-tile error display.
+  // "Use in slot" from the StudioPanel — the chosen asset id is the
+  // SAME local-UUID shape upload/library produce, so the orchestrator's
+  // aspect-crop bridge resolves it unchanged.
+  const handleUse = (asset: StudioJobStatus) => {
     if (asset.status !== 'completed' || !asset.asset_id) return;
-    // Avoid duplicates if onSettled fires for the same id twice.
+    if (asset.url) onAssetKnown(asset.asset_id, { url: asset.url, filename: asset.asset_id });
     if (items.includes(asset.asset_id)) return;
     if (items.length >= maxItems) return;
     onChange([...items, asset.asset_id]);
@@ -1604,6 +1693,7 @@ function ImageGroup({
       // your codebase, this is the single point to adapt.
       const ref = json?.resource_name || json?.id || json?.asset_id;
       if (!ref) throw new Error('Upload response missing asset reference');
+      if (json?.url) onAssetKnown(String(ref), { url: json.url, filename: json.filename || String(ref) });
       onChange([...items, String(ref)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1623,28 +1713,44 @@ function ImageGroup({
           {items.length}{minItems ? `/${minItems} min` : ' (optional)'} · {spec}
         </span>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {items.map((ref, i) => (
-          <div key={ref + i} className="flex items-center gap-1 border border-border rounded-md px-2 py-1 text-xs bg-secondary/30">
-            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="font-mono text-[10px] truncate max-w-[200px]">{ref}</span>
-            <button
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
-              className="ml-1 hover:bg-secondary rounded p-0.5"
-              aria-label="Remove"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-2 items-start">
+        {items.map((ref, i) => {
+          const meta = assetMeta[ref];
+          if (meta) {
+            return (
+              <SlotThumb
+                key={ref + i}
+                meta={meta}
+                targetRatio={googleAspect}
+                targetLabel={googleAspectLabel}
+                onRemove={() => onChange(items.filter((_, j) => j !== i))}
+              />
+            );
+          }
+          // No preview available (e.g. a Google resource name that never
+          // lived in the local library) — fall back to the id chip.
+          return (
+            <div key={ref + i} className="flex items-center gap-1 border border-border rounded-md px-2 py-1 text-xs bg-secondary/30">
+              <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-mono text-[10px] truncate max-w-[200px]">{ref}</span>
+              <button
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+                className="ml-1 hover:bg-secondary rounded p-0.5"
+                aria-label="Remove"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          );
+        })}
         <button
           type="button"
-          onClick={() => setShowGen(true)}
-          className="cursor-pointer border border-dashed border-violet-500/50 rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-violet-500/10 transition-colors text-violet-600 dark:text-violet-300"
-          title={`Generate ${slotAspect} images via Higgsfield`}
+          onClick={() => setPanelOpen(true)}
+          className="cursor-pointer border border-dashed border-primary/40 rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-primary/10 transition-colors text-primary"
+          title={`Open the Studio panel with the ${slotAspect} aspect locked to this slot`}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          Generate (Higgsfield)
+          Generate
         </button>
         <button
           type="button"
@@ -1696,59 +1802,76 @@ function ImageGroup({
           onClose={() => setShowLib(false)}
         />
       )}
-      {/* Higgsfield generation modal — pre-locks the aspect ratio per
-          slot so the operator can't accidentally generate a 16:9 for
-          the square logo group. onSettled hands completed asset_ids
-          straight into the slot's items array (same shape Upload
-          produces, so no PMax-orchestrator-side adapter needed). */}
-      {showGen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
-          onClick={() => setShowGen(false)}
+      {/* Shared Studio panel — slides over with the slot's aspect
+          locked so the operator can't generate a 16:9 for the square
+          group. Stays mounted: jobs keep streaming while it's closed
+          and finished results wait on reopen. */}
+      <StudioPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        mode="image"
+        accountId={accountId}
+        context={{
+          ...promptContext,
+          slot: label,
+          aspect: slotAspect,
+        }}
+        onUse={handleUse}
+      />
+    </div>
+  );
+}
+
+/** One slot item rendered AS GOOGLE WILL RECEIVE IT: framed at the
+ * slot's exact target ratio with a CSS center-crop (object-cover) —
+ * the same crop the server applies at submit. When the source image's
+ * own ratio differs by more than 2%, the frame turns amber and a
+ * "will be cropped" flag appears (no-silent-crop addendum). */
+function SlotThumb({ meta, targetRatio, targetLabel, onRemove }: {
+  meta: SlotAssetMeta;
+  targetRatio: number;
+  targetLabel: string;
+  onRemove: () => void;
+}) {
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
+  const mismatch = naturalRatio !== null
+    && Math.abs(naturalRatio - targetRatio) / targetRatio > 0.02;
+  return (
+    <div className="w-32">
+      <div
+        className={cn(
+          'relative rounded-md border overflow-hidden bg-secondary/30 group',
+          mismatch ? 'border-warning' : 'border-border',
+        )}
+        style={{ aspectRatio: String(targetRatio) }}
+        title={`${meta.filename} — preview shows the exact ${targetLabel} center-crop Google receives`}
+      >
+        <img
+          src={meta.url}
+          alt={meta.filename}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onLoad={e => {
+            const im = e.currentTarget;
+            if (im.naturalWidth && im.naturalHeight) {
+              setNaturalRatio(im.naturalWidth / im.naturalHeight);
+            }
+          }}
+        />
+        <button
+          onClick={onRemove}
+          className="absolute top-1 right-1 bg-background/80 border border-border rounded-full p-0.5 hover:bg-secondary"
+          aria-label="Remove"
         >
-          <div
-            className="w-full max-w-2xl bg-background border border-border rounded-lg shadow-xl overflow-hidden max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div>
-                <div className="text-sm font-semibold flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
-                  Generate {label.toLowerCase()}
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Aspect locked to {slotAspect} for this slot. {spec}.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowGen(false)}
-                className="p-1 hover:bg-secondary rounded"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="p-4">
-              <HiggsfieldGenerator
-                accountId={accountId}
-                lockAspect={slotAspect}
-                onSettled={handleGenerated}
-                caption={`Slot: ${label.toLowerCase()}`}
-                promptContext={{
-                  ...promptContext,
-                  slotLabel: label,
-                  slotAspect,
-                }}
-              />
-            </div>
-            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
-              <p className="text-[10px] text-muted-foreground">
-                {items.length} added · close when done
-              </p>
-              <Button size="sm" onClick={() => setShowGen(false)}>Done</Button>
-            </div>
-          </div>
-        </div>
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+      {mismatch ? (
+        <p className="text-[9px] text-warning mt-0.5 flex items-center gap-0.5 leading-tight">
+          <AlertCircle className="h-2.5 w-2.5 shrink-0" /> will be cropped to {targetLabel}
+        </p>
+      ) : (
+        <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{targetLabel}</p>
       )}
     </div>
   );

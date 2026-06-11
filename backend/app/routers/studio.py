@@ -179,7 +179,48 @@ class JobStatusResponse(BaseModel):
     created_at: Optional[str] = None
 
 
+class CatalogModel(BaseModel):
+    """One entry of the server-side model catalog (Epic 11 P1). The FE
+    renders `label` + `tier` up front (plain language, brief §8) and
+    only exposes the raw `id` inside the Tune disclosure. `constraints`
+    encodes the per-model CLI contract (Veo duration enum vs Kling int)
+    so params get clamped before the CLI can reject them."""
+
+    id: str
+    label: str
+    kind: str                      # 'image' | 'video'
+    tier: str                      # 'Best quality' | 'Fast' | 'Budget'
+    cost_text: str
+    available: bool = True
+    default: bool = False
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelCatalogResponse(BaseModel):
+    models: list[CatalogModel]
+    source: str                    # 'live' (CLI confirmed) | 'static'
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────
+
+
+@router.get("/models", response_model=ModelCatalogResponse)
+async def list_models(kind: Optional[str] = None) -> ModelCatalogResponse:
+    """Server-side model catalog — the single source of truth that ends
+    the FE-side hardcoded-list drift. `kind` filters to image | video;
+    omit for both. Never 502s: when the CLI is unreachable the curated
+    static catalog is served with source='static'."""
+    if kind is not None and kind not in ("image", "video"):
+        raise HTTPException(
+            status_code=400, detail="kind must be 'image' or 'video'",
+        )
+    from app.services.model_catalog import get_models
+
+    payload = await get_models(kind)
+    return ModelCatalogResponse(
+        models=[CatalogModel(**m) for m in payload["models"]],
+        source=payload["source"],
+    )
 
 
 @router.post("/generate-image", response_model=GenerateImageResponse)
