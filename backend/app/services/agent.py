@@ -73,6 +73,37 @@ def _find_cli_js() -> Path:
     return Path.home() / "AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js"
 
 _CLI_JS = _find_cli_js()
+
+# Native-binary install location (curl installer) — the operator's actual
+# logged-in, auto-updating CLI. The npm cli.js copy on this machine can be
+# 100+ builds stale, so the native binary must win discovery.
+_NATIVE_CLAUDE = Path.home() / ".local/bin/claude"
+
+
+def _find_cli() -> list[str]:
+    """Resolve the CLI launch argv prefix, preferring the native binary.
+
+    Resolution order:
+    1. ``~/.local/bin/claude`` exists (native-binary install) → ``[that path]``
+       directly, no node. Checked explicitly FIRST because ``shutil.which``
+       can miss ``~/.local/bin`` under a stripped PATH (pm2/nohup) or resolve
+       a wrapper script instead.
+    2. npm ``cli.js`` exists (legacy layout) → ``[node, cli.js]``.
+    3. ``shutil.which("claude")`` → ``[that path]``.
+    4. Nothing found → the best-guess ``[node, cli.js]`` so the spawn raises
+       a clear FileNotFoundError.
+    """
+    if _NATIVE_CLAUDE.exists():
+        return [str(_NATIVE_CLAUDE)]
+    if _CLI_JS.exists():
+        return [_NODE_PATH, str(_CLI_JS)]
+    which_claude = shutil.which("claude")
+    if which_claude:
+        return [which_claude]
+    return [_NODE_PATH, str(_CLI_JS)]
+
+
+_CLI_CMD = _find_cli()
 _GUIDELINES_DIR = settings.GUIDELINES_DIR
 _BACKEND_DIR = settings.PROJECT_ROOT  # backend/ directory
 _MCP_MAIN = _BACKEND_DIR / "google_ads" / "mcp_main.py"
@@ -1275,7 +1306,7 @@ async def stream_agent_response(
     # Browser automation can easily need 100+ turns. Safety caps in _run_cli prevent runaway costs.
     max_turns = str(settings.AGENT_MAX_TURNS_PER_SEGMENT)
     cmd = [
-        _NODE_PATH, str(_CLI_JS),
+        *_CLI_CMD,
         "--print", "--verbose", "--output-format", "stream-json",
         "--max-turns", max_turns,
         "--model", model_id,
@@ -1361,7 +1392,7 @@ async def stream_agent_response(
                 # full system prompt + work context, so we --resume it and feed
                 # only the new instruction (not the rebuilt combined_prompt).
                 run_cmd = [
-                    _NODE_PATH, str(_CLI_JS),
+                    *_CLI_CMD,
                     "--print", "--verbose", "--output-format", "stream-json",
                     "--resume", resume_sid,
                     "--max-turns", max_turns,
@@ -1373,7 +1404,7 @@ async def stream_agent_response(
                 run_cmd = list(cmd)
             else:
                 run_cmd = [
-                    _NODE_PATH, str(_CLI_JS),
+                    *_CLI_CMD,
                     "--print", "--verbose", "--output-format", "stream-json",
                     "--resume", current_session_id,
                     "--max-turns", max_turns,

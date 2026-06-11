@@ -96,3 +96,34 @@ print(f"[mcp] mounted at /mcp · bearer token: {_mcp_token}", flush=True)
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+
+# ── Built frontend (always-on app at :8000) ─────────────────────────
+# The Vite dev server (:5173) is session-tied and kept dying mid-work,
+# taking "the app" down with it. The backend runs as a launchd service
+# and never dies — so it also serves the production build from
+# frontend/dist. Use http://localhost:8000 for the always-on app;
+# :5173 remains a dev-only HMR convenience. Rebuild with
+# `cd frontend && npx vite build` after frontend changes.
+
+from fastapi.responses import FileResponse  # noqa: E402
+
+_FRONTEND_DIST = settings.PROJECT_ROOT.parent / "frontend" / "dist"
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str):
+    """Serve the built SPA: real files as-is, everything else falls back to
+    index.html so client-side routes (/c/:id, /studio) deep-link correctly.
+    Registered LAST so /api/* routers and the /mcp mount keep priority."""
+    if not _FRONTEND_DIST.exists():
+        return {"detail": "frontend build missing — run: cd frontend && npx vite build"}
+    candidate = (_FRONTEND_DIST / full_path).resolve()
+    # Path-traversal guard + only serve real files inside dist
+    if (
+        full_path
+        and str(candidate).startswith(str(_FRONTEND_DIST.resolve()))
+        and candidate.is_file()
+    ):
+        return FileResponse(candidate)
+    return FileResponse(_FRONTEND_DIST / "index.html")

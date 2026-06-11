@@ -214,11 +214,8 @@ async def _generate_summary(messages: list[dict]) -> str | None:
 
     try:
         # Use Haiku for cheap/fast summarization
-        node_path = shutil.which("node") or "node"
-        cli_js = _find_cli_js()
-
         cmd = [
-            node_path, str(cli_js),
+            *_find_cli(),
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
             "--model", "claude-sonnet-4-6",
@@ -334,3 +331,25 @@ def _find_cli_js() -> Path:
     except Exception:
         pass
     return Path.home() / "AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/cli.js"
+
+
+def _find_cli() -> list[str]:
+    """Resolve the CLI launch argv prefix, preferring the native binary.
+
+    ``~/.local/bin/claude`` (native-binary install — the logged-in,
+    auto-updating CLI) is checked explicitly FIRST: shutil.which can miss
+    ``~/.local/bin`` under a stripped PATH, and the npm cli.js copy can be
+    badly stale. Falls back to ``[node, cli.js]``, then ``which claude``,
+    then the best-guess ``[node, cli.js]`` so spawn errors are clear.
+    """
+    native = Path.home() / ".local/bin/claude"
+    if native.exists():
+        return [str(native)]
+    node_path = shutil.which("node") or "node"
+    cli_js = _find_cli_js()
+    if cli_js.exists():
+        return [node_path, str(cli_js)]
+    which_claude = shutil.which("claude")
+    if which_claude:
+        return [which_claude]
+    return [node_path, str(cli_js)]

@@ -351,38 +351,52 @@ async def _call_haiku(prompt: str) -> str | None:
     try:
         node_path = shutil.which("node") or "node"
 
-        # Find CLI
-        import glob
-        cli_candidates = [
-            Path("/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
-            Path("/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
-            Path.home() / ".npm-global/lib/node_modules/@anthropic-ai/claude-code/cli.js",
-        ]
-        cli_js = None
-        for p in cli_candidates:
-            if p.exists():
-                cli_js = p
-                break
-        if not cli_js:
-            nvm_matches = glob.glob(str(Path.home() / ".nvm/versions/node/*/lib/node_modules/@anthropic-ai/claude-code/cli.js"))
-            if nvm_matches:
-                cli_js = Path(nvm_matches[0])
-        if not cli_js:
-            try:
-                result = subprocess.run([shutil.which("npm") or "npm", "root", "-g"], capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    candidate = Path(result.stdout.strip()) / "@anthropic-ai/claude-code/cli.js"
-                    if candidate.exists():
-                        cli_js = candidate
-            except Exception:
-                pass
+        # Find CLI — prefer the native-binary install (~/.local/bin/claude),
+        # the logged-in, auto-updating CLI. Checked explicitly FIRST because
+        # shutil.which can miss ~/.local/bin under a stripped PATH and the
+        # npm cli.js copy can be badly stale.
+        native_claude = Path.home() / ".local/bin/claude"
+        cli_cmd: list[str] | None = None
+        if native_claude.exists():
+            cli_cmd = [str(native_claude)]
+        else:
+            import glob
+            cli_candidates = [
+                Path("/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
+                Path("/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js"),
+                Path.home() / ".npm-global/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+            ]
+            cli_js = None
+            for p in cli_candidates:
+                if p.exists():
+                    cli_js = p
+                    break
+            if not cli_js:
+                nvm_matches = glob.glob(str(Path.home() / ".nvm/versions/node/*/lib/node_modules/@anthropic-ai/claude-code/cli.js"))
+                if nvm_matches:
+                    cli_js = Path(nvm_matches[0])
+            if not cli_js:
+                try:
+                    result = subprocess.run([shutil.which("npm") or "npm", "root", "-g"], capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        candidate = Path(result.stdout.strip()) / "@anthropic-ai/claude-code/cli.js"
+                        if candidate.exists():
+                            cli_js = candidate
+                except Exception:
+                    pass
+            if cli_js:
+                cli_cmd = [node_path, str(cli_js)]
+            else:
+                which_claude = shutil.which("claude")
+                if which_claude:
+                    cli_cmd = [which_claude]
 
-        if not cli_js:
+        if not cli_cmd:
             logger.warning("Claude CLI not found for skill optimization")
             return None
 
         cmd = [
-            node_path, str(cli_js),
+            *cli_cmd,
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
             "--model", "claude-sonnet-4-6",

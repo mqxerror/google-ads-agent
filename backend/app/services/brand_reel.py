@@ -878,12 +878,20 @@ async def generate_scenes(
     return parsed
 
 
-_CLI_PATH_CACHE: tuple[str, str] | None = None  # (node, cli_js)
+_CLI_PATH_CACHE: list[str] | None = None  # argv prefix ([claude] or [node, cli.js])
 
 
-def _find_claude_cli() -> tuple[str, str] | None:
+def _find_claude_cli() -> list[str] | None:
     global _CLI_PATH_CACHE
     if _CLI_PATH_CACHE is not None:
+        return _CLI_PATH_CACHE
+    # Prefer the native-binary install (~/.local/bin/claude) — the logged-in,
+    # auto-updating CLI. Checked explicitly FIRST because shutil.which can
+    # miss ~/.local/bin under a stripped PATH and the npm cli.js copy can be
+    # badly stale.
+    native_claude = Path.home() / ".local/bin/claude"
+    if native_claude.exists():
+        _CLI_PATH_CACHE = [str(native_claude)]
         return _CLI_PATH_CACHE
     import glob
     node_path = shutil.which("node") or "node"
@@ -907,21 +915,24 @@ def _find_claude_cli() -> tuple[str, str] | None:
         except Exception:
             pass
     if not cli_js:
+        which_claude = shutil.which("claude")
+        if which_claude:
+            _CLI_PATH_CACHE = [which_claude]
+            return _CLI_PATH_CACHE
         return None
-    _CLI_PATH_CACHE = (node_path, str(cli_js))
+    _CLI_PATH_CACHE = [node_path, str(cli_js)]
     return _CLI_PATH_CACHE
 
 
 async def _call_claude_json(prompt: str, model: str = "claude-sonnet-4-6", timeout_s: int = 120) -> str | None:
     """Call Claude CLI in one-shot mode, return concatenated text output. Async-safe."""
-    found = _find_claude_cli()
-    if not found:
+    cli_cmd = _find_claude_cli()
+    if not cli_cmd:
         logger.warning("Claude CLI not found for scene generator")
         return None
-    node_path, cli_js = found
 
     cmd = [
-        node_path, cli_js,
+        *cli_cmd,
         "--print", "--verbose", "--output-format", "stream-json",
         "--max-turns", "1",
         "--model", model,

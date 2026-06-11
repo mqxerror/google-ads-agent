@@ -190,13 +190,12 @@ Agent response (first 1500 chars): {agent_response[:1500]}
 Return ONLY the chronicle entry text (1-2 lines, no bullets, no date prefix). Or "SKIP" if nothing noteworthy."""
 
     try:
-        node_path = shutil.which("node") or "node"
-        cli_js = _find_cli_js()
-        if not cli_js:
+        cli_cmd = _find_cli()
+        if not cli_cmd:
             return None
 
         cmd = [
-            node_path, str(cli_js),
+            *cli_cmd,
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
             "--model", "claude-sonnet-4-6",
@@ -301,4 +300,24 @@ def _find_cli_js() -> Path | None:
                 return cli
     except Exception:
         pass
+    return None
+
+
+def _find_cli() -> list[str] | None:
+    """Resolve the CLI launch argv prefix, preferring the native binary.
+
+    ``~/.local/bin/claude`` (native-binary install — the logged-in,
+    auto-updating CLI) is checked explicitly FIRST: shutil.which can miss
+    ``~/.local/bin`` under a stripped PATH, and the npm cli.js copy can be
+    badly stale. Falls back to ``[node, cli.js]``, then ``which claude``.
+    """
+    native = Path.home() / ".local/bin/claude"
+    if native.exists():
+        return [str(native)]
+    cli_js = _find_cli_js()
+    if cli_js:
+        return [shutil.which("node") or "node", str(cli_js)]
+    which_claude = shutil.which("claude")
+    if which_claude:
+        return [which_claude]
     return None
