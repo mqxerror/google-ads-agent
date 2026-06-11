@@ -27,7 +27,7 @@
         "http://127.0.0.1:9222"
       ],
       "env": {
-        "PATH": "/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin:/Applications/cmux.app/Contents/Resources/bin:/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin:/Users/mqxerrormac16/.bun/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.npm-global/bin:/Users/mqxerrormac16/.antigravity/antigravity/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/mqxerrormac16/.claude/plugins/cache/claude-plugins-official/context7/unknown/bin"
+        "PATH": "/Users/mqxerrormac16/.nvm/versions/node/v22.22.3/bin:/Users/mqxerrormac16/Documents/LangarAI/google-ads-agent/backend/.venv/bin:/Users/mqxerrormac16/.local/bin:/Users/mqxerrormac16/.nvm/versions/node/v20.20.2/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       }
     },
     "clarity": {

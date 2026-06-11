@@ -77,3 +77,10 @@ Images/Review step must show each image AS GOOGLE WILL RECEIVE IT (post-crop
 preview, mismatches flagged), and Studio's generators should produce at the
 slot's exact aspect by default. Stretch: text-safe-margin warning when text
 sits in the crop zone. No silent cropping at submit.
+
+## APPROVED (Wassim, 2026-06-11) — build authorized, one shot
+Epic 12 pass-1 + Epic 11 P1 (model catalog + higgsfield scenes) folded in.
+**Strategic note:** if the result is good, Studio may become a STANDALONE
+product for all social media — so StudioPanel + engine must stay cleanly
+decoupled from Google-Ads-specific code (context prop is the only coupling;
+no google_ads imports in the studio service layer).
