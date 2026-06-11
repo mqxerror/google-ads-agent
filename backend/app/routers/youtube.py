@@ -29,6 +29,17 @@ async def youtube_status() -> dict:
     return {"connected": yt.is_connected()}
 
 
+@router.post("/disconnect")
+async def youtube_disconnect() -> dict:
+    """Forget the stored YouTube identity so a different account / brand
+    channel can be connected (added after a wrong-account connect)."""
+    try:
+        yt.TOKEN_PATH.unlink(missing_ok=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"could not remove token: {e}")
+    return {"connected": False}
+
+
 @router.get("/auth-url")
 async def youtube_auth_url() -> dict:
     """Build the one-time Google consent URL. Open it in a new tab; after

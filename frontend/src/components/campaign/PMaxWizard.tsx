@@ -779,6 +779,19 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
     }
   };
 
+  // Wrong-account recovery: drop the stored token, then run the normal
+  // connect flow (auth URL now forces Google's account chooser).
+  const switchYouTubeAccount = async () => {
+    setUploadError(null);
+    try {
+      await fetch('/api/youtube/disconnect', { method: 'POST' });
+      setYtConnected(false);
+      await connectYouTube();
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const uploadToYouTube = async () => {
     if (!panel.renderedAsset) return;
     setUploading(true);
@@ -954,7 +967,13 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
                       {uploading ? 'Uploading…' : 'Upload to YouTube'}
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Uploaded as unlisted — PMax accepts unlisted videos.</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Uploaded as unlisted — PMax accepts unlisted videos.
+                    {' '}
+                    <button onClick={switchYouTubeAccount} disabled={connectPolling} className="underline hover:text-foreground disabled:opacity-50">
+                      Wrong channel? Switch account
+                    </button>
+                  </p>
                   {uploadedId && (
                     <p className="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1.5">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />

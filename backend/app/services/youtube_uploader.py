@@ -84,7 +84,11 @@ def build_auth_url() -> str:
         "response_type": "code",
         "scope": SCOPE,
         "access_type": "offline",   # we need a refresh token
-        "prompt": "consent",        # force refresh-token issuance even on re-auth
+        # consent: force refresh-token issuance even on re-auth.
+        # select_account: ALWAYS show the account/brand-channel chooser so a
+        # wrong logged-in Google account can't be silently reused (hit live:
+        # connected a channel-less account -> youtubeSignupRequired on upload).
+        "prompt": "consent select_account",
         "state": state,
     }
     return f"{AUTH_ENDPOINT}?{urlencode(params)}"
