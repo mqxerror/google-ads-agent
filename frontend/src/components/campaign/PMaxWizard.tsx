@@ -98,7 +98,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   const [stepIdx, setStepIdx] = useState(0);
   const [bundle, setBundle] = useState<PMaxBundle>(() => {
     try {
-      const saved = sessionStorage.getItem('pmax-wizard-bundle');
+      const saved = localStorage.getItem('pmax-wizard-bundle');
       if (!saved) return EMPTY_BUNDLE;
       // Merge over defaults so bundles saved before new fields (e.g. `brief`)
       // were added don't come back with undefined keys.
@@ -107,7 +107,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       // generate / library) only ever produce LOCAL asset UUIDs. A Google
       // resource name (customers/.../assets/...) or bare numeric asset id
       // in a saved bundle means a prior attempt's server-side UUID→resource
-      // swap leaked into sessionStorage — those refs bypass the server's
+      // swap leaked into localStorage — those refs bypass the server's
       // aspect crop on resubmit (the live ASPECT_RATIO_NOT_ALLOWED), so
       // drop them and let the operator re-pick from local sources.
       const isLocalRef = (r: string) => !!r && !/^\d+$/.test(r) && !r.includes('/');
@@ -124,7 +124,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   const setField = useCallback(<K extends keyof PMaxBundle>(key: K, value: PMaxBundle[K]) => {
     setBundle(prev => {
       const next = { ...prev, [key]: value };
-      try { sessionStorage.setItem('pmax-wizard-bundle', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('pmax-wizard-bundle', JSON.stringify(next)); } catch {}
       return next;
     });
   }, []);
@@ -242,7 +242,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         campaignId: json.campaign_id,
         message: `Campaign ${json.campaign_id} created (PAUSED). Asset group ${json.asset_group_id}. ${(json.warnings || []).length} warning(s).`,
       });
-      try { sessionStorage.removeItem('pmax-wizard-bundle'); } catch {}
+      try { localStorage.removeItem('pmax-wizard-bundle'); } catch {}
     } catch (e) {
       setSubmitResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -380,7 +380,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
 
   // Poll-based: the draft takes 1-3 min and a single long request died
   // whenever the dev proxy or a server blipped. Start a job, poll every 3s;
-  // the job id is kept in sessionStorage so even a page refresh resumes it.
+  // the job id is kept in localStorage so even a page refresh resumes it.
   const applyDraft = useCallback((result: { headlines?: string[]; long_headlines?: string[]; descriptions?: string[] }) => {
     if (result.headlines?.length) setField('headlines', result.headlines);
     if (result.long_headlines?.length) setField('longHeadlines', result.long_headlines);
@@ -396,11 +396,11 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         const job = await res.json();
         if (job.status === 'done') {
           applyDraft(job.result || {});
-          sessionStorage.removeItem('pmax-draft-id');
+          localStorage.removeItem('pmax-draft-id');
           return;
         }
         if (job.status === 'error') {
-          sessionStorage.removeItem('pmax-draft-id');
+          localStorage.removeItem('pmax-draft-id');
           throw new Error(job.message || 'draft failed');
         }
         // still running — keep polling (transient fetch errors just retry)
@@ -427,7 +427,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
       });
       const data = await res.json();
       if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
-      sessionStorage.setItem('pmax-draft-id', data.draft_id);
+      localStorage.setItem('pmax-draft-id', data.draft_id);
       await pollDraft(data.draft_id);
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : String(e));
@@ -438,7 +438,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
 
   // Resume polling a draft that was in flight when the page was refreshed.
   useEffect(() => {
-    const pending = sessionStorage.getItem('pmax-draft-id');
+    const pending = localStorage.getItem('pmax-draft-id');
     if (!pending) return;
     setDrafting(true);
     pollDraft(pending)
@@ -612,7 +612,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   // (library/upload UUIDs only — Google resource names can't feed the renderer).
   const [panel, setPanelRaw] = useState<VideoPanelState>(() => {
     try {
-      const saved = sessionStorage.getItem(VIDEO_PANEL_KEY);
+      const saved = localStorage.getItem(VIDEO_PANEL_KEY);
       // Merge over defaults so panels saved before the YouTube fields were
       // persisted don't come back with undefined keys.
       if (saved) return { ...EMPTY_PANEL, ...JSON.parse(saved) };
@@ -626,7 +626,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   const setPanel = useCallback((updater: (p: VideoPanelState) => VideoPanelState) => {
     setPanelRaw(prev => {
       const next = updater(prev);
-      try { sessionStorage.setItem(VIDEO_PANEL_KEY, JSON.stringify(next)); } catch { /* quota */ }
+      try { localStorage.setItem(VIDEO_PANEL_KEY, JSON.stringify(next)); } catch { /* quota */ }
       return next;
     });
   }, []);
@@ -693,12 +693,12 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         const res = await fetch(`/api/pmax/video/draft/${jobId}`);
         const job = await res.json();
         if (job.status === 'done') {
-          sessionStorage.removeItem('pmax-video-draft-id');
+          localStorage.removeItem('pmax-video-draft-id');
           setPanel(p => ({ ...p, scenes: job.scenes, imageLookup: job.image_lookup || {}, renderedAsset: null }));
           return;
         }
         if (job.status === 'error') {
-          sessionStorage.removeItem('pmax-video-draft-id');
+          localStorage.removeItem('pmax-video-draft-id');
           throw new Error(job.message || 'draft failed');
         }
       } catch (e) {
@@ -726,7 +726,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       });
       const data = await res.json();
       if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
-      sessionStorage.setItem('pmax-video-draft-id', data.job_id);
+      localStorage.setItem('pmax-video-draft-id', data.job_id);
       await pollDraft(data.job_id);
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : String(e));
@@ -744,12 +744,12 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         const res = await fetch(`/api/pmax/video/render/${jobId}`);
         const job = await res.json();
         if (job.status === 'done') {
-          sessionStorage.removeItem('pmax-video-render-id');
+          localStorage.removeItem('pmax-video-render-id');
           setPanel(p => ({ ...p, renderedAsset: { asset_id: job.asset_id, url: job.url, duration: job.duration } }));
           return;
         }
         if (job.status === 'error') {
-          sessionStorage.removeItem('pmax-video-render-id');
+          localStorage.removeItem('pmax-video-render-id');
           throw new Error(job.message || 'render failed');
         }
         if (job.message) setRenderMsg(job.message);
@@ -779,7 +779,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       });
       const data = await res.json();
       if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
-      sessionStorage.setItem('pmax-video-render-id', data.job_id);
+      localStorage.setItem('pmax-video-render-id', data.job_id);
       await pollRender(data.job_id);
     } catch (e) {
       setRenderError(e instanceof Error ? e.message : String(e));
@@ -791,14 +791,14 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
 
   // Resume in-flight jobs after a page refresh (same pattern as StepText).
   useEffect(() => {
-    const draftId = sessionStorage.getItem('pmax-video-draft-id');
+    const draftId = localStorage.getItem('pmax-video-draft-id');
     if (draftId) {
       setDrafting(true);
       pollDraft(draftId)
         .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
         .finally(() => setDrafting(false));
     }
-    const renderId = sessionStorage.getItem('pmax-video-render-id');
+    const renderId = localStorage.getItem('pmax-video-render-id');
     if (renderId) {
       setRendering(true);
       setRenderMsg('Resuming render…');
@@ -806,7 +806,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         .catch(e => setRenderError(e instanceof Error ? e.message : String(e)))
         .finally(() => { setRendering(false); setRenderMsg(null); });
     }
-    const metaId = sessionStorage.getItem('pmax-video-meta-id');
+    const metaId = localStorage.getItem('pmax-video-meta-id');
     if (metaId) {
       setMetaLoading(true);
       pollMetadata(metaId)
@@ -862,7 +862,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         const res = await fetch(`/api/pmax/video/metadata/${jobId}`);
         const job = await res.json();
         if (job.status === 'done') {
-          sessionStorage.removeItem('pmax-video-meta-id');
+          localStorage.removeItem('pmax-video-meta-id');
           const titles: string[] = job.titles || [];
           setTitleOptions(titles);
           if (titles[0]) setYtTitle(titles[0]);          // first option preselected
@@ -870,7 +870,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
           return;
         }
         if (job.status === 'error') {
-          sessionStorage.removeItem('pmax-video-meta-id');
+          localStorage.removeItem('pmax-video-meta-id');
           throw new Error(job.message || 'metadata draft failed');
         }
       } catch (e) {
@@ -898,7 +898,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       });
       const data = await res.json();
       if (!res.ok || !data.job_id) throw new Error(data.detail?.message || data.detail || `HTTP ${res.status}`);
-      sessionStorage.setItem('pmax-video-meta-id', data.job_id);
+      localStorage.setItem('pmax-video-meta-id', data.job_id);
       await pollMetadata(data.job_id);
     } catch (e) {
       setMetaError(e instanceof Error ? e.message : String(e));
