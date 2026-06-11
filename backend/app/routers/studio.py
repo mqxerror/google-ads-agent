@@ -508,7 +508,12 @@ async def _run_image_job(
 
 
 class ExtractBriefRequest(BaseModel):
-    url: str = Field(min_length=1)
+    # Either `url` (fetch a landing page) or `context` (inline rough
+    # idea + campaign context, e.g. from the PMax wizard) must be
+    # provided. URL mode is the original Studio flow; context mode
+    # feeds the same 2-stage drafter without a page fetch.
+    url: Optional[str] = None
+    context: Optional[str] = None
     # What kind of prompt to draft from the page. The drafter tunes
     # its system prompt around this so a "video" prompt focuses on
     # action / motion / scene, while "image" focuses on composition
@@ -586,16 +591,36 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
     from app.services.page_fetcher import fetch, PageFetchError
     from app.services.prompt_drafter import draft_variants, PromptDrafterError
 
-    # Step 1 — fetch + parse.
-    try:
-        page = await fetch(body.url)
-    except PageFetchError as e:
-        raise HTTPException(status_code=400, detail={"code": "fetch_failed", "message": str(e)})
+    # Step 1 — fetch + parse (URL mode), or synthesize a page-shaped
+    # input from inline context (context mode — PMax wizard slots pass
+    # a rough idea + campaign brief without a fetchable page).
+    if body.url and body.url.strip():
+        try:
+            page = await fetch(body.url)
+        except PageFetchError as e:
+            raise HTTPException(status_code=400, detail={"code": "fetch_failed", "message": str(e)})
+        page_dict = page.to_dict()
+    elif body.context and body.context.strip():
+        page_dict = {
+            "url": "",
+            "final_url": "",
+            "title": None,
+            "description": None,
+            "og": {},
+            "h1": None,
+            "body_excerpt": body.context.strip()[:4000],
+            "status": 0,
+        }
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "missing_input", "message": "Provide either `url` or `context`."},
+        )
 
     # Steps 2 + 3 — decompose into structured brief, then draft 3 variants.
     try:
         package = await draft_variants(
-            page=page.to_dict(),
+            page=page_dict,
             target=body.target,
             account_id=body.account_id,
             campaign_id=body.campaign_id,
@@ -615,13 +640,13 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
     )
 
     return ExtractBriefResponse(
-        url=page.url,
-        final_url=page.final_url,
-        title=page.title,
-        description=page.description,
-        h1=page.h1,
-        body_excerpt=(page.body_excerpt or "")[:500],
-        og=page.og,
+        url=page_dict["url"],
+        final_url=page_dict["final_url"],
+        title=page_dict["title"],
+        description=page_dict["description"],
+        h1=page_dict["h1"],
+        body_excerpt=(page_dict["body_excerpt"] or "")[:500],
+        og=page_dict["og"],
         brief=brief_obj,
         variants=variant_objs,
         pinned_claims_used=package.get("pinned_claims_used", []),

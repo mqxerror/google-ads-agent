@@ -381,7 +381,11 @@ export interface ExtractBriefResponse {
 }
 
 export interface ExtractBriefRequest {
-  url: string;
+  /** Landing page to fetch + decompose. Either this or `context`. */
+  url?: string;
+  /** Inline rough idea + campaign context (PMax wizard slots) — runs
+   * the same 2-stage Visual Director drafter without a page fetch. */
+  context?: string;
   target: 'image' | 'video';
   /** Optional — when provided, the drafter loads the campaign's
    * pinned_facts.md and grounds the social-proof variant in

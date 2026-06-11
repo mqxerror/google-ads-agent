@@ -382,3 +382,29 @@ Here's a self-contained prompt to paste to the GTM agent. It includes the hard c
 
 1. How did yesterday compare to the 7-day average? Flag any anomalies.
 2. Are we on pace | pending | ppc_strategist |
+| 2026-06-11 11:42 | 1. **QS 3 on `[canadian citizenship by descent]`** — our single biggest exact keyword has bottom-tier Quality Score, and under MaxClicks at the cap we pay $1.38 for every one of its clicks. QS 3 means Google rates our ad relevance + landing page experience poorly for the campaign's *core term*. That | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-11 11:42 | And the standing caveat, with harder numbers now: weekly CPA went **$81 → $78 → $49 → $394**. The two levers keep being traded against each other. Reach is fixed; CVR was never fixed. 268 clicks at the form's ~1.2–1.4% mobile CVR is 3–4 leads; at a 5-field form's projected 2.5%+ it's 6–7. The form i | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-11 11:42 | I verified the measurement layer before anyone blames it — **tracking is NOT the problem this time.** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-11 11:42 | The result is in Analytics' weekly arc: every traffic regime change just moves us along the same trade-off curve ($81 → $78 → $49 → $394 CPA). The curve itself never shifts because the form never changes. Growth math on the last 72h alone: 268 clicks × a fixed 5-field form's projected ~2.5% CVR = ** | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-11 11:42 | **The audit verdict in one paragraph:** This campaign is not broken from day 1 — it produced 35 leads at $80.49 blended, with a proven $49-CPA week when the mix was right. What's "very bad" is specifically the last 72 hours: the Maximize Clicks flip restored volume exactly as designed, but **it eras | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-06-11 16:10 | EXECUTED approved stop-the-bleed: paused AG4 `"how to get canadian citizenship by descent"` (criterion 1644857374079, via Ads UI — MCP has no keyword-status tool) + desktop bid modifier +25% (campaign criterion 23847913167~30000, via API). Verified LP form change live: 5 fields + optional message, tracking chain intact (GTM-WZKDXFH8, AW-826329520, gf_submit, Clarity). | User approved audit plan items #1+#2 and reported form field change shipped | done — UI confirmed "Your change has been saved"; next checkpoint Jun 13 EOD conversion gate | director |
+| 2026-06-11 12:28 | The approvals are clear: pause the AG4 cannibal keyword and set the +25% desktop bid adjustment. And since you've shipped the form field change, I'll run the GTM Specialist's standing verification on the live page right after. Loading the write tools now.The target keyword is the first row — and tod | User asked: I approve also I changed the form field number | pending | director |
+| 2026-06-11 12:28 | ## 1. AG4 cannibal keyword — PAUSED ✅ | User asked: I approve also I changed the form field number | pending | director |
+| 2026-06-11 12:28 | `"how to get canadian citizenship by descent"` (AG4, criterion `1644857374079`) is now **Paused** — confirmed in the Google Ads UI with "Your change has been saved." Worth knowing: before the pause, it had already taken **11 clicks / $15.27 / 0 conversions today alone** — it was still the campaign's | User asked: I approve also I changed the form field number | pending | director |
+| 2026-06-11 12:28 | ## 3. Your form change — VERIFIED on the live page ✅ | User asked: I approve also I changed the form field number | pending | director |
+| 2026-06-11 12:28 | / Removed / "How did you hear about us?" ✅ and Country of Residence ✅ / | User asked: I approve also I changed the form field number | pending | director |

@@ -26,12 +26,14 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, Plus, X,
   Upload, Image as ImageIcon, Video, Sparkles, Loader2, AlertCircle,
+  FolderOpen, Search, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import HiggsfieldGenerator from '@/components/studio/HiggsfieldGenerator';
+import type { PromptContext } from '@/components/studio/HiggsfieldGenerator';
 import type { StudioJobStatus } from '@/lib/api';
 
 // Map a wizard slot to the higgsfield aspect that fits best.
@@ -486,10 +488,18 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
 }
 
 function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  // Shared campaign context for the Visual Director enhance affordance
+  // inside each slot's generator. Slot label/aspect get appended per
+  // slot in ImageGroup.
+  const baseContext: Omit<PromptContext, 'slotLabel' | 'slotAspect'> = {
+    brief: bundle.brief,
+    businessName: bundle.businessName,
+    finalUrl: bundle.finalUrl,
+  };
   return (
     <div className="space-y-5">
       <AiHint
-        body="Upload your assets, OR click ‘Generate (Higgsfield)’ to create them inline — the generator opens with the correct aspect locked to the slot, and any successful image lands here automatically."
+        body="Upload your assets, pick from the Studio library, OR click ‘Generate (Higgsfield)’ to create them inline — the generator opens with the correct aspect locked to the slot, and any successful image lands here automatically."
       />
       <ImageGroup
         label="Logos"
@@ -499,6 +509,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         onChange={v => setField('logos', v)}
         accountId={accountId}
         minItems={RULES.logos.min}
+        maxItems={5}
+        promptContext={baseContext}
       />
       <ImageGroup
         label="Landscape marketing image (1.91:1)"
@@ -508,6 +520,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         onChange={v => setField('landscape', v)}
         accountId={accountId}
         minItems={RULES.landscape.min}
+        maxItems={20}
+        promptContext={baseContext}
       />
       <ImageGroup
         label="Square marketing image (1:1)"
@@ -517,6 +531,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         onChange={v => setField('square', v)}
         accountId={accountId}
         minItems={RULES.square.min}
+        maxItems={20}
+        promptContext={baseContext}
       />
       <ImageGroup
         label="Portrait marketing image (4:5)"
@@ -526,6 +542,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         onChange={v => setField('portrait', v)}
         accountId={accountId}
         minItems={0}
+        maxItems={20}
+        promptContext={baseContext}
       />
     </div>
   );
@@ -692,14 +710,16 @@ function TextList({
 }
 
 function ImageGroup({
-  label, spec, slotAspect, items, onChange, accountId, minItems,
+  label, spec, slotAspect, items, onChange, accountId, minItems, maxItems = 20, promptContext,
 }: {
   label: string; spec: string; slotAspect: SlotAspect; items: string[]; onChange: (v: string[]) => void;
-  accountId: string; minItems: number;
+  accountId: string; minItems: number; maxItems?: number;
+  promptContext?: Omit<PromptContext, 'slotLabel' | 'slotAspect'>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGen, setShowGen] = useState(false);
+  const [showLib, setShowLib] = useState(false);
 
   const handleGenerated = (asset: StudioJobStatus) => {
     // Only completed assets count toward the slot; failed/nsfw stay
@@ -707,7 +727,18 @@ function ImageGroup({
     if (asset.status !== 'completed' || !asset.asset_id) return;
     // Avoid duplicates if onSettled fires for the same id twice.
     if (items.includes(asset.asset_id)) return;
+    if (items.length >= maxItems) return;
     onChange([...items, asset.asset_id]);
+  };
+
+  // Library toggle: clicking a selected thumbnail removes it from the
+  // slot; clicking an unselected one adds it (up to the slot max).
+  const toggleLibraryAsset = (assetId: string) => {
+    if (items.includes(assetId)) {
+      onChange(items.filter((id) => id !== assetId));
+    } else if (items.length < maxItems) {
+      onChange([...items, assetId]);
+    }
   };
 
   const handleUpload = async (file: File) => {
@@ -767,6 +798,18 @@ function ImageGroup({
           <Sparkles className="h-3.5 w-3.5" />
           Generate (Higgsfield)
         </button>
+        <button
+          type="button"
+          onClick={() => setShowLib(v => !v)}
+          className={cn(
+            'cursor-pointer border border-dashed border-border rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
+            showLib && 'bg-secondary/50 border-solid',
+          )}
+          title="Pick already-generated or uploaded images from the Studio asset library"
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
+          From library
+        </button>
         <label className={cn(
           'cursor-pointer border border-dashed border-border rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
           uploading && 'opacity-60 pointer-events-none'
@@ -789,6 +832,21 @@ function ImageGroup({
         <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" /> {error}
         </p>
+      )}
+      {/* Inline library picker — expands below the slot row (no modal).
+          Lists the account's existing ad_assets images newest-first;
+          a click toggles the asset in/out of this slot. The selected
+          ids are the SAME shape upload/generate produce, so the
+          orchestrator's local-UUID bridge resolves them unchanged. */}
+      {showLib && (
+        <LibraryPicker
+          accountId={accountId}
+          items={items}
+          onToggle={toggleLibraryAsset}
+          slotAspect={slotAspect}
+          maxItems={maxItems}
+          onClose={() => setShowLib(false)}
+        />
       )}
       {/* Higgsfield generation modal — pre-locks the aspect ratio per
           slot so the operator can't accidentally generate a 16:9 for
@@ -828,6 +886,11 @@ function ImageGroup({
                 lockAspect={slotAspect}
                 onSettled={handleGenerated}
                 caption={`Slot: ${label.toLowerCase()}`}
+                promptContext={{
+                  ...promptContext,
+                  slotLabel: label,
+                  slotAspect,
+                }}
               />
             </div>
             <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
@@ -837,6 +900,121 @@ function ImageGroup({
               <Button size="sm" onClick={() => setShowGen(false)}>Done</Button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Minimal slice of the assets API response the picker needs — full
+// shape lives in StudioPage's AdAsset; duplicating 5 fields here beats
+// exporting a cross-page type for a read-only grid.
+interface LibraryAsset {
+  id: string;
+  filename: string;
+  url: string;
+  thumbnail_url?: string | null;
+  created_at: string;
+}
+
+/** Inline expanding panel listing the account's existing image assets
+ * (Higgsfield generations + uploads), newest first. Clicking a tile
+ * toggles its ad_asset id in/out of the slot. Aspect mismatches are
+ * allowed — Google crops marketing images to fit — so the target
+ * aspect is shown as guidance, not a filter. */
+function LibraryPicker({
+  accountId, items, onToggle, slotAspect, maxItems, onClose,
+}: {
+  accountId: string; items: string[]; onToggle: (assetId: string) => void;
+  slotAspect: SlotAspect; maxItems: number; onClose: () => void;
+}) {
+  const [assets, setAssets] = useState<LibraryAsset[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const qs = new URLSearchParams({ asset_type: 'image', limit: '200' });
+    if (accountId) qs.set('account_id', accountId);
+    fetch(`/api/assets?${qs}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d: LibraryAsset[]) => { if (!cancelled) setAssets(d); })
+      .catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e)); });
+    return () => { cancelled = true; };
+  }, [accountId]);
+
+  const q = search.trim().toLowerCase();
+  const visible = (assets || []).filter(a => !q || a.filename.toLowerCase().includes(q));
+  const atMax = items.length >= maxItems;
+
+  return (
+    <div className="mt-2 border border-border rounded-md bg-secondary/20 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-[10px] text-muted-foreground flex-1">
+          Target aspect <span className="font-mono">{slotAspect}</span> — other aspects still work; Google crops to fit.
+          {' '}{items.length}/{maxItems} selected{atMax ? ' (slot full)' : ''}.
+        </p>
+        <div className="relative">
+          <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filter by filename"
+            className="h-7 w-44 pl-6 text-xs"
+          />
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-secondary rounded text-muted-foreground"
+          aria-label="Close library"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {loadError ? (
+        <p className="text-[10px] text-red-500 flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> Library failed to load: {loadError}
+        </p>
+      ) : assets === null ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading library…
+        </div>
+      ) : visible.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-3">
+          {q ? 'No images match that filename.' : 'No images in the library yet — generate or upload some first.'}
+        </p>
+      ) : (
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5 max-h-56 overflow-y-auto">
+          {visible.map(a => {
+            const selected = items.includes(a.id);
+            const disabled = !selected && atMax;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => onToggle(a.id)}
+                disabled={disabled}
+                title={a.filename}
+                className={cn(
+                  'relative aspect-square rounded border overflow-hidden bg-secondary/30 transition-colors',
+                  selected ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50',
+                  disabled && 'opacity-40 cursor-not-allowed',
+                )}
+              >
+                <img
+                  src={a.thumbnail_url || a.url}
+                  alt={a.filename}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                {selected && (
+                  <span className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -104,6 +104,18 @@ const MAX_VARIANTS = 6;
 
 type Mode = 'image' | 'video';
 
+/** Campaign context handed down by wizard callers (PMaxWizard slots).
+ * Fuels the "Enhance (Visual Director)" affordance: the operator's
+ * rough idea + this context run through the same 2-stage drafter the
+ * Studio brief-extract uses, returning 3 angle variants. */
+export interface PromptContext {
+  brief?: string;
+  businessName?: string;
+  finalUrl?: string;
+  slotLabel?: string;
+  slotAspect?: string;
+}
+
 interface HiggsfieldGeneratorProps {
   accountId: string;
   campaignId?: string;
@@ -121,6 +133,11 @@ interface HiggsfieldGeneratorProps {
   lockAspect?: AspectRatio;
   /** Caption / hint shown next to the title. */
   caption?: string;
+  /** Optional wizard context. When present, an "Enhance (Visual
+   * Director)" button appears under the prompt — it sends the rough
+   * idea + this context to the 2-stage drafter and surfaces the
+   * 3-angle variant picker. Studio callers omit it (no change). */
+  promptContext?: PromptContext;
 }
 
 interface VariantState {
@@ -136,6 +153,7 @@ export default function HiggsfieldGenerator({
   initialAspect = '1:1',
   lockAspect,
   caption,
+  promptContext,
 }: HiggsfieldGeneratorProps) {
   const [mode, setMode] = useState<Mode>('image');
   const [prompt, setPrompt] = useState(initialPrompt);
@@ -284,6 +302,51 @@ export default function HiggsfieldGenerator({
   const pickVariant = (v: BriefVariant) => {
     setPrompt(v.prompt);
     setBriefVariants([]);  // collapse the picker once the operator chooses
+  };
+
+  // Visual Director enhance — wizard-slot path. Bundles the operator's
+  // rough idea (whatever is typed in the prompt box, may be empty)
+  // with the campaign context the wizard passed down, and runs the
+  // SAME 2-stage drafter as Extract brief — just context-fed instead
+  // of page-fed. Result lands in the same 3-angle variant picker.
+  const canEnhance = !!(
+    prompt.trim() || promptContext?.brief?.trim() || promptContext?.businessName?.trim()
+  );
+  const handleEnhance = async () => {
+    if (briefLoading || busy || !canEnhance) return;
+    const parts: string[] = [];
+    const idea = prompt.trim();
+    if (idea) parts.push(`Operator's rough idea for the creative: ${idea}`);
+    if (promptContext?.brief?.trim()) parts.push(`Campaign brief: ${promptContext.brief.trim()}`);
+    if (promptContext?.businessName?.trim()) parts.push(`Business name: ${promptContext.businessName.trim()}`);
+    if (promptContext?.finalUrl?.trim()) parts.push(`Landing page URL: ${promptContext.finalUrl.trim()}`);
+    if (promptContext?.slotLabel) {
+      parts.push(
+        `Asset slot: ${promptContext.slotLabel}` +
+        (promptContext.slotAspect ? ` (${promptContext.slotAspect} aspect)` : '') +
+        ' for a Google Performance Max campaign.',
+      );
+    }
+    setBriefLoading(true);
+    setBriefError(null);
+    setBriefVariants([]);
+    try {
+      const res = await studioExtractBrief({
+        context: parts.join('\n'),
+        target: mode === 'video' ? 'video' : 'image',
+        account_id: accountId,
+        campaign_id: campaignId,
+      });
+      if (res.variants && res.variants.length > 0) {
+        setBriefVariants(res.variants.filter((v) => v.prompt));
+      } else if (res.drafted_prompt) {
+        setPrompt(res.drafted_prompt);
+      }
+    } catch (e) {
+      setBriefError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBriefLoading(false);
+    }
   };
 
   // Keep aspect in sync if the parent changes lockAspect mid-mount
@@ -534,11 +597,40 @@ export default function HiggsfieldGenerator({
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="A confident investor reviewing immigration documents in a sunlit home office, editorial photography, soft warm light."
+        placeholder={promptContext
+          ? 'Type a rough idea (or leave blank) — Enhance turns it into a polished cinematic prompt.'
+          : 'A confident investor reviewing immigration documents in a sunlit home office, editorial photography, soft warm light.'}
         rows={3}
         disabled={busy}
         className="w-full rounded bg-secondary/40 border border-border px-2 py-1.5 text-sm disabled:opacity-50 resize-none"
       />
+
+      {/* Visual Director enhance — wizard-slot mode only. Quiet row:
+          one-line explanation + an outline button. The 3 variants land
+          in the same angle picker the URL extract uses. */}
+      {promptContext && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-muted-foreground leading-snug">
+            The Visual Director drafts 3 cinematic prompt angles from your idea + the campaign brief
+            {promptContext.businessName ? ` (${promptContext.businessName})` : ''}.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleEnhance}
+            disabled={briefLoading || busy || !canEnhance}
+            className="h-7 gap-1.5 shrink-0"
+            title="2-stage drafter: decompose the brief, then draft problem-led / aspirational / social-proof variants"
+          >
+            {briefLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Wand2 className="h-3 w-3" />
+            )}
+            {briefLoading ? 'Enhancing…' : 'Enhance (Visual Director)'}
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <label className="flex items-center gap-1.5">

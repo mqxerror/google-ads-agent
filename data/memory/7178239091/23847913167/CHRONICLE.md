@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/canadian-citizenship-by-descent
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ## Timeline
 
@@ -58,6 +58,9 @@ Last updated: 2026-06-10
 - **May 15** — [Competitor Intel] Competitor Intel ran Stage 2 for Canadian Citizenship by Descent campaign: researched competitive landscape, scanned competitor ads, and performed keyword research for new product (distinct from golden visa campaigns).
 
 ### June 2026
+- **Jun 11** — [Agency Director] 2026-06-11: AG4 cannibal keyword "how to get canadian citizenship by descent" paused (had taken 11 clicks/$15.27/0 conv today); desktop bid +25% applied (effective ~$1.75, desktop CPA $59 vs mobile $91); form field change live-verified via GTM Specialist check.
+- **Jun 11** — [Agency Director] EXECUTED user-approved stop-the-bleed pair: (1) paused `"how to get canadian citizenship by descent"` (AG4, criterion 1644857374079) via Google Ads UI — the resurrected cannibal that took $79.78/0 conv under MaxClicks Jun 9–11 plus $15.27/11 clicks on Jun 11 alone; (2) desktop bid modifier +25% via API (campaign criterion 23847913167~30000, desktop CVR 2.01% vs mobile 1.25%). Also verified the LP form change live: form is now 5 fields + optional message (First/Last/Email/Phone/Nationality — "How did you hear" and Country of Residence removed), button "Get My Free Consultation", and the tracking chain (GTM-WZKDXFH8, AW-826329520, dataLayer + gf_submit wiring, Clarity) all intact. Full live test-submission deferred to avoid injecting a fake conversion before the Jun 13 zero-conversion decision gate.
+- **Jun 11** — [Agency Director] 2026-06-11: MapleRoots team audit found campaign broke in Era 4 (Jun 8–11) after MaxClicks switch — $393.61 spent, 1 conversion, $394 CPA vs $49 CPA in prior EXACT-match era; smoking gun is MaxClicks routing $368.44 into low-intent keywords Jun 9–11 with zero conversions.
 - **Jun 10** — [PPC Strategist] MapleRoots MaxClicks flip confirmed working: Jun 9 saw 87 clicks (+164% vs 7-day avg of 33) and $117.91 spend (+198%), with Jun 10 on pace to fill the $150 daily budget for the first time since Jun 2. CPC at $1.36–$1.38 approaching $1.40 cap flagged as new throttle risk.
 - **Jun 09** — [Agency Director] User asked: why you always keep saying reduce the form inputs and scientific studies about that ? also which fie
 - **Jun 09** — [Agency Director] Attempted to flip MapleRoots to Maximize Clicks @ $1.40 max-CPC cap to restore traffic; MCP has no Maximize Clicks tool, fell back to Chrome automation via browser tools.
