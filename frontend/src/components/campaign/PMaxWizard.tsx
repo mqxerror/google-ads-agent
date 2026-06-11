@@ -22,7 +22,7 @@
  * inline so the user fixes them before round-tripping.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, Plus, X,
   Upload, Image as ImageIcon, Video, Sparkles, Loader2, AlertCircle,
@@ -360,6 +360,39 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
+  // Poll-based: the draft takes 1-3 min and a single long request died
+  // whenever the dev proxy or a server blipped. Start a job, poll every 3s;
+  // the job id is kept in sessionStorage so even a page refresh resumes it.
+  const applyDraft = useCallback((result: { headlines?: string[]; long_headlines?: string[]; descriptions?: string[] }) => {
+    if (result.headlines?.length) setField('headlines', result.headlines);
+    if (result.long_headlines?.length) setField('longHeadlines', result.long_headlines);
+    if (result.descriptions?.length) setField('descriptions', result.descriptions);
+  }, [setField]);
+
+  const pollDraft = useCallback(async (draftId: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 6 * 60_000) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/pmax/draft-copy/${draftId}`);
+        const job = await res.json();
+        if (job.status === 'done') {
+          applyDraft(job.result || {});
+          sessionStorage.removeItem('pmax-draft-id');
+          return;
+        }
+        if (job.status === 'error') {
+          sessionStorage.removeItem('pmax-draft-id');
+          throw new Error(job.message || 'draft failed');
+        }
+        // still running — keep polling (transient fetch errors just retry)
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
+      }
+    }
+    throw new Error('Draft timed out after 6 minutes — try again.');
+  }, [applyDraft]);
+
   const draftWithAI = async () => {
     setDrafting(true);
     setDraftError(null);
@@ -375,16 +408,26 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
-      if (data.headlines?.length) setField('headlines', data.headlines);
-      if (data.long_headlines?.length) setField('longHeadlines', data.long_headlines);
-      if (data.descriptions?.length) setField('descriptions', data.descriptions);
+      if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
+      sessionStorage.setItem('pmax-draft-id', data.draft_id);
+      await pollDraft(data.draft_id);
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : String(e));
     } finally {
       setDrafting(false);
     }
   };
+
+  // Resume polling a draft that was in flight when the page was refreshed.
+  useEffect(() => {
+    const pending = sessionStorage.getItem('pmax-draft-id');
+    if (!pending) return;
+    setDrafting(true);
+    pollDraft(pending)
+      .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setDrafting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-5">

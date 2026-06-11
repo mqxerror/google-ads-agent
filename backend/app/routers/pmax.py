@@ -102,11 +102,46 @@ _DRAFT_LIMITS = {
 }
 
 
-@router.post(
-    "/accounts/{account_id}/pmax/draft-copy",
-    response_model=PMaxDraftResponse,
-)
-async def draft_pmax_copy(account_id: str, body: PMaxDraftRequest) -> PMaxDraftResponse:
+# Draft jobs run in the background and the wizard POLLS for the result —
+# a single 1-3 minute HTTP request kept dying when the Vite dev proxy or
+# either server blipped mid-draft (hit live 2026-06-10). In-memory store is
+# fine: drafts are ephemeral and single-process.
+_draft_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+async def _run_draft_job(job_id: str, account_id: str, body: PMaxDraftRequest) -> None:
+    try:
+        result = await _draft_pmax_copy_inner(account_id, body)
+        _draft_jobs[job_id] = {"status": "done", "result": result.model_dump()}
+    except HTTPException as e:
+        detail = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
+        _draft_jobs[job_id] = {"status": "error", "message": detail.get("message", "draft failed")}
+    except Exception as e:
+        logger.exception("PMax draft job %s failed", job_id)
+        _draft_jobs[job_id] = {"status": "error", "message": str(e)[:300]}
+
+
+@router.post("/accounts/{account_id}/pmax/draft-copy")
+async def start_draft_pmax_copy(account_id: str, body: PMaxDraftRequest) -> Dict[str, str]:
+    """Start a Creative Director draft job; poll GET .../draft-copy/{id}."""
+    import asyncio
+    import uuid as _uuid
+
+    job_id = str(_uuid.uuid4())
+    _draft_jobs[job_id] = {"status": "running"}
+    asyncio.create_task(_run_draft_job(job_id, account_id, body))
+    return {"draft_id": job_id, "status": "running"}
+
+
+@router.get("/pmax/draft-copy/{draft_id}")
+async def get_draft_pmax_copy(draft_id: str) -> Dict[str, Any]:
+    job = _draft_jobs.get(draft_id)
+    if not job:
+        return {"status": "error", "message": "unknown draft id (server restarted?) — start a new draft"}
+    return job
+
+
+async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMaxDraftResponse:
     """Draft PMax text assets with the Creative Director role from the
     campaign brief + landing page. Analysis-only (no Google Ads tools);
     the agent may fetch the landing page to ground the copy. Limits are
