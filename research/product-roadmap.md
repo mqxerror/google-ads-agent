@@ -50,7 +50,7 @@ Google gates:
 
 ### Phase A1 — Host it (days)
 - Deploy backend (incl. /mcp bridge + scheduler) to the Mercan server via Dokploy,
-  token-secured, HTTPS. Secrets stay in `~/.mercan-secrets`, never in repo.
+  token-secured, HTTPS. Secrets stay in `~/.langarai-secrets`, never in repo.
 - Caveat: hosting = the whole agent backend (Google creds + runs Claude CLI +
   scheduler). Cost of Claude runs must be covered by pricing later.
 - Pilot: issue 1–3 testers a bearer token; they connect from their Claude Code.
