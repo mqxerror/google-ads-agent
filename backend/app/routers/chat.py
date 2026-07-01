@@ -317,7 +317,7 @@ async def send_message(
                 conversation_id=conv_id,
                 base_guidelines=base_guidelines,
                 campaign_guidelines=campaign_guidelines_text,
-                model=body.model or "sonnet",
+                model=body.model or "fable",
                 active_role=getattr(body, 'active_role', None),
                 attachments=[a.model_dump() for a in (body.attachments or [])],
             ):

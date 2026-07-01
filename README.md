@@ -46,7 +46,7 @@ Open **http://localhost:5173**
 - **Date Range Picker** — Day-by-day performance analysis with presets
 - **Direct Operations** — Pause/enable campaigns, edit budgets, add keywords with one click
 - **Search Terms Analysis** — View search terms, suggest negatives with match types
-- **Model Selector** — Switch between Fable 5 (deepest, default — `claude-fable-5[1m]`), Sonnet (fast), Opus (deep analysis), Haiku (quick/cheap)
+- **Model Selector** — Switch between Fable 5 (deepest, default — `claude-fable-5[1m]`, with automatic fallback to Opus 4.8 / `claude-opus-4-8` on a usage/rate limit), Sonnet (fast), Opus (deep analysis), Haiku (quick/cheap)
 - **Dark/Light Mode** + Cmd+K command palette
 
 ## Architecture

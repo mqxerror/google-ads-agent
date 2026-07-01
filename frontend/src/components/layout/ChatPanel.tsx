@@ -430,7 +430,7 @@ export default function ChatPanel() {
 
   // Send message (queues if agent is busy)
   const handleSend = useCallback(
-    (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
+    (text: string, model: ModelId = 'fable', roleId?: string, attachments?: Attachment[]) => {
       if (isResponding) {
         // Queue the message — show it in chat with pending state
         const queuedMsg: ChatMessage = {
@@ -451,7 +451,7 @@ export default function ChatPanel() {
 
   // Actual send (creates conversation, streams response)
   const actualSend = useCallback(
-    async (text: string, model: ModelId = 'sonnet', roleId?: string, attachments?: Attachment[]) => {
+    async (text: string, model: ModelId = 'fable', roleId?: string, attachments?: Attachment[]) => {
       // Add user message if not already shown (queued messages are already in chat)
       setMessages((prev) => {
         const alreadyShown = prev.some((m) => m.role === 'user' && m.content === text && !m.isPending);

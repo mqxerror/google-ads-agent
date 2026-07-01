@@ -247,6 +247,19 @@ AVAILABLE_MODELS = {
     "haiku": "claude-haiku-4-5-20251001",
 }
 
+# ── Usage/rate-limit fallback ───────────────────────────────────
+# The configured model (default Fable 5) can hit a usage cap or per-minute
+# rate limit on this subscription. When that happens the CLI's stream-json
+# `result` event carries a non-success subtype / error, or the process exits
+# non-zero with a "usage limit" / "rate limit" / "limit reached" / 429 line on
+# stderr. Rather than surface a hard failure, we retry the SAME prompt ONCE
+# with the model swapped to Opus 4.8 (a distinct model that isn't sharing
+# Fable's cap). Mirrors the meta-ads-agent claude_runner fallback contract.
+_FALLBACK_MODEL = "claude-opus-4-8"
+# Case-insensitive signals for a transient usage/rate/limit condition, matched
+# against the CLI's result-event error, stderr, and any api_retry event error.
+_LIMIT_RE = re.compile(r"usage limit|rate limit|limit reached|429", re.I)
+
 
 def _guidelines_dir_for_account(account_id: str | None) -> Path:
     """V2: Resolve guidelines directory — per-account if available, fallback to flat."""
@@ -741,7 +754,7 @@ async def stream_agent_response(
     conversation_id: str | None = None,
     base_guidelines: str | None = None,
     campaign_guidelines: str | None = None,
-    model: str = "sonnet",
+    model: str = "fable",
     active_role: str | None = None,
     attachments: list[dict] | None = None,
     tool_allowlist: list[str] | None = None,
@@ -757,7 +770,7 @@ async def stream_agent_response(
     """
     from app.services.roles import classify_intent, get_role, get_default_role
 
-    model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS["sonnet"])
+    model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS["fable"])
     today = date.today()
 
     # ── Intent classification → resolve role ────────────────
@@ -1318,6 +1331,13 @@ async def stream_agent_response(
     # Remove nesting detection vars so CLI can launch from within a Claude Code session
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_CODE_SESSION", None)
+    # MONEY SAFETY: force subscription billing. If an Anthropic API key/token is
+    # present in the environment the Claude Code CLI would silently bill
+    # PER-TOKEN against the API instead of the logged-in Max subscription. Strip
+    # every API-auth env var so the CLI can ONLY use the subscription OAuth
+    # creds. Hard invariant (mirrors seo-supreme-agent cli_transport._build_env).
+    for _k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"):
+        env.pop(_k, None)
     # Scope-lock the Google Ads MCP server to this conversation's campaign.
     # The MCP middleware (google_ads/mcp_main.py · CampaignScopeMiddleware)
     # rejects any tool call whose arguments name a different campaign id —
@@ -1384,6 +1404,11 @@ async def stream_agent_response(
         continuation_count = 0
         current_session_id = None
         is_first_run = True
+        # The model actually served this run. Starts as the configured model
+        # and is swapped to _FALLBACK_MODEL exactly once if the configured
+        # model hits a usage/rate limit (see the limit-fallback block below).
+        active_model_id = model_id
+        fallback_used = False
 
         while True:
             # Build command — first run uses original cmd, subsequent runs use --resume
@@ -1396,25 +1421,33 @@ async def stream_agent_response(
                     "--print", "--verbose", "--output-format", "stream-json",
                     "--resume", resume_sid,
                     "--max-turns", max_turns,
-                    "--model", model_id,
+                    "--model", active_model_id,
                     "--permission-mode", "bypassPermissions",
                     "--mcp-config", str(mcp_config_path),
                 ]
             elif is_first_run:
+                # Reuse the pre-built cmd, but honor a limit-fallback model swap.
                 run_cmd = list(cmd)
+                if active_model_id != model_id:
+                    m_idx = run_cmd.index("--model") + 1
+                    run_cmd[m_idx] = active_model_id
             else:
                 run_cmd = [
                     *_CLI_CMD,
                     "--print", "--verbose", "--output-format", "stream-json",
                     "--resume", current_session_id,
                     "--max-turns", max_turns,
-                    "--model", model_id,
+                    "--model", active_model_id,
                     "--permission-mode", "bypassPermissions",
                     "--mcp-config", str(mcp_config_path),
                 ]
 
             segment_session_id = None
             segment_subtype = None
+            # Set when this run's CLI output indicates a usage/rate limit for the
+            # active model (result-event error, non-success subtype text, or an
+            # api_retry event) — drives the one-shot Opus fallback below.
+            limit_hit = False
             proc = None
 
             try:
@@ -1452,11 +1485,24 @@ async def stream_agent_response(
                     msg_type = data.get("type", "")
                     if msg_type == "assistant":
                         _parse_assistant_blocks(data.get("message", {}).get("content", []))
+                    elif msg_type == "api_retry":
+                        # The CLI emits api_retry when it hits a retryable server
+                        # condition (rate limit / 529 / etc.). If it names a
+                        # usage/rate limit, flag for the Opus fallback.
+                        if _LIMIT_RE.search(str(data.get("error", "")) or ""):
+                            limit_hit = True
                     elif msg_type == "result":
                         segment_session_id = data.get("session_id")
                         segment_subtype = data.get("subtype", "end_turn")
                         accumulated_cost += data.get("total_cost_usd", 0) or 0
                         accumulated_turns += data.get("num_turns", 0) or 0
+                        # A non-success result subtype whose text mentions a
+                        # usage/rate limit (e.g. "error_max_turns" is fine, but
+                        # a limit-flavored error is not) triggers the fallback.
+                        _result_blob = f"{segment_subtype} {data.get('error', '')} {data.get('errors', '')}"
+                        if segment_subtype not in ("end_turn", "max_turns", "error_max_turns") \
+                                and _LIMIT_RE.search(_result_blob):
+                            limit_hit = True
                         logger.info(
                             "CLI result: subtype=%s turns=%d cost=$%.4f session=%s errors=%s",
                             segment_subtype, accumulated_turns, accumulated_cost,
@@ -1466,14 +1512,44 @@ async def stream_agent_response(
                 proc.wait()
                 logger.info("CLI exited: returncode=%s subtype=%s", proc.returncode, segment_subtype)
 
+                # Read stderr once (drives both the limit-fallback check and the
+                # error path below). A non-zero exit with no result event may be
+                # a rate-limit exit that only printed to stderr.
+                err_text = ""
+                if proc.returncode != 0:
+                    err_text = proc.stderr.read().decode("utf-8", errors="replace").strip()
+                    if not limit_hit and _LIMIT_RE.search(err_text):
+                        limit_hit = True
+
+                # ── One-shot usage/rate-limit fallback → Opus 4.8 ──────────
+                # If the configured (non-fallback) model hit a usage/rate limit
+                # on this first attempt, retry the SAME prompt ONCE with Opus.
+                # Guards: only before any continuation, only once, and never
+                # when the active model is already the fallback (no recursion).
+                if (
+                    limit_hit
+                    and not fallback_used
+                    and continuation_count == 0
+                    and active_model_id != _FALLBACK_MODEL
+                ):
+                    logger.warning(
+                        "model %s hit a usage/rate limit — retrying once with fallback %s",
+                        active_model_id, _FALLBACK_MODEL,
+                    )
+                    active_model_id = _FALLBACK_MODEL
+                    fallback_used = True
+                    # Re-run from scratch: same prompt, swapped model. Reset the
+                    # first-run flag so the full combined_prompt is re-sent.
+                    is_first_run = True
+                    continue
+
                 if proc.returncode != 0 and segment_subtype is None:
                     # User stopped or unexpected error (no result event received)
                     if conversation_id and conversation_id not in _running_procs:
-                        result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": "user_stopped", "resume_session_id": segment_session_id or current_session_id})
+                        result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": active_model_id, "continuations": continuation_count, "stop_reason": "user_stopped", "resume_session_id": segment_session_id or current_session_id})
                     else:
-                        err = proc.stderr.read().decode("utf-8", errors="replace").strip()
-                        logger.error("CLI error (rc=%d): %s", proc.returncode, err[:500])
-                        result_queue.put({"type": "error", "message": f"CLI error: {err[:300]}"})
+                        logger.error("CLI error (rc=%d): %s", proc.returncode, err_text[:500])
+                        result_queue.put({"type": "error", "message": f"CLI error: {err_text[:300]}"})
                     break
 
             except Exception as e:
@@ -1505,7 +1581,7 @@ async def stream_agent_response(
                     (segment_session_id or current_session_id)
                     if stop_reason in _RESUMABLE_STOPS else None
                 )
-                result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": model_id, "continuations": continuation_count, "stop_reason": stop_reason, "resume_session_id": resumable_sid})
+                result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": active_model_id, "continuations": continuation_count, "stop_reason": stop_reason, "resume_session_id": resumable_sid})
                 break
 
             # --- Auto-continue ---
