@@ -43,7 +43,7 @@ export default function WorkflowPanel({ accountId, campaignId, campaignName }: W
   const [goal, setGoal] = useState(
     'Full daily + weekly + ad-copy audit, then team-reconcile the reports into one prioritised action plan, resolving any conflicts.'
   );
-  const [phaseLabels, setPhaseLabels] = useState<Record<string, string>>({});
+  const [, setPhaseLabels] = useState<Record<string, string>>({});
   const [phaseStatus, setPhaseStatus] = useState<Record<PhaseKey, PhaseStatus>>({
     prefetch: 'pending', plan: 'pending', specialists: 'pending', debate: 'pending', synthesis: 'pending',
   });
@@ -53,7 +53,7 @@ export default function WorkflowPanel({ accountId, campaignId, campaignName }: W
   const [spent, setSpent] = useState(0);
   const [budget, setBudget] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [, setActiveRunId] = useState<string | null>(null);
 
   // History + compare
   const [history, setHistory] = useState<RunSummary[]>([]);

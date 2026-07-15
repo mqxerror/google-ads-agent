@@ -9,3 +9,4 @@
 - [Creative Director Notes](role_notes/creative_director.md) — Latest findings from Creative Director
 - [Ppc Strategist Notes](role_notes/ppc_strategist.md) — Latest findings from Ppc Strategist
 - [Gtm Specialist Notes](role_notes/gtm_specialist.md) — Latest findings from Gtm Specialist
+- [Analytics Analyst Notes](role_notes/analytics_analyst.md) — Latest findings from Analytics Analyst

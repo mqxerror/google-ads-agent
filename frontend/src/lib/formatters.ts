@@ -28,6 +28,10 @@ const BIDDING_STRATEGY_NAMES: Record<string, string> = {
 };
 
 export function formatBiddingStrategy(apiValue: string): string {
+  // Unknown/empty strategy → a quiet dash, never the channel type dressed as a
+  // strategy (Dashboard v2.1 B2). Also treats the API's UNSPECIFIED/UNKNOWN
+  // enum sentinels as "no strategy".
+  if (!apiValue || apiValue === 'UNSPECIFIED' || apiValue === 'UNKNOWN') return '—';
   return BIDDING_STRATEGY_NAMES[apiValue] || apiValue.replace(/_/g, ' ');
 }
 

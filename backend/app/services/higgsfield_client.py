@@ -726,8 +726,8 @@ def _classify_cli_error(stderr: str) -> str:
     else → `run`."""
     low = stderr.lower()
     if any(t in low for t in (
-        "not logged in", "login required", "401", "403", "expired",
-        "datadome", "unauthorized", "no session",
+        "not logged in", "not authenticated", "login required", "401", "403",
+        "expired", "datadome", "unauthorized", "no session",
         # `~/.higgsfield/` missing → httpx tries to encode empty/garbage
         # cookies and explodes in set_cookie_header. Root cause is "no
         # auth state"; classify as auth so operator gets the right

@@ -53,6 +53,12 @@ class ExtractRequest(BaseModel):
     text: str                            # the chat message to turn into a plan
 
 
+class AccountAuditRequest(BaseModel):
+    account_id: str
+    recurrence: str | None = None        # defaults to weekly:mon:09:00
+    timezone: str = "UTC"
+
+
 def _row(r) -> dict:
     return dict(r)
 
@@ -83,6 +89,57 @@ async def create_plan(body: PlanCreate) -> dict:
         await db.commit()
         cur = await db.execute("SELECT * FROM scheduled_plans WHERE id = ?", (pid,))
         return _row(await cur.fetchone())
+    finally:
+        await db.close()
+
+
+@router.post("/account-audit")
+async def enable_account_audit(body: AccountAuditRequest) -> dict:
+    """One-click seed the "Weekly account audit" ritual (Story 13.4) for an
+    account. Idempotent: at most ONE active recurring account-audit plan per
+    account — a second call returns the existing plan (with `already_active`)
+    rather than stacking duplicates. The ritual is an account-scoped `audit`
+    plan (campaign_id=None); when fired it launches the account-wide Team Audit
+    via the runner. `infer_mode('audit')` classifies it AUTO (analysis-only),
+    so it is never approval-gated. It appears in the normal Plans listing +
+    dashboard Upcoming like any other plan."""
+    recurrence = body.recurrence or scheduler.WEEKLY_AUDIT_RECURRENCE
+    db = await get_db()
+    try:
+        # Dup-guard: an active recurring audit ritual for this account already
+        # exists (any non-terminal status) → return it, don't create another.
+        cur = await db.execute(
+            "SELECT * FROM scheduled_plans WHERE account_id = ? AND campaign_id IS NULL "
+            "AND action_category = ? AND schedule_type = 'recurring' "
+            "AND status != 'done' ORDER BY created_at LIMIT 1",
+            (body.account_id, scheduler.AUDIT_CATEGORY),
+        )
+        existing = await cur.fetchone()
+        if existing:
+            plan = _row(existing)
+            plan["already_active"] = True
+            return plan
+
+        pid = str(uuid.uuid4())
+        nxt = scheduler.compute_next_run(recurrence)
+        next_run = nxt.isoformat(sep=" ", timespec="seconds") if nxt else None
+        mode = scheduler.infer_mode(scheduler.AUDIT_CATEGORY)   # → "auto"
+        await db.execute(
+            """INSERT INTO scheduled_plans
+               (id, account_id, campaign_id, campaign_name, conversation_id, title,
+                action_detail, context_snippet, action_category, mode, schedule_type,
+                run_at, recurrence, timezone, status, next_run_at, created_by)
+               VALUES (?,?,NULL,NULL,NULL,?,?,NULL,?,?,'recurring',NULL,?,?,'scheduled',?,'user')""",
+            (pid, body.account_id, "Weekly account audit",
+             "Run the account-wide Team Audit across all active campaigns and "
+             "produce one ranked account report.",
+             scheduler.AUDIT_CATEGORY, mode, recurrence, body.timezone, next_run),
+        )
+        await db.commit()
+        cur = await db.execute("SELECT * FROM scheduled_plans WHERE id = ?", (pid,))
+        plan = _row(await cur.fetchone())
+        plan["already_active"] = False
+        return plan
     finally:
         await db.close()
 
@@ -214,7 +271,7 @@ async def extract(body: ExtractRequest) -> dict:
         campaign_id=body.campaign_id, campaign_name=body.campaign_name,
         model="haiku", active_role="director", tool_allowlist=[],
     ):
-        if ev.get("type") == "text":
+        if ev.get("type") in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
             parts.append(ev.get("content", ""))
     raw = "".join(parts)
     draft = {"title": "", "action_detail": body.text[:300], "action_category": "other",

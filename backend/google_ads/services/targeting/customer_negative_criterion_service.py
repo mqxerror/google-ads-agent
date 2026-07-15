@@ -68,64 +68,20 @@ class CustomerNegativeCriterionService:
             List of created customer negative criteria
         """
         try:
-            customer_id = format_customer_id(customer_id)
-
-            # Create operations
-            operations = []
-            for keyword in keywords:
-                # Create customer negative criterion
-                customer_negative_criterion = CustomerNegativeCriterion()
-
-                # Create keyword info
-                keyword_info = KeywordInfo()
-                keyword_info.text = keyword["text"]
-                keyword_info.match_type = getattr(
-                    KeywordMatchTypeEnum.KeywordMatchType, keyword["match_type"]
-                )
-                customer_negative_criterion.keyword = keyword_info
-                customer_negative_criterion.type_ = (
-                    CriterionTypeEnum.CriterionType.KEYWORD
-                )
-
-                # Create operation
-                operation = CustomerNegativeCriterionOperation()
-                operation.create = customer_negative_criterion
-                operations.append(operation)
-
-            # Create request
-            request = MutateCustomerNegativeCriteriaRequest()
-            request.customer_id = customer_id
-            request.operations = operations
-
-            # Make the API call
-            response: MutateCustomerNegativeCriteriaResponse = (
-                self.client.mutate_customer_negative_criteria(request=request)
+            # Customer-level negatives support content_label / placement /
+            # mobile_app / youtube_video / youtube_channel ONLY — NOT keywords.
+            # The API has no 'keyword' field on CustomerNegativeCriterion
+            # ("Unknown field 'keyword'"), so this tool is invalid by design and
+            # sends no request. Negative KEYWORDS live at the campaign,
+            # ad-group, or shared-set (negative keyword list) level.
+            raise NotImplementedError(
+                "add_negative_keywords is not implemented: Google Ads does NOT "
+                "support negative KEYWORDS at the customer/account level "
+                "(CustomerNegativeCriterion has no 'keyword' field — only "
+                "content_label, placement, mobile_app, and youtube). Add negative "
+                "keywords at the campaign level, ad-group level, or via a shared "
+                "negative-keyword list instead. No mutate was sent."
             )
-
-            # Process results
-            results = []
-            for i, result in enumerate(response.results):
-                criterion_resource = result.resource_name
-                criterion_id = (
-                    criterion_resource.split("/")[-1] if criterion_resource else ""
-                )
-                keyword = keywords[i]
-                results.append(
-                    {
-                        "resource_name": criterion_resource,
-                        "criterion_id": criterion_id,
-                        "type": "KEYWORD",
-                        "keyword_text": keyword["text"],
-                        "match_type": keyword["match_type"],
-                    }
-                )
-
-            await ctx.log(
-                level="info",
-                message=f"Added {len(results)} negative keywords at account level",
-            )
-
-            return results
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"

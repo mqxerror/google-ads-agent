@@ -308,6 +308,10 @@ def register_keyword_plan_campaign_tools(mcp: FastMCP[Any]) -> None:
             customer_id=customer_id, operations=[operation]
         )
 
+        # results is empty under validate_only (and any empty response) — guard
+        # the [0] index so it does not raise IndexError.
+        if not response.results:
+            return "Validated keyword plan campaign create (no result returned)"
         result = response.results[0]
         return f"Created keyword plan campaign: {result.resource_name}"
 

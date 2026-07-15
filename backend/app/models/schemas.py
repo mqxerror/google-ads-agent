@@ -93,6 +93,7 @@ class ChatMessageRequest(BaseModel):
     model: str = "sonnet"  # fable (UI default), sonnet, opus, haiku
     active_role: str | None = None  # force a specific specialist role
     attachments: list[AttachmentInfo] = Field(default_factory=list)
+    orchestrate: bool = False  # opt into Chat Orchestration v2 multi-agent turn
 
 
 class ChatMessageResponse(BaseModel):

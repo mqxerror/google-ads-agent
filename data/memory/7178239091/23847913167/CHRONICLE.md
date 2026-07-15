@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/canadian-citizenship-by-descent
-Last updated: 2026-06-11
+Last updated: 2026-07-05
 
 ## Timeline
 
@@ -85,6 +85,19 @@ Last updated: 2026-06-11
 - **Jun 02** — [Creative Director] 2026-06-02 — Creative Director ran MapleRoots RSA workshop: AG2-Grandparent flagged weakest (7.69% CTR, 0 conv) due to 4 near-duplicate grandparent headlines; AG1-Core Descent dropped to AVERAGE ad strength (64% of spend); AG4 skip confirmed (bid-suppressed at $0.35, not a copy issue).
 - **Jun 02** — [Search Term Hunter] MapleRoots 14-day deep dive (May 19–Jun 1): 27 conv at blended CPA $65.92, avg CPC $1.09; three inflection points identified — May 23 bid corrections (CPC dropped from $1.20→$1.05), May 26 LP switch to /lp/, May 30–31 weekend collapse (impr halved to 416, normal pattern).
 - **Jun 02** — [PPC Strategist] MapleRoots daily review June 2: June 1 showed 3 conversions at ~$46.46 CPA (+61% vs 7-day avg of 1.86/day), spend $139.38 (39% over $100/day budget), monthly pace ~$4,170 vs $3,000 target. `[grandparent canadian citizen]` exact flagged: 61 clicks, ~$66 spend, 0 conversions — bid reduction recommended.
+
+### July 2026
+- **Jul 05** — [Agency Director] Wassim approved the pending pause of `[EXACT] grandparent canadian citizen` (AG2 — Grandparent Path, criterion `2479038163338`, 96 clicks / 0 conv); MCP confirmed no pause tool exists so execution routed to Chrome Ads UI on Tab 7 (already open on keywords page).
+- **Jul 05** — [Analytics Analyst] MapleRoots (23847913167): added 6 campaign-level negatives (bill c 3 variants, how-to-apply, am-i-canadian, what-documents) + captured `[EXACT] canadian citizenship by descent lawyer` in AG1; auction insights pulled via impression-share-lost-to-rank proxy (API has no competitor-domain endpoint). Campaign declared volume-saturated; Meta Ads now running in parallel.
+- **Jul 05** — [Agency Director] Team session validated Jun 21–Jul 4 blended CPA at $48.53 (605 clicks / $2,038.20 / 42 conv), surfacing that best days hit $21.62 CPA vs AG3/other groups dragging at $71–$97; revised holiday gate — no portfolio cap trigger until Jul 6–7 full weekdays with CPC >$3.80 on both.
+- **Jul 05** — [Search Term Hunter] MapleRoots (23847913167) Jul 4 spike confirmed: $279 spend, 2 conv, CPA $139.67 (3.2× baseline) — not a holiday artifact; Jul 5 CPC hit $4.46 (all-time high), 0 conv on $102 partial, dayparting/portfolio-cap review warranted if CPC holds above $3.80 through Jul 7.
+- **Jul 04** — [Analytics Analyst] Analytics Analyst audited MapleRoots (23847913167) Jun 20–Jul 3: spend -13.5% ($1,037→$897), clicks -14%, conversions 24→21, but CPA held flat at ~$43 — efficiency stable, volume decline only. Jul 4 flagged as clean waste outlier: 69 clicks, $279 spend, 2 conversions, CPA $139.67 vs $39 baseline, CPC 26% above recent high.
+- **Jul 04** — [PPC Strategist] User asked: [Campaign: "MapleRoots — Citizenship by Descent (US)" · id 23847913167]
+MapleRoots — Citizenship by. ---
+
+## MapleRoots Budget & Performance Audit — July 4, 2026
+**PPC Strategist | Campaign 23847913167
+- **Jul 04** — [Search Term Hunter] 2026-07-04 MapleRoots search-term audit (Jul 2–4 window, 40 terms): zero genealogy-hobby, other-country-descent, or job-visa queries found — intent targeting clean. Ranked negatives identified: `[canadian bill c 3]` ($8.63/click, ~$20/wk waste), DIY-self-assessment cluster, and legislation searchers as top waste buckets under Maximize Conversions bidding ($3–4 CPC).
 
 ## Key Metrics Milestones
 

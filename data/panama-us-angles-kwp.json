@@ -1,0 +1,1353 @@
+{
+  "meta": {
+    "customer_id": "7178239091",
+    "geo": "US/2840",
+    "lang": "EN/1000",
+    "network": "GOOGLE_SEARCH",
+    "api_version": "v23",
+    "fetched": "2026-07-15 11:43",
+    "sources": {
+      "kwp_ideas_raw": "panama-us-angles-kwp-ideas-raw.json (2,116 idea rows, 3 seed calls)",
+      "kwp_historical_raw": "panama-us-angles-kwp-hist-raw.json (97 canonical rows)",
+      "dfs_serp_raw": "panama-us-dfs-serp-raw.json (3 head-term SERPs, google US)",
+      "dfs_ranked_raw": "panama-us-dfs-ranked-raw.json (7 domains x 700 ranked kws)"
+    },
+    "dedupe_method": "variant pools \u2014 identical (volume, bids, comp_index) within candidate set counted once; cross-angle",
+    "grand_total_addressable_us_monthly": 48040
+  },
+  "serp_competitors": {
+    "panama residency by investment": [
+      "www.henleyglobal.com#1",
+      "kraemerlaw.com#2",
+      "www.goldenvisas.com#4",
+      "ntltrust.com#5",
+      "globalresidenceindex.com#6",
+      "getgoldenvisa.com#7",
+      "panamasovereign.com#8",
+      "www.imidaily.com#9",
+      "harveylawcorporation.com#10",
+      "thewanderinginvestor.com#11",
+      "immigrantinvest.com#13",
+      "nomadcapitalist.com#14"
+    ],
+    "panama qualified investor visa": [
+      "kraemerlaw.com#2",
+      "www.henleyglobal.com#3",
+      "www.mercan.com#4",
+      "www.imidaily.com#5",
+      "panamasovereign.com#6",
+      "www.goldenvisas.com#7",
+      "getgoldenvisa.com#8",
+      "ntltrust.com#10",
+      "globalresidenceindex.com#12",
+      "harveylawcorporation.com#13",
+      "passportivity.com#14",
+      "www.legal500.com#15"
+    ],
+    "panama golden visa": [
+      "www.henleyglobal.com#2",
+      "kraemerlaw.com#3",
+      "www.goldenvisas.com#4",
+      "www.mercan.com#6",
+      "ntltrust.com#7",
+      "www.imidaily.com#9",
+      "getgoldenvisa.com#10",
+      "globalresidenceindex.com#11",
+      "panamasovereign.com#13",
+      "www.youtube.com#14",
+      "www.embassyofpanama.org#15",
+      "citizenremote.com#16"
+    ]
+  },
+  "clusters": {
+    "property": {
+      "buyer_intent_score": 4,
+      "policy_note": "SAFE \u2014 but geo-ambiguity: Panama City Beach FLORIDA pollutes generic 'panama homes/houses' queries; needs FL negatives",
+      "cluster_total_us_monthly_deduped": 16360,
+      "priority_index": 65440,
+      "keywords": [
+        {
+          "keyword": "buy property in panama",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 41,
+          "top_of_page_bid_low_usd": 0.21,
+          "top_of_page_bid_high_usd": 1.56,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "buying property in panama",
+          "avg_monthly_searches_us": null,
+          "note": "folded into close variant",
+          "counted": false
+        },
+        {
+          "keyword": "buy real estate in panama",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 41,
+          "top_of_page_bid_low_usd": 0.21,
+          "top_of_page_bid_high_usd": 1.56,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "buying real estate in panama",
+          "avg_monthly_searches_us": null,
+          "note": "folded into close variant",
+          "counted": false
+        },
+        {
+          "keyword": "buy house in panama",
+          "avg_monthly_searches_us": 6600,
+          "competition": "LOW",
+          "competition_index": 28,
+          "top_of_page_bid_low_usd": 0.04,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "buy apartment in panama",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 26,
+          "top_of_page_bid_low_usd": 0.03,
+          "top_of_page_bid_high_usd": 1.67,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "buy condo in panama",
+          "avg_monthly_searches_us": 590,
+          "competition": "MEDIUM",
+          "competition_index": 41,
+          "top_of_page_bid_low_usd": 0.06,
+          "top_of_page_bid_high_usd": 2.16,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama real estate",
+          "avg_monthly_searches_us": 3600,
+          "competition": "LOW",
+          "competition_index": 33,
+          "top_of_page_bid_low_usd": 0.04,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 10
+          }
+        },
+        {
+          "keyword": "panama real estate for sale",
+          "avg_monthly_searches_us": 2400,
+          "competition": "MEDIUM",
+          "competition_index": 35,
+          "top_of_page_bid_low_usd": 0.05,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "panama real estate investment",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 20,
+          "top_of_page_bid_low_usd": 1.46,
+          "top_of_page_bid_high_usd": 3.55,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "real estate investment in panama",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 20,
+          "top_of_page_bid_low_usd": 1.46,
+          "top_of_page_bid_high_usd": 3.55,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "investing in panama real estate",
+          "avg_monthly_searches_us": null,
+          "note": "folded into close variant",
+          "counted": false
+        },
+        {
+          "keyword": "invest in panama real estate",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 20,
+          "top_of_page_bid_low_usd": 1.46,
+          "top_of_page_bid_high_usd": 3.55,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama investment property",
+          "avg_monthly_searches_us": 20,
+          "competition": "MEDIUM",
+          "competition_index": 54,
+          "top_of_page_bid_low_usd": 2.08,
+          "top_of_page_bid_high_usd": 4.85,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama property for sale",
+          "avg_monthly_searches_us": 2400,
+          "competition": "MEDIUM",
+          "competition_index": 35,
+          "top_of_page_bid_low_usd": 0.05,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {
+            "panamasovereign.com": 4
+          }
+        },
+        {
+          "keyword": "homes for sale in panama",
+          "avg_monthly_searches_us": 6600,
+          "competition": "LOW",
+          "competition_index": 28,
+          "top_of_page_bid_low_usd": 0.04,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "houses for sale in panama",
+          "avg_monthly_searches_us": 6600,
+          "competition": "LOW",
+          "competition_index": 28,
+          "top_of_page_bid_low_usd": 0.04,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {
+            "panamasovereign.com": 2
+          }
+        },
+        {
+          "keyword": "panama city panama real estate",
+          "avg_monthly_searches_us": 1000,
+          "competition": "MEDIUM",
+          "competition_index": 40,
+          "top_of_page_bid_low_usd": 0.03,
+          "top_of_page_bid_high_usd": 1.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 8
+          }
+        },
+        {
+          "keyword": "panama city panama condos for sale",
+          "avg_monthly_searches_us": 720,
+          "competition": "MEDIUM",
+          "competition_index": 45,
+          "top_of_page_bid_low_usd": 0.03,
+          "top_of_page_bid_high_usd": 1.67,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 4
+          }
+        },
+        {
+          "keyword": "apartments for sale in panama city panama",
+          "avg_monthly_searches_us": 320,
+          "competition": "MEDIUM",
+          "competition_index": 36,
+          "top_of_page_bid_low_usd": 0.03,
+          "top_of_page_bid_high_usd": 1.2,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 12
+          }
+        },
+        {
+          "keyword": "santa maria panama real estate",
+          "avg_monthly_searches_us": 50,
+          "competition": "LOW",
+          "competition_index": 19,
+          "top_of_page_bid_low_usd": 0.31,
+          "top_of_page_bid_high_usd": 1.62,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama real estate for expats",
+          "avg_monthly_searches_us": 320,
+          "competition": "MEDIUM",
+          "competition_index": 51,
+          "top_of_page_bid_low_usd": 0.05,
+          "top_of_page_bid_high_usd": 1.49,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 4,
+            "nomadcapitalist.com": 71
+          }
+        },
+        {
+          "keyword": "best place to buy real estate in panama",
+          "avg_monthly_searches_us": 70,
+          "competition": "MEDIUM",
+          "competition_index": 42,
+          "top_of_page_bid_low_usd": 0.22,
+          "top_of_page_bid_high_usd": 1.86,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama beachfront property for sale",
+          "avg_monthly_searches_us": 40,
+          "competition": "MEDIUM",
+          "competition_index": 39,
+          "top_of_page_bid_low_usd": 0.07,
+          "top_of_page_bid_high_usd": 1.84,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": [
+        [
+          "buy property in panama",
+          "buy real estate in panama"
+        ],
+        [
+          "buy house in panama",
+          "homes for sale in panama",
+          "houses for sale in panama"
+        ],
+        [
+          "panama property for sale",
+          "panama real estate for sale"
+        ],
+        [
+          "invest in panama real estate",
+          "panama real estate investment",
+          "real estate investment in panama"
+        ]
+      ]
+    },
+    "golden_visa_generic": {
+      "buyer_intent_score": 3,
+      "policy_note": "SAFE terms, but EU-leaning demand; needs country negatives (spain/dubai/uae/malta/italy/cyprus on top of existing greece/portugal/europe)",
+      "cluster_total_us_monthly_deduped": 11230,
+      "priority_index": 33690,
+      "keywords": [
+        {
+          "keyword": "golden visa",
+          "avg_monthly_searches_us": 8100,
+          "competition": "MEDIUM",
+          "competition_index": 36,
+          "top_of_page_bid_low_usd": 1.41,
+          "top_of_page_bid_high_usd": 6.02,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 4,
+            "getgoldenvisa.com": 12,
+            "immigrantinvest.com": 7,
+            "nomadcapitalist.com": 67
+          }
+        },
+        {
+          "keyword": "golden visa program",
+          "avg_monthly_searches_us": 720,
+          "competition": "MEDIUM",
+          "competition_index": 43,
+          "top_of_page_bid_low_usd": 1.31,
+          "top_of_page_bid_high_usd": 6.39,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 4,
+            "getgoldenvisa.com": 19,
+            "immigrantinvest.com": 15,
+            "nomadcapitalist.com": 70
+          }
+        },
+        {
+          "keyword": "golden visa programs",
+          "avg_monthly_searches_us": null,
+          "note": "folded into close variant",
+          "counted": false
+        },
+        {
+          "keyword": "golden visa countries",
+          "avg_monthly_searches_us": 1600,
+          "competition": "MEDIUM",
+          "competition_index": 58,
+          "top_of_page_bid_low_usd": 0.5,
+          "top_of_page_bid_high_usd": 3.55,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 4,
+            "getgoldenvisa.com": 7,
+            "immigrantinvest.com": 10
+          }
+        },
+        {
+          "keyword": "best golden visa",
+          "avg_monthly_searches_us": 90,
+          "competition": "MEDIUM",
+          "competition_index": 46,
+          "top_of_page_bid_low_usd": 1.35,
+          "top_of_page_bid_high_usd": 4.59,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "goldenvisas.com": 3
+          }
+        },
+        {
+          "keyword": "best golden visa programs",
+          "avg_monthly_searches_us": 140,
+          "competition": "MEDIUM",
+          "competition_index": 59,
+          "top_of_page_bid_low_usd": 1.62,
+          "top_of_page_bid_high_usd": 6.11,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "goldenvisas.com": 3
+          }
+        },
+        {
+          "keyword": "cheapest golden visa",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 40,
+          "top_of_page_bid_low_usd": 1.37,
+          "top_of_page_bid_high_usd": 5.78,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "goldenvisas.com": 6,
+            "getgoldenvisa.com": 9
+          }
+        },
+        {
+          "keyword": "golden visa real estate",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 10,
+          "top_of_page_bid_low_usd": 0.96,
+          "top_of_page_bid_high_usd": 4.98,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "real estate golden visa",
+          "avg_monthly_searches_us": 140,
+          "competition": "MEDIUM",
+          "competition_index": 40,
+          "top_of_page_bid_low_usd": 1.87,
+          "top_of_page_bid_high_usd": 7.26,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "goldenvisas.com": 3
+          }
+        },
+        {
+          "keyword": "golden visa cost",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 22,
+          "top_of_page_bid_low_usd": 1.4,
+          "top_of_page_bid_high_usd": 5.77,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": []
+    },
+    "citizenship_flag": {
+      "buyer_intent_score": 2,
+      "policy_note": "POLICY-RISKY \u2014 LP sells residency, not citizenship; ad copy must never promise passport/citizenship; v2 'passport' negative currently blocks part of this",
+      "cluster_total_us_monthly_deduped": 14730,
+      "priority_index": 29460,
+      "keywords": [
+        {
+          "keyword": "citizenship by investment",
+          "avg_monthly_searches_us": 2400,
+          "competition": "MEDIUM",
+          "competition_index": 40,
+          "top_of_page_bid_low_usd": 1.06,
+          "top_of_page_bid_high_usd": 5.1,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 9,
+            "getgoldenvisa.com": 18,
+            "immigrantinvest.com": 8,
+            "nomadcapitalist.com": 30
+          }
+        },
+        {
+          "keyword": "citizenship by investment programs",
+          "avg_monthly_searches_us": 1300,
+          "competition": "LOW",
+          "competition_index": 7,
+          "top_of_page_bid_low_usd": 1.49,
+          "top_of_page_bid_high_usd": 8.26,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "second passport",
+          "avg_monthly_searches_us": 590,
+          "competition": "MEDIUM",
+          "competition_index": 37,
+          "top_of_page_bid_low_usd": 2.22,
+          "top_of_page_bid_high_usd": 9.43,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 11
+          }
+        },
+        {
+          "keyword": "second citizenship",
+          "avg_monthly_searches_us": 2900,
+          "competition": "LOW",
+          "competition_index": 2,
+          "top_of_page_bid_low_usd": 1.24,
+          "top_of_page_bid_high_usd": 5.71,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "golden passport",
+          "avg_monthly_searches_us": 5400,
+          "competition": "LOW",
+          "competition_index": 24,
+          "top_of_page_bid_low_usd": 1.41,
+          "top_of_page_bid_high_usd": 7.93,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama citizenship",
+          "avg_monthly_searches_us": 590,
+          "competition": "LOW",
+          "competition_index": 19,
+          "top_of_page_bid_low_usd": 0.53,
+          "top_of_page_bid_high_usd": 4.44,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 2,
+            "henleyglobal.com": 7,
+            "goldenvisas.com": 38,
+            "getgoldenvisa.com": 20,
+            "nomadcapitalist.com": 31
+          }
+        },
+        {
+          "keyword": "panama citizenship by investment",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 48,
+          "top_of_page_bid_low_usd": 1.96,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 4,
+            "panamasovereign.com": 19,
+            "goldenvisas.com": 11
+          }
+        },
+        {
+          "keyword": "panama passport",
+          "avg_monthly_searches_us": 720,
+          "competition": "LOW",
+          "competition_index": 1,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 6,
+            "goldenvisas.com": 47,
+            "getgoldenvisa.com": 10,
+            "immigrantinvest.com": 48,
+            "nomadcapitalist.com": 17
+          }
+        },
+        {
+          "keyword": "panama passport by investment",
+          "avg_monthly_searches_us": 20,
+          "competition": "MEDIUM",
+          "competition_index": 56,
+          "top_of_page_bid_low_usd": 1.18,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama dual citizenship",
+          "avg_monthly_searches_us": 210,
+          "competition": "LOW",
+          "competition_index": 16,
+          "top_of_page_bid_low_usd": 1.08,
+          "top_of_page_bid_high_usd": 5.66,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 3,
+            "goldenvisas.com": 20
+          }
+        },
+        {
+          "keyword": "cheapest citizenship by investment",
+          "avg_monthly_searches_us": 390,
+          "competition": "MEDIUM",
+          "competition_index": 40,
+          "top_of_page_bid_low_usd": 0.94,
+          "top_of_page_bid_high_usd": 3.67,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 15,
+            "getgoldenvisa.com": 11,
+            "immigrantinvest.com": 6,
+            "nomadcapitalist.com": 39
+          }
+        }
+      ],
+      "variant_pools": []
+    },
+    "panama_program": {
+      "buyer_intent_score": 5,
+      "policy_note": "SAFE \u2014 program/residency wording only",
+      "cluster_total_us_monthly_deduped": 2390,
+      "priority_index": 11950,
+      "keywords": [
+        {
+          "keyword": "panama qualified investor program",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama qualified investor visa",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama golden visa",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 63,
+          "top_of_page_bid_low_usd": 1.74,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 3,
+            "panamasovereign.com": 10,
+            "goldenvisas.com": 4
+          }
+        },
+        {
+          "keyword": "panama residency by investment",
+          "avg_monthly_searches_us": 50,
+          "competition": "MEDIUM",
+          "competition_index": 47,
+          "top_of_page_bid_low_usd": 2.44,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama residency by investment program",
+          "avg_monthly_searches_us": 70,
+          "competition": "LOW",
+          "competition_index": 14,
+          "top_of_page_bid_low_usd": 5.81,
+          "top_of_page_bid_high_usd": 10.96,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 9
+          }
+        },
+        {
+          "keyword": "panama investor visa",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama investment visa",
+          "avg_monthly_searches_us": 40,
+          "competition": "HIGH",
+          "competition_index": 77,
+          "top_of_page_bid_low_usd": 1.77,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama permanent residency",
+          "avg_monthly_searches_us": 170,
+          "competition": "MEDIUM",
+          "competition_index": 44,
+          "top_of_page_bid_low_usd": 0.93,
+          "top_of_page_bid_high_usd": 2.83,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 9,
+            "panamasovereign.com": 29,
+            "goldenvisas.com": 12
+          }
+        },
+        {
+          "keyword": "panama permanent residency by investment",
+          "avg_monthly_searches_us": 10,
+          "competition": "HIGH",
+          "competition_index": 69,
+          "top_of_page_bid_low_usd": 1.49,
+          "top_of_page_bid_high_usd": 6.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama residency",
+          "avg_monthly_searches_us": 260,
+          "competition": "MEDIUM",
+          "competition_index": 51,
+          "top_of_page_bid_low_usd": 0.87,
+          "top_of_page_bid_high_usd": 2.7,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 21,
+            "henleyglobal.com": 5,
+            "goldenvisas.com": 17,
+            "getgoldenvisa.com": 35
+          }
+        },
+        {
+          "keyword": "panama residency requirements",
+          "avg_monthly_searches_us": 320,
+          "competition": "MEDIUM",
+          "competition_index": 52,
+          "top_of_page_bid_low_usd": 0.71,
+          "top_of_page_bid_high_usd": 2.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 16,
+            "panamasovereign.com": 21,
+            "henleyglobal.com": 8,
+            "getgoldenvisa.com": 39,
+            "nomadcapitalist.com": 25
+          }
+        },
+        {
+          "keyword": "panama residency visa",
+          "avg_monthly_searches_us": 90,
+          "competition": "MEDIUM",
+          "competition_index": 49,
+          "top_of_page_bid_low_usd": 0.8,
+          "top_of_page_bid_high_usd": 2.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 23
+          }
+        },
+        {
+          "keyword": "residency visa panama",
+          "avg_monthly_searches_us": 90,
+          "competition": "MEDIUM",
+          "competition_index": 49,
+          "top_of_page_bid_low_usd": 0.8,
+          "top_of_page_bid_high_usd": 2.5,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama residency for americans",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama residency program",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 26,
+          "top_of_page_bid_low_usd": 0.64,
+          "top_of_page_bid_high_usd": 4.61,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "how to get residency in panama",
+          "avg_monthly_searches_us": 90,
+          "competition": "MEDIUM",
+          "competition_index": 51,
+          "top_of_page_bid_low_usd": 1.06,
+          "top_of_page_bid_high_usd": 3.25,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 20
+          }
+        },
+        {
+          "keyword": "panama residency cost",
+          "avg_monthly_searches_us": 10,
+          "competition": "HIGH",
+          "competition_index": 86,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama immigration lawyer",
+          "avg_monthly_searches_us": 70,
+          "competition": "MEDIUM",
+          "competition_index": 46,
+          "top_of_page_bid_low_usd": 2.93,
+          "top_of_page_bid_high_usd": 7.85,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 4
+          }
+        },
+        {
+          "keyword": "panama immigration lawyers",
+          "avg_monthly_searches_us": 210,
+          "competition": "MEDIUM",
+          "competition_index": 53,
+          "top_of_page_bid_low_usd": 3.06,
+          "top_of_page_bid_high_usd": 8.8,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 4
+          }
+        },
+        {
+          "keyword": "immigrate to panama from us",
+          "avg_monthly_searches_us": 50,
+          "competition": "MEDIUM",
+          "competition_index": 60,
+          "top_of_page_bid_low_usd": 0.53,
+          "top_of_page_bid_high_usd": 2.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 22
+          }
+        },
+        {
+          "keyword": "panama visa for us citizens",
+          "avg_monthly_searches_us": 720,
+          "competition": "LOW",
+          "competition_index": 14,
+          "top_of_page_bid_low_usd": 0.07,
+          "top_of_page_bid_high_usd": 2.0,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 10,
+            "panamasovereign.com": 60,
+            "nomadcapitalist.com": 70
+          }
+        }
+      ],
+      "variant_pools": [
+        [
+          "panama investor visa",
+          "panama qualified investor program",
+          "panama qualified investor visa",
+          "panama residency for americans"
+        ],
+        [
+          "panama residency visa",
+          "residency visa panama"
+        ]
+      ]
+    },
+    "friendly_nations": {
+      "buyer_intent_score": 4,
+      "policy_note": "SAFE \u2014 named Panama program; NOTE: FNV is the $200K/employment route, not QIP; LP must bridge",
+      "cluster_total_us_monthly_deduped": 1330,
+      "priority_index": 5320,
+      "keywords": [
+        {
+          "keyword": "panama friendly nations visa",
+          "avg_monthly_searches_us": 880,
+          "competition": "LOW",
+          "competition_index": 18,
+          "top_of_page_bid_low_usd": 0.5,
+          "top_of_page_bid_high_usd": 1.51,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 11,
+            "panamasovereign.com": 6,
+            "nomadcapitalist.com": 24
+          }
+        },
+        {
+          "keyword": "friendly nations visa",
+          "avg_monthly_searches_us": 390,
+          "competition": "LOW",
+          "competition_index": 22,
+          "top_of_page_bid_low_usd": 0.25,
+          "top_of_page_bid_high_usd": 0.94,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "panamasovereign.com": 5
+          }
+        },
+        {
+          "keyword": "panama friendly nations visa requirements",
+          "avg_monthly_searches_us": 40,
+          "competition": "MEDIUM",
+          "competition_index": 34,
+          "top_of_page_bid_low_usd": 0.48,
+          "top_of_page_bid_high_usd": 1.44,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "friendly nations visa panama requirements",
+          "avg_monthly_searches_us": 20,
+          "competition": "MEDIUM",
+          "competition_index": 33,
+          "top_of_page_bid_low_usd": 0.45,
+          "top_of_page_bid_high_usd": 1.48,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": []
+    },
+    "rbi_generic": {
+      "buyer_intent_score": 4,
+      "policy_note": "SAFE \u2014 category generic",
+      "cluster_total_us_monthly_deduped": 820,
+      "priority_index": 3280,
+      "keywords": [
+        {
+          "keyword": "residency by investment",
+          "avg_monthly_searches_us": null,
+          "note": "folded into close variant",
+          "counted": false
+        },
+        {
+          "keyword": "residency by investment programs",
+          "avg_monthly_searches_us": 320,
+          "competition": "LOW",
+          "competition_index": 24,
+          "top_of_page_bid_low_usd": 3.15,
+          "top_of_page_bid_high_usd": 9.13,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "residence by investment",
+          "avg_monthly_searches_us": 260,
+          "competition": "LOW",
+          "competition_index": 27,
+          "top_of_page_bid_low_usd": 2.04,
+          "top_of_page_bid_high_usd": 6.92,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 2,
+            "goldenvisas.com": 7,
+            "getgoldenvisa.com": 76,
+            "immigrantinvest.com": 4
+          }
+        },
+        {
+          "keyword": "best residency by investment",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "permanent residency by investment",
+          "avg_monthly_searches_us": 70,
+          "competition": "MEDIUM",
+          "competition_index": 48,
+          "top_of_page_bid_low_usd": 1.67,
+          "top_of_page_bid_high_usd": 4.07,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "residency by investment countries",
+          "avg_monthly_searches_us": 140,
+          "competition": "MEDIUM",
+          "competition_index": 57,
+          "top_of_page_bid_low_usd": 1.26,
+          "top_of_page_bid_high_usd": 5.16,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "goldenvisas.com": 3
+          }
+        },
+        {
+          "keyword": "cheapest residency by investment",
+          "avg_monthly_searches_us": 30,
+          "competition": "MEDIUM",
+          "competition_index": 54,
+          "top_of_page_bid_low_usd": 1.34,
+          "top_of_page_bid_high_usd": 3.41,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": []
+    },
+    "investor_visa_generic": {
+      "buyer_intent_score": 2,
+      "policy_note": "CAUTION \u2014 direction-ambiguous: most 'investment visa' US searches mean EB-5 INTO the US",
+      "cluster_total_us_monthly_deduped": 790,
+      "priority_index": 1580,
+      "keywords": [
+        {
+          "keyword": "investor visa",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "investment visa",
+          "avg_monthly_searches_us": 720,
+          "competition": "LOW",
+          "competition_index": 23,
+          "top_of_page_bid_low_usd": 1.83,
+          "top_of_page_bid_high_usd": 7.74,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "henleyglobal.com": 6,
+            "goldenvisas.com": 31,
+            "getgoldenvisa.com": 52,
+            "immigrantinvest.com": 54
+          }
+        },
+        {
+          "keyword": "investor residency",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "investment residency",
+          "avg_monthly_searches_us": 260,
+          "competition": "LOW",
+          "competition_index": 27,
+          "top_of_page_bid_low_usd": 2.04,
+          "top_of_page_bid_high_usd": 6.92,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "countries with investment visa",
+          "avg_monthly_searches_us": 50,
+          "competition": "MEDIUM",
+          "competition_index": 54,
+          "top_of_page_bid_low_usd": 0.72,
+          "top_of_page_bid_high_usd": 5.57,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "real estate investment visa",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 3,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "property investment visa",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 3,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": [
+        [
+          "investor residency",
+          "investor visa"
+        ],
+        [
+          "property investment visa",
+          "real estate investment visa"
+        ]
+      ]
+    },
+    "second_residency": {
+      "buyer_intent_score": 3,
+      "policy_note": "SAFE but near-zero US volume",
+      "cluster_total_us_monthly_deduped": 240,
+      "priority_index": 720,
+      "keywords": [
+        {
+          "keyword": "second residency",
+          "avg_monthly_searches_us": 40,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "second residency program",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "second residence",
+          "avg_monthly_searches_us": 170,
+          "competition": "LOW",
+          "competition_index": 1,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "plan b residency",
+          "avg_monthly_searches_us": 10,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "plan b citizenship",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 1,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "backup residency",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": [
+        [
+          "backup residency",
+          "second residency program"
+        ]
+      ]
+    },
+    "tax": {
+      "buyer_intent_score": 2,
+      "policy_note": "CAUTION \u2014 tax-benefit claims restricted in ads; near-zero volume anyway",
+      "cluster_total_us_monthly_deduped": 150,
+      "priority_index": 300,
+      "keywords": [
+        {
+          "keyword": "territorial tax countries",
+          "avg_monthly_searches_us": 70,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama tax residency",
+          "avg_monthly_searches_us": 10,
+          "competition": "LOW",
+          "competition_index": 18,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "tax residency panama",
+          "avg_monthly_searches_us": 10,
+          "competition": "LOW",
+          "competition_index": 14,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama taxes for expats",
+          "avg_monthly_searches_us": 40,
+          "competition": "LOW",
+          "competition_index": 22,
+          "top_of_page_bid_low_usd": 0.02,
+          "top_of_page_bid_high_usd": 2.5,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "countries with no tax on foreign income",
+          "avg_monthly_searches_us": 20,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "no tax on foreign income",
+          "avg_monthly_searches_us": 10,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "best tax residency countries",
+          "avg_monthly_searches_us": 10,
+          "competition": "LOW",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        },
+        {
+          "keyword": "panama territorial tax",
+          "avg_monthly_searches_us": 0,
+          "competition": "UNSPECIFIED",
+          "competition_index": 0,
+          "top_of_page_bid_low_usd": null,
+          "top_of_page_bid_high_usd": null,
+          "counted_in_cluster_total": false,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": [
+        [
+          "best tax residency countries",
+          "no tax on foreign income"
+        ]
+      ]
+    },
+    "retirement_excluded": {
+      "buyer_intent_score": 0,
+      "policy_note": "EXCLUDED \u2014 pensionado searchers are not QIP buyers ($300K threshold mismatch)",
+      "cluster_total_us_monthly_deduped": 4780,
+      "priority_index": 0,
+      "keywords": [
+        {
+          "keyword": "panama retirement visa",
+          "avg_monthly_searches_us": 1300,
+          "competition": "LOW",
+          "competition_index": 12,
+          "top_of_page_bid_low_usd": 0.31,
+          "top_of_page_bid_high_usd": 1.2,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 3,
+            "panamasovereign.com": 29
+          }
+        },
+        {
+          "keyword": "panama pensionado visa",
+          "avg_monthly_searches_us": 880,
+          "competition": "LOW",
+          "competition_index": 10,
+          "top_of_page_bid_low_usd": 0.53,
+          "top_of_page_bid_high_usd": 1.65,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 5,
+            "panamasovereign.com": 32
+          }
+        },
+        {
+          "keyword": "pensionado visa panama",
+          "avg_monthly_searches_us": 1000,
+          "competition": "LOW",
+          "competition_index": 14,
+          "top_of_page_bid_low_usd": 0.36,
+          "top_of_page_bid_high_usd": 1.73,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {
+            "kraemerlaw.com": 4,
+            "panamasovereign.com": 26
+          }
+        },
+        {
+          "keyword": "retiring to panama",
+          "avg_monthly_searches_us": 1600,
+          "competition": "LOW",
+          "competition_index": 25,
+          "top_of_page_bid_low_usd": 0.03,
+          "top_of_page_bid_high_usd": 2.31,
+          "counted_in_cluster_total": true,
+          "competitors_ranking": {}
+        }
+      ],
+      "variant_pools": []
+    }
+  }
+}

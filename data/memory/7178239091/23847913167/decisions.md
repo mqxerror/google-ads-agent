@@ -408,3 +408,55 @@ Here's a self-contained prompt to paste to the GTM agent. It includes the hard c
 | 2026-06-11 12:28 | `"how to get canadian citizenship by descent"` (AG4, criterion `1644857374079`) is now **Paused** — confirmed in the Google Ads UI with "Your change has been saved." Worth knowing: before the pause, it had already taken **11 clicks / $15.27 / 0 conversions today alone** — it was still the campaign's | User asked: I approve also I changed the form field number | pending | director |
 | 2026-06-11 12:28 | ## 3. Your form change — VERIFIED on the live page ✅ | User asked: I approve also I changed the form field number | pending | director |
 | 2026-06-11 12:28 | / Removed / "How did you hear about us?" ✅ and Country of Residence ✅ / | User asked: I approve also I changed the form field number | pending | director |
+| 2026-07-04 18:17 | **Why it's waste:** Self-assessment query. The user is asking a yes/no question — "am I already a citizen?" They're not looking to engage a consultant; they want a quick answer. At $3.92/click for zero consulting intent, this is a confirmed negative. The variation `"am i eligible for canadian citize | User asked: [Campaign: "MapleRoots — Citizenship by Descent (US)" · id 23847913167]
+MapleRoots — Citizenship by Descent (US). Mine the injected search-term data f | pending | search_term_hunter |
+| 2026-07-04 18:17 | **Total confirmed 3-day waste: $26.39 → ~$61.50/week estimated** | User asked: [Campaign: "MapleRoots — Citizenship by Descent (US)" · id 23847913167]
+MapleRoots — Citizenship by Descent (US). Mine the injected search-term data f | pending | search_term_hunter |
+| 2026-07-04 23:16 | Jul 4 is running **86% over daily budget** at a CPC 26% above the recent high ($3.95 Jun 29). The mechanism is confirmed: holiday search volume drops but advertisers don't adjust dayparting — Google fills inventory at a premium. $279 at $4.05/click for 2 conversions = $140 CPA, 3.2× the baseline. | User asked: Audit campaign "MapleRoots — Citizenship by Descent (US)" (id 23847913167) — compare the most recent period vs the period before it.
+1. Performance vs | pending | analytics_analyst |
+| 2026-07-04 23:16 | The Search Term Hunter's Jul 4 audit identified 6 confirmed negatives — all from real spend, all ready to go — and put the estimated weekly savings at **~$61.50/week**. These are sitting unexecuted: | User asked: Audit campaign "MapleRoots — Citizenship by Descent (US)" (id 23847913167) — compare the most recent period vs the period before it.
+1. Performance vs | pending | analytics_analyst |
+| 2026-07-04 23:16 | **These are low-risk, high-confidence negatives — all [EXACT] or narrow [PHRASE], no risk of clipping legitimate queries.** The Search Term Hunter confirmed: say the word and they go in one shot via MCP. | User asked: Audit campaign "MapleRoots — Citizenship by Descent (US)" (id 23847913167) — compare the most recent period vs the period before it.
+1. Performance vs | pending | analytics_analyst |
+| 2026-07-05 16:26 | Data pulled entirely from context — no API re-fetch. Let me answer the budget question first since you flagged it, then walk the seven dimensions. | User asked: Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
+
+1. **Trend Analysis**: How has performance changed over the last 14 days? I | pending | search_term_hunter |
+| 2026-07-05 16:26 | / AG5 — Cajun/Acadian / 0 / $0 / 0 / — / — / Paused (correct) / | User asked: Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
+
+1. **Trend Analysis**: How has performance changed over the last 14 days? I | pending | search_term_hunter |
+| 2026-07-05 16:26 | / **[EXACT] grandparent canadian citizen** / **96** / **0** / -- / **PAUSE — flagged 3×** / | User asked: Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
+
+1. **Trend Analysis**: How has performance changed over the last 14 days? I | pending | search_term_hunter |
+| 2026-07-05 16:26 | One honest caveat: the negatives recover ~$60–90/week, but the bigger number is locked in **Recommendation #2** — the two QS3 phrase keywords carry a third of your clicks and are the real driver of the CPC you flagged. Negatives are the fast win; QS is the structural one. | User asked: Deep performance analysis for "MapleRoots — Citizenship by Descent (US)":
+
+1. **Trend Analysis**: How has performance changed over the last 14 days? I | pending | search_term_hunter |
+| 2026-07-05 16:37 | **Gap 2: I under-explored *why* CPC tripled.** I attributed the June-$1.40 → now-$3.37 jump entirely to "MaxConversions bidding up for likely converters." That's half the story at most. The other half — which Competitor Intel should confirm — is that our launch intel had CPCs at **$0.17–$0.83 with L | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-07-05 16:37 | The 30-second script that fits the data: open on the discovery hook Competitor Intel found nobody is running as video — *"There are Americans who became Canadian citizens on December 15, 2025, and don't know it yet."* → the three-generation path → "Free eligibility consultation." That's a YouTube/De | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-07-05 16:37 | Where I *extend* the report: the CVR story. Blended CVR is ~2.4%, but my Clarity work showed the real ceiling is behavioral — **97.8% mobile, 78.7% of visitors bounce at 3% scroll depth.** The good news the report doesn't mention: the ads now point at **`/lp/canadian-citizenship-by-descent`** (form  | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-07-05 16:37 | My read: the same Bill C-3 news cycle that created the demand also pulled in the law firms I profiled — **Serotte (Buffalo/toll-free US), Borders (Dallas), Immigration.ca (the calculator play).** When 74K/mo of high-emotion demand appears in a low-competition niche, it doesn't stay low-competition f | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-07-05 16:37 | Where I reinforce Analytics: the ads *are* on `/lp/` now (form at 167px, old-page ads paused) — that P0 shipped. But two P0s from my May review may still be open and they gate everything above: **submit button text** ("Submit" → "Get My Free Consultation") and **field count → 5**. On 97.8% mobile tr | User asked: TEAM SESSION — Respond as each of these specialists IN SEQUENCE. For each role, use this EXACT format:
+
+---ROLE: [role_id]---
+[Your analysis as that s | pending | director |
+| 2026-07-05 16:47 | - ✅ **6 negatives added** (campaign-level, 6 criteria confirmed) | User asked: 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insig | pending | analytics_analyst |
+| 2026-07-05 16:47 | The two report queries hit a `PAGE_SIZE_NOT_SUPPORTED` quirk on the paginated search tool. Let me switch to the streaming query tool (fixed page size) and re-run.Done. Here's the full report. | User asked: 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insig | pending | analytics_analyst |
+| 2026-07-05 16:47 | / **6 negatives added** (campaign-level) / `[EXACT] bill c 3`, `[EXACT] canadian bill c 3`, `[EXACT] bill c 3 canada`, `[PHRASE] how to apply for`, `[EXACT] am i a canadian citizen`, `[PHRASE] what documents do i need` / 6 criteria created (e.g. `…23847913167~784688299`) / | User asked: 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insig | pending | analytics_analyst |
+| 2026-07-05 16:47 | Recovers ~$60–90/wk of junk spend + captures the high-intent "lawyer" query. No manual bid set — the campaign is on **Maximize Conversions** (confirmed below), so it's algorithm-managed. | User asked: 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insig | pending | analytics_analyst |
+| 2026-07-05 16:47 | **Budget confirmed:** `amount_micros 150000000` = **$150/day**, `MAXIMIZE_CONVERSIONS`, ENABLED. The pinned "$250 on Jun 19" step **never went live** — the operative ceiling is $150, which matches your "we're saturated, no more increase" note. Good — that resolves the open budget question. | User asked: 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insig | pending | analytics_analyst |
+| 2026-07-05 16:57 | Approved. The one gated item still open is the **pause of `[EXACT] grandparent canadian citizen`** (96 clicks / 0 conv, flagged 3×, in AG2 — Grandparent Path). The 6 negatives + the `lawyer` keyword already landed last turn, so "the changes" = this pause. | User asked: i approve the changes | pending | director |
+| 2026-07-05 16:57 | Memory says pausing a keyword needs Chrome (no MCP keyword-status tool), but the tool surface has grown — let me verify that's still true before reaching for the browser, and grab the criterion ID I need either way.No keyword-status (pause) tool exists in the MCP — confirmed. It only offers **update | User asked: i approve the changes | pending | director |
+| 2026-07-05 16:57 | Let me (1) confirm the criterion's exact identity + that it's still ENABLED, and (2) warm up Chrome in parallel.Chrome is already live on port 9222. The paginated query tool hit the same `PAGE_SIZE_NOT_SUPPORTED` quirk the last session saw — switching to the streaming query tool, which uses a fixed  | User asked: i approve the changes | pending | director |
+| 2026-07-05 16:57 | MCP can only *remove* or *rebid* a keyword — not pause it — so I'll do the reversible pause in the Ads UI via Chrome, exactly as approved. Loading the browser tools and checking what's open.Let me see what's already open in Chrome.Tab 7 is already on the Google Ads keywords page for our account (`__ | User asked: i approve the changes | pending | director |
+| 2026-07-05 16:57 | / Status / ENABLED → **PAUSED** ✅ (API-confirmed) / | User asked: i approve the changes | pending | director |

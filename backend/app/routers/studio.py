@@ -161,6 +161,22 @@ class CostEstimateNullable(BaseModel):
     credits_exact: Optional[float] = None
     error_code: Optional[str] = None
     error_message: Optional[str] = None
+    # Additive: the HiggsfieldError `.code` (auth / cli / run / shape / nsfw)
+    # so the UI can distinguish "not logged in" (auth → login banner) from a
+    # param mismatch. Mirrors error_code today; nullable, unset on success.
+    error_class: Optional[str] = None
+
+
+class AuthStatusResponse(BaseModel):
+    """Cheap pre-flight: is the Higgsfield CLI logged in? Always 200 (never
+    throws) so the FE can gate expensive video runs on a boolean instead of
+    catching a 401. `error_class` carries the HiggsfieldError code when the
+    account check is degraded (auth = logged out; other codes = reachable but
+    unhealthy)."""
+
+    logged_in: bool
+    error_class: Optional[str] = None
+    message: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):
@@ -193,6 +209,8 @@ class CatalogModel(BaseModel):
     cost_text: str
     available: bool = True
     default: bool = False
+    origin: Optional[str] = None       # video only: e.g. 'Google (US)' | 'Kuaishou (CN)'
+    strengths: Optional[str] = None    # video only: one-line model strengths (§10.2)
     constraints: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -329,6 +347,7 @@ async def cost_estimate(body: CostEstimateRequest) -> CostEstimateNullable:
             credits=None, credits_exact=None,
             error_code=e.code or "run",
             error_message=e.message,
+            error_class=e.code or "run",
         )
 
 
@@ -354,6 +373,33 @@ async def get_balance() -> BalanceResponse:
             if k not in ("credits", "email", "subscription_plan_type", "plan")
         },
     )
+
+
+@router.get("/auth-status", response_model=AuthStatusResponse)
+async def auth_status() -> AuthStatusResponse:
+    """Cheap pre-flight for the FE: is Higgsfield logged in? Reuses the same
+    auth-truth path as /balance (`higgsfield account status`) but NEVER throws
+    — always 200 with a boolean so the UI can gate video runs and show a login
+    banner. code=='auth' → logged_in=False; any other HiggsfieldError →
+    reachable-but-degraded (logged_in=True, error_class set)."""
+    client = HiggsfieldClient(timeout_s=15.0)
+    try:
+        await client.get_balance()
+    except HiggsfieldError as e:
+        if e.code == "auth":
+            return AuthStatusResponse(
+                logged_in=False, error_class="auth", message=e.message,
+            )
+        # Reachable but something else is off (cli/run/shape) — treat as
+        # logged-in-but-degraded so we don't nag a login that won't help.
+        return AuthStatusResponse(
+            logged_in=True, error_class=e.code or "run", message=e.message,
+        )
+    except Exception as e:  # never throw from a pre-flight probe
+        return AuthStatusResponse(
+            logged_in=True, error_class="other", message=str(e)[:300],
+        )
+    return AuthStatusResponse(logged_in=True)
 
 
 @router.post("/generate-video", response_model=GenerateVideoResponse)

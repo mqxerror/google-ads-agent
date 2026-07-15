@@ -103,7 +103,29 @@ async def sync_campaigns(account_id: str) -> int:
 
     db = await get_db()
     try:
+        # Snapshot the CURRENT roster values BEFORE the upsert so we can diff
+        # old→new and detect out-of-band ("external") changes (Epic C / C5).
+        # {campaign_id -> {status, bidding_strategy, budget_micros}}. Best-effort:
+        # a snapshot failure must never block the sync.
+        before_rows: dict[str, dict] = {}
+        try:
+            cur = await db.execute(
+                "SELECT campaign_id, status, bidding_strategy, budget_micros "
+                "FROM campaigns WHERE account_id = ?",
+                (account_id,),
+            )
+            for row in await cur.fetchall():
+                before_rows[str(row["campaign_id"])] = {
+                    "status": row["status"],
+                    "bidding_strategy": row["bidding_strategy"],
+                    "budget_micros": row["budget_micros"],
+                }
+        except Exception as _e:  # pragma: no cover — defensive
+            logger.warning("external-change snapshot failed for %s: %s", account_id, _e)
+            before_rows = {}
+
         n = 0
+        after_rows: dict[str, dict] = {}
         for item in live:
             d = item.model_dump() if hasattr(item, "model_dump") else dict(item)
             cid = str(d.get("id") or d.get("campaign_id") or "").strip()
@@ -135,12 +157,29 @@ async def sync_campaigns(account_id: str) -> int:
                     d.get("budget_micros"),
                 ),
             )
+            after_rows[cid] = {
+                "status": d.get("status"),
+                "bidding_strategy": d.get("bidding_strategy"),
+                "budget_micros": d.get("budget_micros"),
+            }
             n += 1
         await db.commit()
         logger.info("Synced %d campaigns for account %s.", n, account_id)
-        return n
     finally:
         await db.close()
+
+    # Detect + record out-of-band changes (Epic C / C5), AFTER the connection is
+    # closed so the diff writer's own connection doesn't contend on the WAL.
+    # Best-effort — external-change detection must never break the roster sync's
+    # contract (it still returns the row count `n` unchanged).
+    try:
+        from app.services import external_change
+
+        await external_change.diff_and_record(account_id, before_rows, after_rows)
+    except Exception as _e:  # pragma: no cover — defensive
+        logger.warning("external-change diff failed for %s: %s", account_id, _e)
+
+    return n
 
 
 # ── Internals ────────────────────────────────────────────────────────

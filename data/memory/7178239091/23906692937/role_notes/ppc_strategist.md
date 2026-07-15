@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-07 20:05
+**Last updated:** 2026-07-04 18:18
 
 **Task:** As the PPC Strategist, design the complete campaign structure:
 
@@ -196,3 +196,10 @@ Two hard ceilings sit above the money:
 - **The honest path:** run the current $100/day, get the first handful of conversions, and I'll give you a budget for a *realistic* target (start with 1/day). A €250K-deal product needs lead *quality*, not 150 leads/month.
 Want me to set a concrete gate — e.g. "if we hit 5 total conversions by Jun 21, I recompute the budget for a 1/day target"? That replaces guesswork with your own data.
 — PPC Strategist
+
+### 2026-07-04 18:18 — [Campaign: "Greece GV — Plan B — Search — US Tier-1" · id 23906692937]
+Greece GV
+
+**Task:** [Campaign: "Greece GV — Plan B — Search — US Tier-1" · id 23906692937]
+Greece GV — Plan B — Search — US Tier-1, $100/day MANUAL_CPC, ~$2,514 spend in 30 days (≈$84/d — check for days it hit or breache
+I have the last 7 days of daily data and keyword click counts in context, but I'm missing keyword-level cost breakdown and the full 30-day daily series needed for the 15d vs 15d split. Fetching those three gaps now in parallel.Running all three data pulls in parallel now.You've hit your session limit · resets 9:40pm (America/Toronto)

@@ -103,6 +103,14 @@ class CreateRSARequest(BaseModel):
     status: str = "PAUSED"  # PAUSED or ENABLED
 
 
+class UpdateAdFinalUrlsRequest(BaseModel):
+    customer_id: str
+    final_urls: list[str]  # New landing page URLs (http/https, non-empty)
+    ad_group_id: str | None = None  # With ad_id, if no ad_resource_name
+    ad_id: str | None = None  # With ad_group_id, if no ad_resource_name
+    ad_resource_name: str | None = None  # customers/{cid}/ads/{ad_id}
+
+
 class UpdateCampaignRequest(BaseModel):
     customer_id: str
     campaign_id: str
@@ -507,6 +515,68 @@ async def create_responsive_search_ad(body: CreateRSARequest):
         )
         ad_rn = response.results[0].resource_name
         return {"status": "ok", "resource_name": ad_rn}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/ad/final-urls")
+async def update_ad_final_urls(body: UpdateAdFinalUrlsRequest):
+    """Update an existing ad's final URLs (landing pages) in place.
+
+    Preserves RSA pins, ad history, and the ad ID — no delete+recreate.
+    Provide either ad_resource_name OR both ad_group_id and ad_id.
+    """
+    _ensure_sdk()
+    client = get_sdk_client().client
+    cid = format_customer_id(body.customer_id)
+
+    from google.ads.googleads.v23.resources.types.ad import Ad
+    from google.ads.googleads.v23.services.types.ad_service import (
+        AdOperation, MutateAdsRequest,
+    )
+    from google.protobuf import field_mask_pb2
+
+    # Validate final URLs
+    if not body.final_urls:
+        raise HTTPException(status_code=400, detail="final_urls must contain at least one URL")
+    cleaned_urls: list[str] = []
+    for url in body.final_urls:
+        if not isinstance(url, str) or not url.strip():
+            raise HTTPException(status_code=400, detail="Each final URL must be a non-empty string")
+        stripped = url.strip()
+        if not (stripped.startswith("http://") or stripped.startswith("https://")):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Final URL must start with http:// or https://: {url!r}",
+            )
+        cleaned_urls.append(stripped)
+
+    # Resolve the ad resource name
+    if body.ad_resource_name:
+        resource_name = body.ad_resource_name
+    elif body.ad_group_id and body.ad_id:
+        resource_name = f"customers/{cid}/ads/{body.ad_id}"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either ad_resource_name, or both ad_group_id and ad_id",
+        )
+
+    ad = Ad()
+    ad.resource_name = resource_name
+    ad.final_urls.extend(cleaned_urls)
+
+    operation = AdOperation()
+    operation.update = ad
+    operation.update_mask = field_mask_pb2.FieldMask(paths=["final_urls"])
+
+    service = client.get_service("AdService")
+    try:
+        response = service.mutate_ads(
+            request=MutateAdsRequest(customer_id=cid, operations=[operation])
+        )
+        await _cache.invalidate(cid)
+        return {"status": "ok", "resource_name": response.results[0].resource_name}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

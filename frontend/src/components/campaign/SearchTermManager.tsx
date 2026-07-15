@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Eye, Ban, Plus, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Eye, Ban, Loader2 } from 'lucide-react';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +43,6 @@ export default function SearchTermManager({ campaignId }: SearchTermManagerProps
   const [applying, setApplying] = useState(false);
   const [days, setDays] = useState(7);
   const [appliedTerms, setAppliedTerms] = useState<Set<string>>(new Set());
-  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['search-terms-analysis', accountId, campaignId, days],
@@ -98,7 +97,6 @@ export default function SearchTermManager({ campaignId }: SearchTermManagerProps
       });
 
       if (!res.ok) throw new Error('Failed to apply negatives');
-      const result = await res.json();
       // Remove applied terms from the UI immediately
       setAppliedTerms((prev) => {
         const next = new Set(prev);

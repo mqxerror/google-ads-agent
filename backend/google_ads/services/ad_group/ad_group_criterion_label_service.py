@@ -308,6 +308,10 @@ def register_ad_group_criterion_label_tools(mcp: FastMCP[Any]) -> None:
             validate_only=validate_only,
         )
 
+        # results is empty under validate_only (and any empty response) — guard
+        # the [0] index so it does not raise IndexError.
+        if not response.results:
+            return "Validated label assignment to criterion (no result returned)"
         result = response.results[0]
         return f"Assigned label to criterion: {result.resource_name}"
 

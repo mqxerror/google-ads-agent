@@ -350,7 +350,7 @@ interface MCPServerCardProps {
 }
 
 function MCPServerCard({
-  name, icon, description, tools, info, enabled, available, reason, alwaysOn, onToggle, children,
+  name, icon, description, tools, enabled, available, reason, alwaysOn, onToggle, children,
 }: MCPServerCardProps) {
   return (
     <div className={cn(

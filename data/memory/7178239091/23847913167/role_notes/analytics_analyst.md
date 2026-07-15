@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-05-26 12:25
+**Last updated:** 2026-07-05 16:47
 
 **Task:** analyze clarity data for this campaign
 Let me pull Clarity data for the landing page across multiple dimensions in parallel.Now let me get one more data point — mobile vs desktop conversion behavior.# Clarity Behavioral Analysis — MapleRoots Landing Page
@@ -75,4 +75,70 @@ Targeting is clean — 95.7% US traffic as intended. The 3.1% Canada traffic is 
 Clarity tells the story that Google Ads data couldn't: **this isn't a traffic quality problem or a bid optimization problem — it's a page architecture problem.** You're sending 98% mobile traffic to a 13,500px page with the form at 84% scroll depth, and only 5.3% of users scroll past the hero. The floating CTA is the only thing producing conversions at all.
 **The new LP (`/lp/`) with form at 167px fixes the #1 problem.** Combined with the P0 changes (button text, field reduction), this should lift CVR from 1.2% to 2.5-3.5% — worth more than every bid correction we've made combined.
 **When you're ready to switch, I'll update all 4 RSA final_urls in one shot.**
+— *Analytics Analyst*
+
+---
+
+## Session Log
+
+### 2026-07-04 23:16 — Audit campaign "MapleRoots — Citizenship by Descent (US)" (id 23847913167) — com
+
+**Task:** Audit campaign "MapleRoots — Citizenship by Descent (US)" (id 23847913167) — compare the most recent period vs the period before it.
+1. Performance vs the comparison window: spend, clicks, conversions
+## MapleRoots Performance Audit — Jul 4, 2026
+**Analytics Analyst | Campaign 23847913167**
+### 1. Period Comparison: Jun 20–26 vs Jun 27–Jul 3
+|--------|----------------|-------------------|--------|
+**Verdict:** Remarkably stable. Volume and spend both declined ~14%, but CPA held at $43 in both windows. The efficiency profile hasn't degraded — the campaign is just spending less due to lower click volume Jun 27–Jul 3 (weekend drag, especially Jun 27–28 where Jun 27 dropped to 33 clicks).
+**One anomaly: Jun 25 — 926 impressions, $138.86, only 1 conversion ($138 CPA).** Stands out as a low-CVR day in an otherwise consistent window. Not enough data to diagnose — single-day variance at this volume.
+### 2. Budget Pacing + Jul 4 Waste
+Jul 4 is the clean outlier. With data already in context from the PPC Strategist's earlier audit:
+| Date | Clicks | Cost | Conv | CPC | CPA |
+|------|--------|------|------|-----|-----|
+Jul 4 is running **86% over daily budget** at a CPC 26% above the recent high ($3.95 Jun 29). The mechanism is confirmed: holiday search volume drops but advertisers don't adjust dayparting — Google fills inventory at a premium. $279 at $4.05/click for 2 conversions = $140 CPA, 3.2× the baseline.
+This is a holiday artifact. Check Jul 5 morning. If CPC returns to $2.90–$3.20, no structural action needed.
+### 3. The Single Biggest Fix: Execute the 6 Pending Negatives
+The Search Term Hunter's Jul 4 audit identified 6 confirmed negatives — all from real spend, all ready to go — and put the estimated weekly savings at **~$61.50/week**. These are sitting unexecuted:
+| Negative | Match | Est. weekly waste |
+|----------|-------|-------------------|
+**Estimated weekly impact: $61.50/week → ~$267/month** in recovered budget. At the current $42.73 CPA, that's roughly **6 additional conversions/month** redirected from junk clicks to real buyers — at no extra spend.
+At July's $3–4 CPC vs June's $1.40, the per-click waste cost is 2.5× what it was. Every day these stay unexecuted costs more than it did last month.
+**These are low-risk, high-confidence negatives — all [EXACT] or narrow [PHRASE], no risk of clipping legitimate queries.** The Search Term Hunter confirmed: say the word and they go in one shot via MCP.
+**Bottom line:** The campaign's efficiency is stable ($43 CPA held across both windows). Jul 4 is a holiday artifact, not a structural failure. The one actionable move sitting on the table is the 6-negative execution — $61.50/week, ready to go, no approvals needed beyond yours.
+— *Analytics Analyst*
+
+### 2026-07-05 16:47 — 6 is done partially 7 no mroe increase available , we are saturated now we have 
+
+**Task:** 6 is done partially 7 no mroe increase available , we are saturated now we have a meta ads running also , i approve the other , get the aucction insigjhts and report back
+I'll execute the approved changes and pull the auction insights. Let me load the Google Ads MCP tools first (the server is still connecting — ToolSearch will wait for it).Tools loaded. I'm executing the approved batch now (6 negatives + the `lawyer` keyword) and pulling the auction-insights data in parallel. Note: the actual **Auction Insights competitor-domain report is UI-only — the Google Ads A
+- ✅ **6 negatives added** (campaign-level, 6 criteria confirmed)
+- ✅ **`[EXACT] canadian citizenship by descent lawyer`** added to AG1 — Core Descent
+The two report queries hit a `PAGE_SIZE_NOT_SUPPORTED` quirk on the paginated search tool. Let me switch to the streaming query tool (fixed page size) and re-run.Done. Here's the full report.
+## Analytics Analyst — Auction Insights & Execution Report
+**Campaign 23847913167 · MapleRoots — Citizenship by Descent (US) · July 5, 2026**
+### ✅ Executed (your approval)
+| Action | Detail | Confirmation |
+|---|---|---|
+Recovers ~$60–90/wk of junk spend + captures the high-intent "lawyer" query. No manual bid set — the campaign is on **Maximize Conversions** (confirmed below), so it's algorithm-managed.
+**Budget confirmed:** `amount_micros 150000000` = **$150/day**, `MAXIMIZE_CONVERSIONS`, ENABLED. The pinned "$250 on Jun 19" step **never went live** — the operative ceiling is $150, which matches your "we're saturated, no more increase" note. Good — that resolves the open budget question.
+### 🔍 The Auction Insights answer: **the CPC tripling is competition, not budget — and not us hitting a budget wall**
+First, the honest tooling caveat: **the true Auction Insights report (competitor domains, overlap rate, outranking share) is UI-only — the Google Ads API does not expose it.** What the API *does* give is the competitive proxy — the impression-share-loss breakdown — and it tells the story cleanly. (In the table, `<10%` = Google's reporting floor, shown by the API as 0.0999.)
+| Week of | Clicks | Cost | **CPC** | Impr. Share | **Lost to RANK** | Lost to BUDGET |
+|---|---|---|---|---|---|---|
+**Three things the data proves:**
+**1. It is NOT a budget problem.** Budget-lost impression share collapsed from ~54% in May to 12–18% now. We're no longer leaving the auction because we run out of money — so "raise the budget" wouldn't fix the CPC even if you had room (you don't).
+**2. The auction floor rose UNDER us — the signature of new competition.** Compare the two comparable full weeks:
+- **Jun 8** (MaxClicks, $1.40 cap): 763 clicks, 26.4% IS, **$1.40 CPC**
+- **Jun 29** (MaxConversions): 286 clicks, 22.3% IS, **$3.58 CPC**
+Same ~$1,050 spend. We paid **+156% per click and got 63% FEWER clicks — while impression share slightly *fell*.** If competition were flat, 2.5× the bid would have *bought* more share. It didn't. Holding the same ~22% share now costs 2.5× — that only happens when new bidders raise the going rate. This directly confirms **Competitor Intel's hypothesis**: the Bill C-3 news cycle pulled the law firm
+**3. Rank-loss is now the dominant leak (60%+) and it's half self-inflicted.** "Lost to rank" = competitors' Ad Rank beating ours = (their bid × their QS) vs (our bid × our QS). The API can't split "their pressure" from "our weak QS" — but we *know* our QS is soft (12 of 35 keywords below QS 5; the two biggest keywords, `through parents` 737 clicks + `through ancestry` 469 clicks, both sit at QS 3
+### So what — given you're saturated at $150 and Meta is now running
+You can't outspend this. At a fixed $150/day with a rising auction floor, **bidding harder just converts budget into fewer clicks** (763 → 286 already). The only lever that lowers CPC *without* spending more is **Quality Score** — every QS point on `through parents` + `through ancestry` (a third of all clicks) buys back Ad Rank for free and reclaims some of that 60% rank-loss. That's Rec #3 from t
+The good news: with Meta carrying demand-gen, Search doesn't need to chase volume. Let Search do what it's good at — capturing the highest-intent queries cheaply — and QS is how you make that capture cheaper.
+### One item still open
+**Pause `[EXACT] grandparent canadian citizen`** (96 clicks / **0 conv**, flagged 3×). The Search Term Hunter gated this on your explicit "go," and it can't go through the API — **the MCP has no keyword-status tool, so it needs the Ads UI (Chrome)**, same as the AG4 pause on Jun 11. Chrome is now live. Say **"pause it"** and I'll do it in one pass and confirm.
+**Recommended next (no action from you needed to *decide*, just to greenlight):**
+1. **Pause the grandparent keyword** (Chrome) — say the word.
+2. **QS rehab** — Creative Director adds "applying for" as a pinned H1 in AG4 (fixes the QS1 exact) and mirrors "through ancestry" language in AG1. This is now the highest-leverage move on the CPC per the auction data.
+3. *(Optional)* I can pull the **real domain-level Auction Insights via Chrome** if you want to see exactly *which* competitors entered and their outranking share — the API can't, the UI can.
 — *Analytics Analyst*

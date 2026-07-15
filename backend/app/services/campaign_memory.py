@@ -26,6 +26,34 @@ logger = logging.getLogger(__name__)
 
 _MEMORY_ROOT = settings.MEMORY_DIR
 
+# WS3 — findings freshness guard. Role notes older than this are labelled STALE
+# in assembled context so a persona re-verifies (live pull/fetch) before acting
+# on a past state. CONSERVATIVE first-cut window — tune here.
+ROLE_NOTES_STALE_DAYS = 7
+
+# Matches the exact header save_role_notes/append_role_notes write:
+#   **Last updated:** YYYY-MM-DD HH:MM
+_LAST_UPDATED_RE = re.compile(r'\*\*Last updated:\*\* (\d{4}-\d{2}-\d{2} \d{2}:\d{2})')
+
+
+def role_notes_age_days(body: str) -> tuple[int | None, str | None]:
+    """Age (in days) of a role-notes body from its `**Last updated:**` header.
+
+    Returns (age_days, date_str). age_days is None when the header is missing or
+    unparseable; date_str is the raw matched timestamp (or None). Uses
+    datetime.now() so it tracks local time like the writers do.
+    """
+    m = _LAST_UPDATED_RE.search(body or "")
+    if not m:
+        return None, None
+    date_str = m.group(1)
+    try:
+        ts = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+    except ValueError:
+        return None, date_str
+    age = (datetime.now() - ts).days
+    return (age if age >= 0 else 0), date_str
+
 
 def _dir_has_real_content(d: Path) -> bool:
     """True if a memory dir holds actual logged work (not just seed skeletons).
@@ -605,11 +633,24 @@ def build_campaign_context(
             role_id = role_file.stem
             notes = role_file.read_text(encoding="utf-8")
             if notes and len(notes) > 50:
+                # WS3 — flag stale findings so a persona re-verifies before acting.
+                age_days, date_str = role_notes_age_days(notes)
+                stale_prefix = ""
+                if age_days is None:
+                    stale_prefix = (
+                        f"⚠️ STALE (>{ROLE_NOTES_STALE_DAYS}d old, last updated unknown) "
+                        "— RE-VERIFY before acting\n"
+                    )
+                elif age_days > ROLE_NOTES_STALE_DAYS:
+                    stale_prefix = (
+                        f"⚠️ STALE (>{ROLE_NOTES_STALE_DAYS}d old, last updated {date_str}) "
+                        "— RE-VERIFY before acting\n"
+                    )
                 if role_id == active_role:
-                    parts.append(f"=== YOUR PREVIOUS FINDINGS — CONTINUE FROM HERE ===\n{notes}")
+                    parts.append(f"{stale_prefix}=== YOUR PREVIOUS FINDINGS — CONTINUE FROM HERE ===\n{notes}")
                 else:
                     label = role_id.replace('_', ' ').upper()
-                    parts.append(f"=== FINDINGS FROM {label} ===\n{notes}")
+                    parts.append(f"{stale_prefix}=== FINDINGS FROM {label} ===\n{notes}")
 
     # Account-wide insights
     account_mem = load_account_memory(account_id)

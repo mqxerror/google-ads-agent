@@ -64,6 +64,44 @@ class Settings(BaseSettings):
     AGENT_MAX_CONTINUATIONS: int = 5        # auto-resume cycles if 200 isn't enough (up to 1000 total)
     AGENT_MAX_TOTAL_COST_USD: float = 25.0  # cost safety cap (env: AGENT_MAX_TOTAL_COST_USD)
 
+    # Workflow orchestrator (Team Audit)
+    WORKFLOW_MAX_COST_USD: float = 50.0   # per-run cost cap — degrades to synthesis, never hard-fails
+    WORKFLOW_MAX_CAMPAIGNS: int = 5       # account-wide mode: campaigns per run (highest recent spend first; excluded ones are named in the report)
+    # Runner reliability (Story 13.2). A run executes in a detached background
+    # task decoupled from the SSE stream; a client disconnect no longer cancels
+    # it. The sweeper marks any run still 'running' whose updated_at is older
+    # than WORKFLOW_MAX_RUNTIME_MINUTES * WORKFLOW_STALE_MULTIPLIER as failed —
+    # this reaps orphaned zombies (e.g. from the pre-fix in-stream execution).
+    WORKFLOW_MAX_RUNTIME_MINUTES: int = 20   # a generous ceiling for one full audit
+    WORKFLOW_STALE_MULTIPLIER: float = 2.0   # sweep threshold = runtime * this
+    WORKFLOW_SWEEP_INTERVAL_MINUTES: int = 10  # periodic zombie sweep cadence
+
+    # Chat Orchestration v2 (Epic 1+). The turn runner executes each chat turn
+    # in a detached background task decoupled from the SSE viewer (mirrors the
+    # workflow runner). These caps bound an orchestrated turn; the sweeper marks
+    # any chat_turn still 'running' past CHAT_ORCH_MAX_RUNTIME_MIN *
+    # CHAT_ORCH_STALE_MULTIPLIER as stale so a restart shows honest state.
+    CHAT_ORCH_MAX_COST_USD: float = 5.0        # per-turn orchestration cost cap
+    CHAT_ORCH_MAX_RUNTIME_MIN: float = 6.0     # per-turn wall-clock ceiling
+    CHAT_ORCH_MAX_SPECIALISTS: int = 3         # max parallel specialists per turn
+    CHAT_ORCH_STALE_MULTIPLIER: float = 2.0    # zombie-sweep threshold = runtime * this
+    CHAT_ORCH_SWEEP_INTERVAL_MINUTES: float = 5.0  # periodic chat-turn zombie sweep cadence
+    CHAT_TURN_EVENT_FLUSH_COUNT: int = 20      # batch flush to chat_turn_events every N events
+    CHAT_TURN_EVENT_FLUSH_MS: int = 500        # …or every this many ms, whichever first
+    AGENT_STREAM_PARTIAL_MESSAGES: bool = False  # token-level streaming previews (story 1.4); requires a CLI that supports --include-partial-messages
+
+    # Account report staleness (Story 13.2). The homepage shows "audited Nh ago"
+    # and flags the report stale past this age so the operator knows to re-run.
+    ACCOUNT_REPORT_STALE_HOURS: float = 24.0
+
+    # Fast-signals lane (Story 13.2) — deterministic, always-fresh thresholds.
+    # Budget pacing: flag a campaign whose day-so-far spend projects to exceed
+    # its daily budget by this ratio (or is already over). Wasted spend: a
+    # campaign with >= this spend over the window and ZERO conversions.
+    FAST_SIGNAL_PACING_RATIO: float = 1.2       # projected spend / budget alert threshold
+    FAST_SIGNAL_WASTE_MIN_SPEND: float = 10.0   # min $ over window to flag 0-conv waste
+    FAST_SIGNAL_WINDOW_DAYS: int = 7            # window for pacing/waste rollups
+
     # Server
     HOST: str = "127.0.0.1"
     PORT: int = 8000
@@ -74,6 +112,19 @@ class Settings(BaseSettings):
     SYNC_INTERVAL_HOURS: int = 6
     SYNC_LOOKBACK_DAYS: int = 30
     SYNC_ENABLED: bool = True
+
+    # Dashboard v2.1 (Epic A) — two-cadence metrics sync. The hot loop runs
+    # every METRICS_HOT_SYNC_MINUTES over just the last METRICS_HOT_WINDOW_DAYS
+    # (cheap, keeps "today/yesterday" fresh). Once per day the loop instead does
+    # a full METRICS_FULL_SYNC_LOOKBACK-day re-pull to restate conversions that
+    # Google attributes late (conversion lag). All READ-ONLY GAQL.
+    METRICS_HOT_SYNC_MINUTES: int = 60
+    METRICS_HOT_WINDOW_DAYS: int = 3
+    METRICS_FULL_SYNC_LOOKBACK: int = 30
+    # Self-heal (A4) stampede guard: a read-triggered background sync will NOT
+    # kick if the last attempt for this account was under this many minutes ago,
+    # so multiple tabs / rapid navigation can't loop the sync.
+    METRICS_SELF_HEAL_MIN_INTERVAL_MINUTES: int = 10
 
     # MCP server bearer token — Claude Code uses this to call /mcp on the
     # backend. Leave blank to auto-generate per-process (token logged at

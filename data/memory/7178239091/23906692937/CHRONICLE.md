@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/greece-golden-visa/
-Last updated: 2026-06-07
+Last updated: 2026-07-05
 
 ## Timeline
 
@@ -28,6 +28,11 @@ All 22 keywords show QS = `--`
 - **Jun 03** — [Search Term Hunter] 2026-06-03: Search Term Hunter built 5-ad-group / 38-keyword Greece Golden Visa strategy for 23906692937; Phrase-heavy / no-Broad match philosophy set to avoid repeat of old campaign's AI-Max waste (95.7% budget burn); Keyword Planner quota exhausted (429s), volume tiers marked as estimates pending re-validation.
 - **Jun 03** — [Competitor Intel] Competitor Intel role executed qualitative Greece GV research for 23906692937 (zero live impressions, day-0 campaign); identified 3 main ad-spend competitors (Henley & Partners, Global Citizen Solutions, Get Golden Visa) plus property-side platforms as a required segment; confirmed Plan-B/precarity framing lane is open.
 - **Jun 03** — [CRO Specialist] CRO Specialist audited Greece GV landing page (mercan.com/greece-golden-visa/) for new campaign build; flagged diluted CTAs (4+ competing actions), potential 10-field form friction, and missing "Plan B / tech worker" angle from the brief — page skews rational/comparison rather than emotional safety narrative.
+
+### July 2026
+- **Jul 05** — [Agency Director] Campaign "Greece GV — Plan B — Search — US Tier-1" (ID 23906692937) paused after $3,330 spent with 0 lifetime conversions; root cause identified as 87% of spend going to program-agnostic AG3 ($2,018) and LP-mismatched AG4 ($858) pulling EU-comparison traffic onto a Greece-only page.
+- **Jul 05** — [Agency Director] Agency Director diagnosed Greece GV USA CP zero-conversion root cause: 87% of $3,330 lifetime spend (AG3 $2,018 + AG4 $858) went to program-agnostic EU residency traffic, only $450 (13%) hit Greece-intent ad groups — tracking confirmed working, pure traffic-quality failure.
+- **Jul 04** — [Analytics Analyst] Greece GV Plan B (23906692937) audited: impressions collapsed −65% P1→P2 (Jun 20–26 vs Jun 27–Jul 3) while spend dropped only −25%, CTR artifact rose 6.6%→14.1%; AG3 drives 61% of all-time spend with zero conversions — flagged as primary waste source.
 
 ## Key Metrics Milestones
 

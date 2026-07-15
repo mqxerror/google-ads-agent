@@ -303,8 +303,11 @@ class CampaignAssetService:
         """
         try:
             customer_id = format_customer_id(customer_id)
-            # Campaign asset resource names use ~ as separator
-            campaign_asset_resource = f"customers/{customer_id}/campaignAssets/{campaign_id}~{asset_id}~{field_type}"
+            # Campaign asset resource names use ~ as separator and the field
+            # type ENUM NAME (e.g. "SITELINK"), NOT its numeric value — passing
+            # the enum object stringifies to the int and yields BAD_RESOURCE_ID.
+            field_type_name = getattr(field_type, "name", str(field_type))
+            campaign_asset_resource = f"customers/{customer_id}/campaignAssets/{campaign_id}~{asset_id}~{field_type_name}"
 
             # Create operation
             operation = CampaignAssetOperation()

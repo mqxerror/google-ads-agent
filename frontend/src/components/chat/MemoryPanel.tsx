@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Pin, FileText, Plus, X, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 
 interface MemoryPanelProps {
@@ -8,7 +7,7 @@ interface MemoryPanelProps {
   campaignName?: string | null;
 }
 
-export default function MemoryPanel({ campaignId, campaignName }: MemoryPanelProps) {
+export default function MemoryPanel({ campaignId }: MemoryPanelProps) {
   const accountId = useClientAccountId();
   const [pinnedFacts, setPinnedFacts] = useState('');
   const [decisions, setDecisions] = useState('');

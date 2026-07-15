@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import re
 import threading
@@ -145,26 +146,137 @@ def _find_modern_npx() -> str:
 
 _MODERN_NPX = _find_modern_npx()
 
-# Track running agent subprocesses by conversation_id so users can cancel stuck tasks
-_running_procs: dict[str, subprocess.Popen] = {}
+# Track running agent subprocesses by conversation_id so users can cancel stuck
+# tasks. Value is a SET because parallel workflow specialists share one
+# conversation_id and each registers its own CLI child — a dict would clobber
+# all but the last, letting a stop reach only one (possibly the wrong) process.
+_running_procs: dict[str, set[subprocess.Popen]] = {}
+
+# Conversation ids for which a stop was requested. Set by stop_agent (even when
+# no proc is registered — a stop that lands between segments must still block
+# the continuation relaunch) and consulted by _run_cli. Cleared at the top of a
+# fresh stream_agent_response run so a later legit message isn't perma-blocked.
+_stop_requested: set[str] = set()
+
+# ── Chat Orchestration v2 process registry (Epic 1.5/1.6/2.6) ────────
+# A SECOND, distinct registry keyed by (turn_id, call_id) that lives ALONGSIDE
+# the conversation-keyed _running_procs above. The v2 chat turn runner threads a
+# `proc_key=(turn_id, call_id)` through stream_agent_response; when set, _run_cli
+# ALSO registers/deregisters the Popen here so a per-turn or per-specialist stop
+# reaches exactly the right child (the conversation-keyed path is last-writer-
+# wins across parallel specialists — the F7 bug). call_id for a direct-mode turn
+# is the literal "director"; specialists use the plan's call_id (c1, c2, …). The
+# Epic 0 conversation-keyed logic is untouched — this is purely additive.
+_turn_procs: dict[tuple[str, str], set[subprocess.Popen]] = {}
+
+# (turn_id, call_id) OR (turn_id, "*") entries for which a stop was requested.
+# A (turn_id, "*") entry is a whole-turn stop and also blocks the continuation
+# relaunch for every call under that turn. Consulted by _run_cli's guard sites.
+_turn_stop_requested: set[tuple[str, str]] = set()
 
 
-def stop_agent(conversation_id: str) -> bool:
-    """Stop a running agent subprocess for the given conversation. Returns True if a process was killed."""
-    proc = _running_procs.get(conversation_id)
-    if proc is None:
+def _turn_stop_pending(proc_key: tuple[str, str] | None) -> bool:
+    """True if a v2 stop was requested for this proc_key or its whole turn.
+
+    A `(turn_id, call_id)` stop blocks just that call; a `(turn_id, "*")` stop
+    (whole-turn) blocks every call under the turn — including a would-be
+    continuation relaunch. Returns False when proc_key is None (direct/legacy
+    callers ride the conversation-keyed path only).
+    """
+    if proc_key is None:
         return False
+    return proc_key in _turn_stop_requested or (proc_key[0], "*") in _turn_stop_requested
+
+
+def _killpg(proc: subprocess.Popen) -> bool:
+    """Kill a subprocess's WHOLE process group: SIGTERM, wait 2s, then SIGKILL.
+
+    Popen is created with start_new_session=True (agent.py:1608) so the CLI is
+    its own process-group leader and this reaches its children (google-ads MCP
+    via uv, chrome MCP via npx, headless Chrome). Returns True if a signal was
+    delivered; an already-dead group counts as a successful stop (True).
+    """
     try:
-        proc.terminate()
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
         try:
             proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                pass
         return True
-    except Exception:
-        return False
+    except (ProcessLookupError, OSError):
+        # Process (group) already gone — treat as a successful stop.
+        return True
+
+
+def stop_agent(conversation_id: str) -> bool:
+    """Stop all running agent subprocesses for the given conversation.
+
+    Kills each registered CLI child's WHOLE process group (SIGTERM, then
+    SIGKILL after a short grace) so the CLI's own children (google-ads MCP via
+    uv, chrome MCP via npx, headless Chrome) die with it. ALWAYS flags the
+    conversation as stop-requested so a stop between segments still blocks the
+    continuation relaunch. Returns True if any process was killed.
+    """
+    # Flag first — a stop between segments (no proc registered right now) must
+    # still block the continuation loop from relaunching.
+    _stop_requested.add(conversation_id)
+    procs = set(_running_procs.get(conversation_id, set()))
+    killed = False
+    try:
+        for proc in procs:
+            killed = True
+            _killpg(proc)
+        return killed
     finally:
         _running_procs.pop(conversation_id, None)
+
+
+def stop_turn(turn_id: str) -> dict:
+    """Process-level stop for a whole v2 chat turn.
+
+    Flags `(turn_id, "*")` as stop-requested (blocks any pending continuation
+    relaunch for every call under the turn) and process-group-kills every child
+    registered under any `(turn_id, *)` key. Idempotent: a second call finds no
+    live procs and returns an empty `killed` list. Returns the list of call_ids
+    whose process groups were signalled.
+
+    NOTE: this is the PROCESS half only. The chat_runner owns the asyncio task
+    cancel + terminal `turn_stopped` event + chat_turns.status flip and calls
+    this for the killpg.
+    """
+    _turn_stop_requested.add((turn_id, "*"))
+    killed: list[str] = []
+    # Snapshot the keys first — _killpg may mutate nothing here, but popping
+    # while iterating the dict would raise.
+    keys = [k for k in list(_turn_procs.keys()) if k[0] == turn_id]
+    for key in keys:
+        procs = set(_turn_procs.get(key, set()))
+        if procs:
+            killed.append(key[1])
+            for proc in procs:
+                _killpg(proc)
+        _turn_procs.pop(key, None)
+    return {"turn_id": turn_id, "killed": killed}
+
+
+def stop_call(turn_id: str, call_id: str) -> dict:
+    """Process-level stop for ONE specialist call within a turn (story 2.6).
+
+    Flags `(turn_id, call_id)` as stop-requested and process-group-kills only
+    that call's registered children; the rest of the turn continues. Idempotent.
+    Returns `{killed: bool}` — True if any process was signalled for the call.
+    """
+    _turn_stop_requested.add((turn_id, call_id))
+    procs = set(_turn_procs.get((turn_id, call_id), set()))
+    killed = False
+    for proc in procs:
+        killed = True
+        _killpg(proc)
+    _turn_procs.pop((turn_id, call_id), None)
+    return {"turn_id": turn_id, "call_id": call_id, "killed": killed}
 
 
 def _get_mcp_config_path() -> Path:
@@ -177,7 +289,11 @@ def _get_mcp_config_path() -> Path:
             "args": [
                 "run", "--directory", backend_dir,
                 "python", str(_MCP_MAIN),
-                "--groups", "core,targeting,bidding,planning,reporting",
+                # Full 311-tool surface (assets/extensions, batch, planning, etc.)
+                # — restores the 2026-06-16 Windows-session decision that never
+                # synced to this Mac. Tool-mispick risk contained by the campaign
+                # scope-guard middleware + per-agent allowlist + approval flow.
+                "--groups", "all",
             ],
             "cwd": backend_dir,
             "env": {
@@ -587,7 +703,19 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
     if has_local:
         local_data = await metrics_store.format_for_agent(account_id, campaign_id, None)
         if local_data and "No local metrics" not in local_data:
-            return currency_header + local_data + "\n\n(Data from local store. Use API endpoints for real-time data if needed.)"
+            # WS2 — even on the fast local-metrics path, fetch the live landing
+            # page so page/form/tracking claims aren't diagnosed off stale data
+            # (the exact post-mortem failure). Best-effort; never blocks the read.
+            lp = ""
+            if campaign_id:
+                try:
+                    lp = await fetch_ad_landing_pages(account_id, campaign_id)
+                except Exception:
+                    lp = ""
+            lp_block = ("\n\n" + lp) if lp else ""
+            return (currency_header + local_data +
+                    "\n\n(Data from local store. Use API endpoints for real-time data if needed.)"
+                    + lp_block)
 
     # Fallback: fetch from API (slow but always fresh)
     parts = [currency_header.rstrip()]
@@ -633,6 +761,15 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
                 for ad in ads:
                     url = ad.final_urls[0] if ad.final_urls else "(no final URL)"
                     parts.append(f"  - {ad.id} | {ad.ad_group_name} | {ad.status} | {url}")
+            except Exception:
+                pass
+
+            # WS2 — fetch the actual landing pages THIS session so page/form/
+            # tracking claims are verified against live HTML, not stale memory.
+            try:
+                lp = await fetch_ad_landing_pages(account_id, campaign_id)
+                if lp:
+                    parts.append("\n" + lp)
             except Exception:
                 pass
 
@@ -692,6 +829,73 @@ async def _get_campaign_data(account_id: str | None, campaign_id: str | None) ->
     return "\n".join(parts)
 
 
+# ── WS2: verify-before-diagnose — live landing-page state ──────────
+
+# CONSERVATIVE cap: fetch at most this many DISTINCT final URLs per call so an
+# ordinary campaign chat doesn't fan out into many synchronous fetches. Tune here.
+_MAX_LANDING_FETCH = 3
+
+# Stripped-text signals (page_fetcher returns text, not raw HTML) that a lead
+# form / contact affordance is present, and that a tag/tracking token is present.
+_FORM_SIGNALS = ('<form', 'type="email"', 'type=email', 'type="tel"',
+                 'type=tel', 'mailto:', 'tel:')
+_TRACKING_SIGNALS = ('gtag', 'gtm', 'datalayer', 'googletagmanager')
+
+
+async def fetch_ad_landing_pages(account_id: str | None, campaign_id: str | None) -> str:
+    """Best-effort: fetch THIS campaign's ad final_urls THIS session so a persona
+    can verify page/form/tracking claims against the live page (not month-old
+    memory). Returns a compact text block, or "" when nothing to fetch.
+
+    NEVER raises — every failure degrades to a labelled UNKNOWN line so the caller
+    (and the persona) treats page state as unverified rather than assumed.
+    """
+    if not account_id or not campaign_id:
+        return ""
+
+    from app.services import page_fetcher
+
+    # Collect + dedupe final URLs across the campaign's ads, cap at _MAX_LANDING_FETCH.
+    urls: list[str] = []
+    try:
+        ads = await _ads_svc.get_ads(account_id, campaign_id)
+    except Exception:
+        return ""
+    for ad in ads:
+        for u in (ad.final_urls or []):
+            if u and u not in urls:
+                urls.append(u)
+            if len(urls) >= _MAX_LANDING_FETCH:
+                break
+        if len(urls) >= _MAX_LANDING_FETCH:
+            break
+
+    if not urls:
+        return ""
+
+    lines = ["=== LIVE LANDING PAGE STATE (fetched this session) ===",
+             "(Verify page/form/tracking claims against THIS, not stored findings.)"]
+    for url in urls:
+        try:
+            page = await page_fetcher.fetch(url)
+        except Exception:
+            lines.append(f"- {url} → COULD NOT FETCH — treat page state as UNKNOWN")
+            continue
+        # body_excerpt is stripped text; search it + h1 + title defensively.
+        hay = " ".join(str(x or "") for x in (
+            page.body_excerpt, page.h1, page.title, page.description)).lower()
+        form_hit = any(sig in hay for sig in _FORM_SIGNALS) or ("@" in hay and "email" in hay)
+        track_hit = any(sig in hay for sig in _TRACKING_SIGNALS)
+        title = (page.title or "").strip()[:80] or "(no title)"
+        h1 = (page.h1 or "").strip()[:80] or "(no h1)"
+        lines.append(
+            f"- {url} → HTTP {page.status} | title: {title} | h1: {h1} | "
+            f"form signal: {'YES' if form_hit else 'none detected'} | "
+            f"tracking token: {'YES' if track_hit else 'none detected'}"
+        )
+    return "\n".join(lines)
+
+
 def _condense_for_memory(response_text: str, user_message: str, max_chars: int = 3000) -> str:
     """Condense an agent response into a memory-friendly format.
 
@@ -744,6 +948,66 @@ def _condense_for_memory(response_text: str, user_message: str, max_chars: int =
     return "\n".join(parts)
 
 
+# ── Story 1.4: partial-message streaming ─────────────────────────
+
+def _extract_stream_text_delta(data: dict) -> str:
+    """Pull the incremental text out of a CLI `stream_event` line.
+
+    With --include-partial-messages the CLI wraps Anthropic streaming events:
+    {"type":"stream_event","event":{"type":"content_block_delta",
+     "delta":{"type":"text_delta","text":"<chunk>"}}}
+    Returns the text chunk for a content_block_delta/text_delta, else "".
+    Tolerant of missing keys / other event shapes (returns "").
+    """
+    event = data.get("event")
+    if not isinstance(event, dict) or event.get("type") != "content_block_delta":
+        return ""
+    delta = event.get("delta")
+    if not isinstance(delta, dict) or delta.get("type") != "text_delta":
+        return ""
+    text = delta.get("text")
+    return text if isinstance(text, str) else ""
+
+
+def _emit_assistant_blocks(blocks: list, result_queue, full_response_text: list, *, stream_partial: bool) -> None:
+    """Parse assistant message content blocks into queue events.
+
+    Module-level (extracted from the `_run_cli` closure) so the Story 1.4 dedup
+    rule is unit-testable. `full_response_text` MUST accumulate text in BOTH
+    modes (it feeds persistence + findings-JSON parsing). When `stream_partial`
+    is True the token-level `text_delta` events already streamed the text, so
+    the `text` event is suppressed here to avoid DOUBLING — but tool_use /
+    tool_result blocks are always emitted.
+    """
+    for block in blocks:
+        if block.get("type") == "text":
+            text = block["text"]
+            full_response_text.append(text)
+            if not stream_partial:
+                result_queue.put({"type": "text", "content": text})
+        elif block.get("type") == "tool_use":
+            tool_name = block.get("name", "")
+            tool_input = block.get("input", {})
+            # Determine source from tool name prefix
+            if tool_name.startswith("mcp__google-ads__"):
+                clean_name = tool_name.replace("mcp__google-ads__", "")
+                result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads-mcp", "name": clean_name, "input": tool_input})
+            elif tool_name.startswith("mcp__chrome__"):
+                clean_name = tool_name.replace("mcp__chrome__", "")
+                result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "chrome", "name": clean_name, "input": tool_input})
+            elif tool_name.startswith("mcp__gtm__"):
+                clean_name = tool_name.replace("mcp__gtm__", "")
+                result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "gtm", "name": clean_name, "input": tool_input})
+            elif tool_name == "Bash":
+                cmd_text = tool_input.get("command", "")
+                if "localhost:8000" in cmd_text:
+                    result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads", "name": "API Call", "input": {"command": cmd_text}})
+            else:
+                result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads", "name": tool_name, "input": tool_input})
+        elif block.get("type") == "tool_result":
+            result_queue.put({"type": "tool_result", "id": block.get("tool_use_id", ""), "source": "google-ads", "output": str(block.get("content", ""))[:500], "status": "success"})
+
+
 # ── Main: Assemble All Layers ────────────────────────────────────
 
 async def stream_agent_response(
@@ -758,6 +1022,7 @@ async def stream_agent_response(
     active_role: str | None = None,
     attachments: list[dict] | None = None,
     tool_allowlist: list[str] | None = None,
+    proc_key: tuple[str, str] | None = None,
 ) -> AsyncIterator[dict]:
     """Stream agent responses with full layered memory.
 
@@ -767,11 +1032,23 @@ async def stream_agent_response(
     An empty list means "no Google Ads tools" — pure analysis of injected
     context, which is the safest mode for rate-limited audit workflows. None
     means unrestricted (normal chat behaviour).
+
+    proc_key: OPTIONAL (turn_id, call_id) for Chat Orchestration v2. When set,
+    _run_cli ALSO registers/deregisters the CLI Popen under _turn_procs[proc_key]
+    and consults _turn_stop_requested for both proc_key and (proc_key[0], "*") at
+    both stop-guard sites, so a per-turn / per-specialist stop reaches exactly
+    this child. The Epic 0 conversation-keyed path (_running_procs /
+    _stop_requested) stays intact and unchanged; this is purely additive.
     """
     from app.services.roles import classify_intent, get_role, get_default_role
 
     model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS["fable"])
     today = date.today()
+
+    # Fresh run for this conversation clears any prior stop request so a later
+    # legit message isn't perma-blocked by an earlier stop (see _stop_requested).
+    if conversation_id:
+        _stop_requested.discard(conversation_id)
 
     # ── Intent classification → resolve role ────────────────
     intent = classify_intent(user_message)
@@ -1199,6 +1476,25 @@ async def stream_agent_response(
 
         system_parts.append(f"\nYou are responding as the {role_obj.name}. Sign your analysis with your role perspective.")
 
+    # === VERIFICATION & INTEGRITY GUARDRAILS === (global; survives role overrides)
+    system_parts.append(
+        "=== VERIFICATION & INTEGRITY GUARDRAILS ===\n"
+        "VERIFY BEFORE YOU DIAGNOSE: NEVER assert that the landing page has or "
+        "lacks a form, or that tracking/conversions are or aren't firing, without "
+        "a SAME-SESSION fetch of the ad's actual final_url. If a "
+        "'LIVE LANDING PAGE STATE (fetched this session)' block is present, treat "
+        "IT as ground truth over any stored note. If page state is unknown or the "
+        "fetch failed, SAY SO and fetch/ask — do NOT assume.\n"
+        "STALE FINDINGS: Findings marked ⚠️ STALE reflect a PAST state; re-verify "
+        "with a live pull/fetch before ANY budget, bid, status, or URL "
+        "recommendation. Do not act on stale numbers as if current.\n"
+        "ID INTEGRITY: Never state a specific conversion action ID, GTM container "
+        "ID (GTM-…), Google Ads conversion ID (AW-…), GA4 measurement ID (G-…), or "
+        "conversion label unless it came from a live query/tag pull THIS session — "
+        "and LABEL it with its source. If an ID isn't confirmed live, say "
+        "'ID not verified — pull it before relying on it' rather than reciting from memory."
+    )
+
     # Assemble the base system prompt (P0 — always included)
     system_prompt_base = "\n".join(system_parts)
 
@@ -1318,6 +1614,10 @@ async def stream_agent_response(
     # High max-turns for harness mode — agent runs until done, not until an arbitrary limit.
     # Browser automation can easily need 100+ turns. Safety caps in _run_cli prevent runaway costs.
     max_turns = str(settings.AGENT_MAX_TURNS_PER_SEGMENT)
+    # Story 1.4: token-level streaming previews. When ON, the CLI ALSO emits
+    # `stream_event` lines carrying Anthropic content_block_delta text_deltas
+    # (parsed below into `text_delta` events). Default OFF — no behavior change.
+    partial_flags = ["--include-partial-messages"] if settings.AGENT_STREAM_PARTIAL_MESSAGES else []
     cmd = [
         *_CLI_CMD,
         "--print", "--verbose", "--output-format", "stream-json",
@@ -1325,6 +1625,7 @@ async def stream_agent_response(
         "--model", model_id,
         "--permission-mode", "bypassPermissions",
         "--mcp-config", str(mcp_config_path),
+        *partial_flags,
     ]
 
     env = {**os.environ, "CLAUDE_CODE_ENTRYPOINT": "sdk-py"}
@@ -1369,33 +1670,12 @@ async def stream_agent_response(
     full_response_text: list[str] = []
 
     def _parse_assistant_blocks(blocks: list):
-        """Parse assistant message content blocks into queue events."""
-        for block in blocks:
-            if block.get("type") == "text":
-                text = block["text"]
-                full_response_text.append(text)
-                result_queue.put({"type": "text", "content": text})
-            elif block.get("type") == "tool_use":
-                tool_name = block.get("name", "")
-                tool_input = block.get("input", {})
-                # Determine source from tool name prefix
-                if tool_name.startswith("mcp__google-ads__"):
-                    clean_name = tool_name.replace("mcp__google-ads__", "")
-                    result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads-mcp", "name": clean_name, "input": tool_input})
-                elif tool_name.startswith("mcp__chrome__"):
-                    clean_name = tool_name.replace("mcp__chrome__", "")
-                    result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "chrome", "name": clean_name, "input": tool_input})
-                elif tool_name.startswith("mcp__gtm__"):
-                    clean_name = tool_name.replace("mcp__gtm__", "")
-                    result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "gtm", "name": clean_name, "input": tool_input})
-                elif tool_name == "Bash":
-                    cmd_text = tool_input.get("command", "")
-                    if "localhost:8000" in cmd_text:
-                        result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads", "name": "API Call", "input": {"command": cmd_text}})
-                else:
-                    result_queue.put({"type": "tool_call", "id": block.get("id", ""), "source": "google-ads", "name": tool_name, "input": tool_input})
-            elif block.get("type") == "tool_result":
-                result_queue.put({"type": "tool_result", "id": block.get("tool_use_id", ""), "source": "google-ads", "output": str(block.get("content", ""))[:500], "status": "success"})
+        """Thin delegator to the module-level parser (read the flag at call
+        time so runtime setting overrides apply). Story 1.4."""
+        _emit_assistant_blocks(
+            blocks, result_queue, full_response_text,
+            stream_partial=settings.AGENT_STREAM_PARTIAL_MESSAGES,
+        )
 
     def _run_cli():
         """Run CLI subprocess with auto-continuation on max-turns exhaustion."""
@@ -1411,6 +1691,16 @@ async def stream_agent_response(
         fallback_used = False
 
         while True:
+            # A stop requested before this segment launches (e.g. between
+            # segments, or before the first run) must block the relaunch. Emit
+            # the same user_stopped done event as the mid-segment path — no
+            # segment ran here, so resume from current_session_id. Both the
+            # conversation-keyed (Epic 0) and the v2 turn-keyed stop are honored.
+            if (conversation_id and conversation_id in _stop_requested) \
+                    or _turn_stop_pending(proc_key):
+                result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": active_model_id, "continuations": continuation_count, "stop_reason": "user_stopped", "resume_session_id": current_session_id})
+                break
+
             # Build command — first run uses original cmd, subsequent runs use --resume
             if is_first_run and resume_sid:
                 # Resuming a stopped session: the Claude session already has the
@@ -1424,6 +1714,7 @@ async def stream_agent_response(
                     "--model", active_model_id,
                     "--permission-mode", "bypassPermissions",
                     "--mcp-config", str(mcp_config_path),
+                    *partial_flags,
                 ]
             elif is_first_run:
                 # Reuse the pre-built cmd, but honor a limit-fallback model swap.
@@ -1440,6 +1731,7 @@ async def stream_agent_response(
                     "--model", active_model_id,
                     "--permission-mode", "bypassPermissions",
                     "--mcp-config", str(mcp_config_path),
+                    *partial_flags,
                 ]
 
             segment_session_id = None
@@ -1451,9 +1743,17 @@ async def stream_agent_response(
             proc = None
 
             try:
-                proc = subprocess.Popen(run_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, bufsize=0)
+                # start_new_session=True puts the CLI in its own process group so
+                # stop_agent's killpg reaches the CLI's own children (google-ads
+                # MCP via uv, chrome MCP via npx, headless Chrome) instead of
+                # orphaning them.
+                proc = subprocess.Popen(run_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, bufsize=0, start_new_session=True)
                 if conversation_id:
-                    _running_procs[conversation_id] = proc
+                    _running_procs.setdefault(conversation_id, set()).add(proc)
+                # v2: ALSO register under the turn-keyed registry so a per-turn /
+                # per-specialist stop reaches exactly this child (additive).
+                if proc_key is not None:
+                    _turn_procs.setdefault(proc_key, set()).add(proc)
 
                 if is_first_run:
                     # On a resume, the session already has the context — only
@@ -1485,6 +1785,16 @@ async def stream_agent_response(
                     msg_type = data.get("type", "")
                     if msg_type == "assistant":
                         _parse_assistant_blocks(data.get("message", {}).get("content", []))
+                    elif msg_type == "stream_event":
+                        # Story 1.4: token-level streaming. With
+                        # --include-partial-messages the CLI emits stream_event
+                        # lines wrapping Anthropic streaming deltas. Surface the
+                        # incremental text as a distinct `text_delta` event —
+                        # NOT `text`, because the final `assistant` message still
+                        # carries the same complete text (dedup handled above).
+                        _delta = _extract_stream_text_delta(data)
+                        if _delta:
+                            result_queue.put({"type": "text_delta", "content": _delta})
                     elif msg_type == "api_retry":
                         # The CLI emits api_retry when it hits a retryable server
                         # condition (rate limit / 529 / etc.). If it names a
@@ -1544,8 +1854,11 @@ async def stream_agent_response(
                     continue
 
                 if proc.returncode != 0 and segment_subtype is None:
-                    # User stopped or unexpected error (no result event received)
-                    if conversation_id and conversation_id not in _running_procs:
+                    # User stopped or unexpected error (no result event received).
+                    # Key "user stopped" off the explicit stop flag — with a
+                    # set-based registry the old "key absence" heuristic is
+                    # unreliable (a sibling specialist may still hold the key).
+                    if conversation_id and conversation_id in _stop_requested:
                         result_queue.put({"type": "done", "cost": accumulated_cost, "turns": accumulated_turns, "model": active_model_id, "continuations": continuation_count, "stop_reason": "user_stopped", "resume_session_id": segment_session_id or current_session_id})
                     else:
                         logger.error("CLI error (rc=%d): %s", proc.returncode, err_text[:500])
@@ -1556,8 +1869,22 @@ async def stream_agent_response(
                 result_queue.put({"type": "error", "message": str(e)})
                 break
             finally:
-                if conversation_id:
-                    _running_procs.pop(conversation_id, None)
+                # Discard only THIS proc from the conversation's set; pop the key
+                # once the last proc for the conversation is gone. proc may be
+                # None if Popen threw before assignment.
+                if conversation_id and proc is not None:
+                    _procs = _running_procs.get(conversation_id)
+                    if _procs is not None:
+                        _procs.discard(proc)
+                        if not _procs:
+                            _running_procs.pop(conversation_id, None)
+                # v2: mirror the deregistration for the turn-keyed registry.
+                if proc_key is not None and proc is not None:
+                    _tprocs = _turn_procs.get(proc_key)
+                    if _tprocs is not None:
+                        _tprocs.discard(proc)
+                        if not _tprocs:
+                            _turn_procs.pop(proc_key, None)
 
             # --- Decide: continue or stop ---
             should_continue = (
@@ -1565,6 +1892,8 @@ async def stream_agent_response(
                 and segment_session_id is not None
                 and continuation_count < settings.AGENT_MAX_CONTINUATIONS
                 and accumulated_cost < settings.AGENT_MAX_TOTAL_COST_USD
+                and not (conversation_id and conversation_id in _stop_requested)
+                and not _turn_stop_pending(proc_key)
             )
 
             if not should_continue:

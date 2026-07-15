@@ -1,0 +1,1931 @@
+{
+  "EN": {
+    "Oman": {
+      "best country for tax residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest citizenship by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 57,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 57,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "citizenship by investment": {
+        "avg_monthly_searches": 20,
+        "competition": "MEDIUM",
+        "competition_index": 60,
+        "low_top_of_page_bid_usd": 1.19,
+        "high_top_of_page_bid_usd": 9.02,
+        "close_variants": []
+      },
+      "citizenship through real estate": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "dual citizenship by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "easiest golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "get a second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa": {
+        "avg_monthly_searches": 50,
+        "competition": "LOW",
+        "competition_index": 31,
+        "low_top_of_page_bid_usd": 0.42,
+        "high_top_of_page_bid_usd": 11.9,
+        "close_variants": []
+      },
+      "golden visa by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa consultants": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa program": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa real estate": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "investment visa": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 14,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "investor visa"
+        ]
+      },
+      "offshore residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama citizenship": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama citizenship by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 57,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama friendly nations visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama passport by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "affordable golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best country residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best second passport for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest golden visa 2026": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "dollarized economy residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "family relocation plan b": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "fast permanent residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "fastest residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa $300000": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "golden visa $300,000"
+        ]
+      },
+      "golden visa vs citizenship by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "invest for residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "invest in panama residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "no tax on foreign income country": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama $300000 visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "panama $300,000 visa"
+        ]
+      },
+      "panama investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama permanent residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama residency by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 43,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "passport by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "HIGH",
+        "competition_index": 81,
+        "low_top_of_page_bid_usd": 1.09,
+        "high_top_of_page_bid_usd": 4.56,
+        "close_variants": []
+      },
+      "permanent residency by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "HIGH",
+        "competition_index": 86,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "plan b citizenship": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "property investment visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "real estate golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "residence by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 43,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "residency by investment"
+        ]
+      },
+      "residency by investment programs": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "residency through investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second citizenship": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 32,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 52,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "tax free residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama qualified investor program": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama qualified investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama real estate residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "permanent residency real estate investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "plan b residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "real estate residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "relocate for tax": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second passport for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second residency program": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "strongest second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "tax friendly second residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "territorial tax country": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "visa free passport investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "wealth protection second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      }
+    },
+    "Jordan": {
+      "best country for tax residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest citizenship by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 57,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "citizenship by investment": {
+        "avg_monthly_searches": 30,
+        "competition": "MEDIUM",
+        "competition_index": 47,
+        "low_top_of_page_bid_usd": 0.28,
+        "high_top_of_page_bid_usd": 1.49,
+        "close_variants": []
+      },
+      "citizenship through real estate": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "dual citizenship by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "easiest golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "get a second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "HIGH",
+        "competition_index": 71,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa": {
+        "avg_monthly_searches": 50,
+        "competition": "LOW",
+        "competition_index": 22,
+        "low_top_of_page_bid_usd": 0.32,
+        "high_top_of_page_bid_usd": 2.11,
+        "close_variants": []
+      },
+      "golden visa by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa consultants": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa program": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa real estate": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "investment visa": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 29,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "investor visa"
+        ]
+      },
+      "offshore residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama citizenship": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama citizenship by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama friendly nations visa": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama golden visa": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama passport by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "affordable golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best country residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "best second passport for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "cheapest golden visa 2026": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "dollarized economy residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "family relocation plan b": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "fast permanent residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "fastest residency by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "golden visa $300000": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "golden visa $300,000"
+        ]
+      },
+      "golden visa vs citizenship by investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "invest for residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "invest in panama residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "no tax on foreign income country": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama $300000 visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": [
+          "panama $300,000 visa"
+        ]
+      },
+      "panama investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama permanent residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama residency": {
+        "avg_monthly_searches": 10,
+        "competition": "HIGH",
+        "competition_index": 71,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama residency by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "passport by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "MEDIUM",
+        "competition_index": 43,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "permanent residency by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "plan b citizenship": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "property investment visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "real estate golden visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "residence by investment": {
+        "avg_monthly_searches": 10,
+        "competition": "HIGH",
+        "competition_index": 70,
+        "low_top_of_page_bid_usd": 0.37,
+        "high_top_of_page_bid_usd": 1.72,
+        "close_variants": [
+          "residency by investment"
+        ]
+      },
+      "residency by investment programs": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "residency through investment": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second citizenship": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second passport": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "tax free residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama qualified investor program": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama qualified investor visa": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "panama real estate residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "permanent residency real estate investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "plan b residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "real estate residency": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "relocate for tax": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second passport for family": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "second residency program": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "strongest second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "tax friendly second residency": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "territorial tax country": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "visa free passport investment": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "wealth protection second passport": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      }
+    }
+  },
+  "AR": {
+    "Oman": {
+      "الإقامة الذهبية": {
+        "avg_monthly_searches": 40,
+        "competition": "LOW",
+        "competition_index": 1,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "التأشيرة الذهبية": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية الثانية": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عبر الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عن طريق الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 19,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الحصول على جواز سفر ثاني": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "المواطنة عن طريق الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر بنما": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر ثان": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص إقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص جنسية عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص جواز سفر ثاني": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أسرع إقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل الفيزا الذهبية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل جواز سفر ثاني": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل دول الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الاستثمارية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الثانية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الدائمة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الدائمة في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الذهبية للعائلة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الضريبية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة بدون ضرائب": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عبر الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة في بنما عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الاستثمار العقاري في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية البنمية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "برنامج الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "برنامج المستثمر المؤهل بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "بلد آمن للاستثمار والإقامة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "تأشيرة المستثمر": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جنسية بنما عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر أوروبي بديل": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر ثاني": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 14,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "دولة بدون ضرائب": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "حماية الثروة جنسية ثانية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "خطة بديلة للعائلة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "دولة معفاة من الضرائب": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "شراء عقار في بنما للإقامة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "فيزا المستثمر": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "فيزا بنما للمستثمرين": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      }
+    },
+    "Jordan": {
+      "الإقامة الذهبية": {
+        "avg_monthly_searches": 30,
+        "competition": "LOW",
+        "competition_index": 1,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "التأشيرة الذهبية": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية الثانية": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عبر الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عن طريق الاستثمار": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الحصول على جواز سفر ثاني": {
+        "avg_monthly_searches": 10,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية": {
+        "avg_monthly_searches": 20,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "المواطنة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر بنما": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر ثان": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص إقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص جنسية عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أرخص جواز سفر ثاني": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أسرع إقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل الفيزا الذهبية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل جواز سفر ثاني": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "أفضل دول الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الاستثمارية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الثانية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الدائمة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الدائمة في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الذهبية للعائلة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة الضريبية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة بدون ضرائب": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عبر الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الإقامة في بنما عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الاستثمار العقاري في بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية البنمية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الجنسية عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "الفيزا الذهبية عن طريق الاستثمار العقاري": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "برنامج الإقامة عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "برنامج المستثمر المؤهل بنما": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "بلد آمن للاستثمار والإقامة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "تأشيرة المستثمر": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جنسية بنما عن طريق الاستثمار": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر أوروبي بديل": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "جواز سفر ثاني": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 7,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "دولة بدون ضرائب": {
+        "avg_monthly_searches": 10,
+        "competition": "LOW",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "حماية الثروة جنسية ثانية": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "خطة بديلة للعائلة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "دولة معفاة من الضرائب": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "شراء عقار في بنما للإقامة": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "فيزا المستثمر": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      },
+      "فيزا بنما للمستثمرين": {
+        "avg_monthly_searches": 0,
+        "competition": "UNSPECIFIED",
+        "competition_index": 0,
+        "low_top_of_page_bid_usd": null,
+        "high_top_of_page_bid_usd": null,
+        "close_variants": []
+      }
+    }
+  },
+  "meta": {
+    "customer_id": "7178239091",
+    "geo": {
+      "Oman": "geoTargetConstants/2512",
+      "Jordan": "geoTargetConstants/2400"
+    },
+    "lang": {
+      "EN": "languageConstants/1000",
+      "AR": "languageConstants/1019"
+    },
+    "network": "GOOGLE_SEARCH",
+    "api_version": "v23"
+  }
+}

@@ -9,8 +9,6 @@ from google.ads.googleads.v23.services.services.batch_job_service import (
     BatchJobServiceClient,
 )
 from google.ads.googleads.v23.services.types.batch_job_service import (
-    AddBatchJobOperationsRequest,
-    AddBatchJobOperationsResponse,
     BatchJobOperation,
     ListBatchJobResultsRequest,
     MutateBatchJobRequest,
@@ -20,7 +18,6 @@ from google.ads.googleads.v23.services.types.batch_job_service import (
 from google.ads.googleads.v23.services.services.google_ads_service import (
     GoogleAdsServiceClient,
 )
-from google.ads.googleads.v23.services.types.google_ads_service import MutateOperation
 
 from google_ads.sdk_client import get_sdk_client
 from google_ads.utils import format_customer_id, get_logger, serialize_proto_message
@@ -179,42 +176,13 @@ class BatchJobService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            # Note: This is a simplified implementation
-            # In practice, you'd need to construct proper MutateOperation objects
-            # based on the specific operation types (campaign, ad group, keyword, etc.)
-
-            operations = []
-            for _ in operations_data:
-                # This is a placeholder - actual implementation would require
-                # parsing the operation data and creating appropriate MutateOperation objects
-                operation = MutateOperation()
-                # You would set the appropriate operation based on op_data['type']
-                # For example:
-                # if op_data.get('type') == 'campaign':
-                #     operation.campaign_operation = ...
-                # elif op_data.get('type') == 'ad_group':
-                #     operation.ad_group_operation = ...
-                # etc.
-                operations.append(operation)
-
-            # Create request
-            request = AddBatchJobOperationsRequest()
-            request.resource_name = batch_job_resource_name
-            request.sequence_token = ""  # Start with empty token
-            request.mutate_operations = operations
-
-            # Make the API call
-            response: AddBatchJobOperationsResponse = (
-                self.client.add_batch_job_operations(request=request)
+            raise NotImplementedError(
+                "batch add-operations not implemented: operation-data → MutateOperation "
+                "mapping is unbuilt. The previous version built empty MutateOperation() "
+                "objects that ignored operations_data and sent them to Google, which "
+                "would corrupt the batch job. Build the campaign/ad_group/keyword/etc. "
+                "operations directly, or run individual mutate tools instead."
             )
-
-            await ctx.log(
-                level="info",
-                message=f"Added {len(operations)} operations to batch job",
-            )
-
-            # Return serialized response
-            return serialize_proto_message(response)
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"

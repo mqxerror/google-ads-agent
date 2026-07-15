@@ -282,8 +282,6 @@ class SharedSetService:
                 MutateCampaignSharedSetsRequest,
             )
 
-            raise NotImplementedError
-
             # Create operations
             operations = []
             shared_set_resource = f"customers/{customer_id}/sharedSets/{shared_set_id}"
@@ -305,7 +303,9 @@ class SharedSetService:
             request.operations = operations
 
             # Make the API call
-            campaign_shared_set_service.mutate_campaign_shared_sets(request=request)
+            response = campaign_shared_set_service.mutate_campaign_shared_sets(
+                request=request
+            )
 
             await ctx.log(
                 level="info",
@@ -313,7 +313,7 @@ class SharedSetService:
             )
 
             # Return serialized response
-            # return serialize_proto_message(response)
+            return serialize_proto_message(response)
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"

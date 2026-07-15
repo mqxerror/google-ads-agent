@@ -385,6 +385,77 @@ class AdGroupCriterionService:
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
+    async def update_ad_group_criterion_status(
+        self,
+        ctx: Context,
+        customer_id: str,
+        ad_group_id: str,
+        criterion_id: str,
+        status: str,
+        validate_only: bool = False,
+    ) -> Dict[str, Any]:
+        """Update the status of an ad group criterion (e.g. pause/enable a keyword).
+
+        A keyword is an ad group criterion, so this pauses or enables a keyword
+        by flipping its status.
+
+        Args:
+            ctx: FastMCP context
+            customer_id: The customer ID
+            ad_group_id: The ad group ID the criterion belongs to
+            criterion_id: The criterion ID (the keyword's criterion id)
+            status: New status, one of ENABLED or PAUSED
+            validate_only: If true, the request is validated but not executed.
+
+        Returns:
+            Updated criterion details
+        """
+        try:
+            customer_id = format_customer_id(customer_id)
+
+            # A criterion's resource name is composed as ad_group_id~criterion_id
+            criterion_resource_name = (
+                f"customers/{customer_id}/adGroupCriteria/"
+                f"{ad_group_id}~{criterion_id}"
+            )
+
+            # Create ad group criterion with the new status
+            ad_group_criterion = AdGroupCriterion()
+            ad_group_criterion.resource_name = criterion_resource_name
+            ad_group_criterion.status = getattr(
+                AdGroupCriterionStatusEnum.AdGroupCriterionStatus, status
+            )
+
+            # Create operation with a status-only field mask
+            operation = AdGroupCriterionOperation()
+            operation.update = ad_group_criterion
+            operation.update_mask.CopyFrom(field_mask_pb2.FieldMask(paths=["status"]))
+
+            # Create request
+            request = MutateAdGroupCriteriaRequest()
+            request.customer_id = customer_id
+            request.operations = [operation]
+            request.validate_only = validate_only
+
+            # Make the API call
+            response = self.client.mutate_ad_group_criteria(request=request)
+
+            await ctx.log(
+                level="info",
+                message=f"Updated criterion status to {status}: {criterion_resource_name}",
+            )
+
+            return serialize_proto_message(response)
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to update criterion status: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
     async def remove_ad_group_criterion(
         self,
         ctx: Context,
@@ -550,6 +621,38 @@ def create_ad_group_criterion_tools(
             bid_modifier=bid_modifier,
         )
 
+    async def update_ad_group_criterion_status(
+        ctx: Context,
+        customer_id: str,
+        ad_group_id: str,
+        criterion_id: str,
+        status: str,
+        validate_only: bool = False,
+    ) -> Dict[str, Any]:
+        """Update the status of an ad group criterion (pause/enable a keyword).
+
+        A keyword is an ad group criterion, so use this to pause or enable a
+        keyword by flipping its status.
+
+        Args:
+            customer_id: The customer ID
+            ad_group_id: The ad group ID the criterion belongs to
+            criterion_id: The criterion ID (the keyword's criterion id)
+            status: New status, one of ENABLED or PAUSED
+            validate_only: If true, the request is validated but not executed.
+
+        Returns:
+            Updated criterion details
+        """
+        return await service.update_ad_group_criterion_status(
+            ctx=ctx,
+            customer_id=customer_id,
+            ad_group_id=ad_group_id,
+            criterion_id=criterion_id,
+            status=status,
+            validate_only=validate_only,
+        )
+
     async def remove_ad_group_criterion(
         ctx: Context,
         customer_id: str,
@@ -576,6 +679,7 @@ def create_ad_group_criterion_tools(
             add_audience_criteria,
             add_demographic_criteria,
             update_criterion_bid,
+            update_ad_group_criterion_status,
             remove_ad_group_criterion,
         ]
     )

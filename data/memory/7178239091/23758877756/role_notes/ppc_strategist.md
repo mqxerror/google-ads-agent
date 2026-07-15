@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-06-02 15:37
+**Last updated:** 2026-07-14 16:57
 
 **Task:** Bid strategy review for "Greece Golden Visa - Turkey":
 
@@ -182,3 +182,144 @@ Agreed — and I said this first. No conflict. But the Analyst's framing implies
 | Today | Verify language targeting live (read-only API check) | PPC | Verify |
 The form fix (9→3 fields + dead-click bugs) sits outside this table — it's the highest-leverage action in the entire campaign but belongs to the LP team, not the ads team. That brief should go out today in parallel.
 — *PPC Strategist*
+
+### 2026-07-06 16:35 — I though we fixed teh languages issues a month ago,
+ignore the form we already o
+
+**Task:** I though we fixed teh languages issues a month ago,
+ignore the form we already optimized it what about the headline why the changes?
+Short version: you're crossing **two different "language" fixes**. One is real and working. The other never actually applied — which is why it still looks broken.
+## 1. Language TARGETING — no, it was never actually fixed
+The live targeting on this campaign right now reads: **`Languages: English, Czech`.**
+Here's what happened. On **May 19** the GTM Specialist removed Korean and "added Turkish" — but used language constant **`1021`**. That ID is **Czech**, not Turkish. Turkish is **`1037`**. So the fix a month ago swapped Korean → **Czech** while everyone recorded it as "Turkish added." That single wrong digit is why 3 specialists kept re-flagging "English, Czech" on Jun 2, Jun 8, and Jul 4 — it was
+Impact: near-zero — almost nobody in Türkiye has their Google UI set to Czech, so you're leaning on "English" to catch Turkish speakers. It's a QS/relevance suppressor, and it costs nothing to correct.
+**This is a 30-second fix:** remove Czech (`1021`), add Turkish (`1037`). Want me to execute it? (Targeting change — I'll confirm the live criteria with one query, then apply.)
+## 2. The HEADLINE changes — a completely separate lever, and this one worked
+The headline changes have nothing to do with campaign targeting. They fix **ad-copy relevance**:
+- Turkish keywords (`yunanistan golden visa`, `oturum izni`) were being served **English** headlines → Google saw zero keyword-to-copy overlap → **Ad Relevance "Below Average" → QS 1 → 5–10x CPC premium** (that's what caused the $69.95 click on May 20).
+- **Fix (done May 21):** built Turkish RSAs `809590104375` + `809625956041`, paused the English ones. Both are live now.
+Proof it's working — QS climbed since:
+| Keyword | Then (QS) | Now (QS) |
+|---|---|---|
+**One gap remains:** the extra citizenship headlines planned for Jun 4 ("Ev Alarak Oturma İzni", "7 Yılda Vatandaşlığa Yol") appear **never added** — proof: `yunanistan ev alarak oturma izni` is **still QS 1** (5 clicks, 0 conv). That's the last stuck keyword.
+**Bottom line:** headline/copy fix = real and working. Targeting fix = botched a month ago (Czech, not Turkish). Say the word and I'll (a) correct Czech→Turkish and (b) add the two citizenship headlines — different change types, so they don't collide under one-change-per-day.
+— *PPC Strategist*
+
+### 2026-07-14 15:45 — Structural 'why it sucks' synthesis from context data only — no tool calls. Rank
+
+**Task:** Structural 'why it sucks' synthesis from context data only — no tool calls. Rank the causes of zero leads by $ impact using the fresh 15-day daily table: 1) CPC/spend discipline is slipping — Jul 6 ($
+
+**Critical Details:** GTM-WZKDXFH8
+## Structural Breakdown — Why This Campaign Has Zero Leads ($1,057 / 15 Days)
+**Ranked by dollar impact:**
+**#1 — CPC band breach + impression spike: ~$300 excess over 3 days**
+Jul 6 jumped to 439 impressions (vs. 44–170 surrounding days) and $172.82 spend. Jul 7–8 ran $127–119. CPC ceiling certified at $6.08; Jul 6 ($6.40), Jul 8 ($6.64), Jul 10 ($6.77), Jul 12 ($7.27), Jul 14 ($7.06) all breach it. Most plausible trigger: the Jul 6 citizenship keyword additions (ev almak vatandaşlık, ev alınca vatandaşlık, oturum için ev almak) expanded matching into noisier, higher-CP
+**#2 — Informational waste: ~$121 of visible 7-day search spend (41%)**
+şartları cluster alone: $44.28 + $21.70 + $12.50 + $0.57 + $0.83 = **$79.88**. nedir: $28.35. nasıl alınır: $11.83. ekşi: $1.14. Researchers, never converts. Extrapolated ~$259/15d.
+**#3 — EN group still ENABLED: ~$60–90/15d wasted**
+`greece-golden-visa-en` (198513892027): $361 lifetime / 0 conversions. English ad → Turkish LP. Pause deferred since Jun 2, now 42 days overdue.
+**#4 — Czech targeting: $0 direct, QS drag amplifies #1**
+Constant 1021 (Czech) still live, Turkish (1037) never applied. Fix: one API call.
+**Execution calendar (one-change-per-day; analyst's browser GTM check runs in parallel):**
+| Day | Action | Type |
+|-----|--------|------|
+*Conditional: If browser check (GTM-WZKDXFH8 on mercan.com/tr/yunanistan-altin-vize) confirms tracking is broken, freeze Jul 17 bid changes until restored — don't optimize spend on a campaign that can't record conversions.*
+— *PPC Strategist*
+
+### 2026-07-14 15:47 — Orchestrated finding
+
+{
+  "summary": "$1,057 / 15 days / 0 leads: a 3-day CPC+spend spike (~$300 excess, Jul 6-8) and ~$121/week in informational waste are the dollar leaders; pause EN group and add \u015fartlar\u0131 negatives recover the most spend fastest, Czech fix costs nothing and should go first today.",
+  "findings": [
+    {
+      "claim": "CPC band breached since Jul 6 \u2014 certified ceiling $6.08, but Jul 12 hit $7.27 and Jul 14 $7.06 \u2014 driven by a 3-day impression/spend spike (~$300 excess) plausibly from Jul 6 keyword additions expanding into noisier match territory",
+      "severity": "high",
+      "confidence": 0.7,
+      "sources": [
+        "15-day daily table in context",
+        "Jul 6 decision log: 3 PHRASE keywords added to oturum-gayrimenkul group"
+      ],
+      "disconfirmed_by": "API pull confirming no keyword additions or bid raises around Jul 5-6",
+      "id": "c3-f0"
+    },
+    {
+      "claim": "~41% of visible 7-day search spend (~$121 of $292) is informational \u2014 \u015fartlar\u0131 cluster $79.88, nedir $28.35, nas\u0131l al\u0131n\u0131r $11.83, ek\u015fi $1.14 \u2014 zero conversion probability by query intent",
+      "severity": "high",
+      "confidence": 0.92,
+      "sources": [
+        "7-day search term table in context (2026-07-14)"
+      ],
+      "disconfirmed_by": "Any of these terms recording a conversion in account history",
+      "id": "c3-f1"
+    },
+    {
+      "claim": "greece-golden-visa-en (198513892027) continues burning ~$60-90 in this 15-day window with 0 conversions due to English ad \u2192 Turkish LP mismatch; pause deferred 42 days",
+      "severity": "medium",
+      "confidence": 0.88,
+      "sources": [
+        "Ad group data: $361.22 lifetime / 0 conv",
+        "Ad 809344396278 final_url: mercan.com/tr/yunanistan-altin-vize",
+        "Chronicle: pause held since Jun 2"
+      ],
+      "disconfirmed_by": "Ad group showing any conversion in a fresh API pull",
+      "id": "c3-f2"
+    },
+    {
+      "claim": "Czech language tar
+
+### 2026-07-14 16:55 — Arbitrate the user's structural fork using ONLY context data: (A) clone this cam
+
+**Task:** Arbitrate the user's structural fork using ONLY context data: (A) clone this campaign keeping only what works vs (B) prune in place — AND design the $50/day hard cap. Key facts to use: campaign runs M
+**Verdict: B — prune in place.**
+On Manual CPC there is no algorithmic state to reset. What cloning costs vs. buys:
+- **Costs:** fresh ad approvals (24–48hr + re-review risk), QS history erased (`golden vize` QS 5, `altın vize` QS 6, `greece golden visa program` QS 8 — all earned, all gone)
+- **Buys:** nothing — no smart-bidding learning phase exists to protect or restart
+**Budget math — the agreed cuts hit $50/day before touching the dial:**
+| Move | Daily savings |
+|---|---|
+| Pause EN group (198513892027) | ~$6–9/day |
+| şartları PHRASE + nedir PHRASE + nasıl alınır PHRASE + ekşi EXACT negatives (Jul 14 PPC synthesis) | ~$18/day |
+| **Combined** | **~$24–27/day** |
+~$70/day avg − $25 ≈ **$45/day** — already at target. Set $50/day cap only to block Jul-6-style spikes ($172.82, $152.70). **>20% reduction from current ceiling — explicit confirm required before executing.**
+**One-change-per-day order:**
+- Day 1: 4 campaign negatives (şartları PHRASE, nedir PHRASE, nasıl alınır PHRASE, ekşi EXACT)
+- Day 2: Pause EN group + set $50/day budget
+- Day 3: Czech (1021) → Turkish (1037)
+- Day 4: Add `golden visa yunanistan` PHRASE at $5 bid; cap Jul-6 citizenship keywords at $5 within the certified band
+
+### 2026-07-14 16:57 — Orchestrated finding
+
+{
+  "summary": "Prune in place (B) \u2014 Manual CPC makes cloning pointless; execute EN pause + 4 negatives to reach ~$45/day naturally, then set $50/day cap as spike guardrail (explicit confirm required).",
+  "findings": [
+    {
+      "claim": "Prune in place (B) is correct \u2014 on Manual CPC, cloning resets earned QS history with zero algorithmic benefit and adds re-approval delay; the identical structural outcome is achievable in place",
+      "severity": "high",
+      "confidence": 0.93,
+      "sources": [
+        "Live roster: MANUAL_CPC confirmed 2026-07-14",
+        "QS data in context: QS 5/6/8 on key terms",
+        "Jul 14 PPC structural synthesis: same cuts executable in-place"
+      ],
+      "disconfirmed_by": "Evidence that an automated smart-bidding strategy is actually active, making a clean-slate learning reset worthwhile",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "EN pause (~$6-9/day) + \u015fartlar\u0131-cluster negatives (~$18/day) saves ~$24-27/day, bringing ~$70/day average spend to ~$43-46/day \u2014 hitting $50 target before the budget setting is changed",
+      "severity": "high",
+      "confidence": 0.86,
+      "sources": [
+        "15-day daily table: $1,057/15d = $70.5/day avg",
+        "Jul 14 Search Term Hunter: \u015fartlar\u0131 $79.88 + nedir $28.35 + nas\u0131l al\u0131n\u0131r $11.83 = $120.06/week (~$18/day)",
+        "EN group context: $361 lifetime at ~$6-9/day run rate"
+      ],
+      "disconfirmed_by": "Live API pull showing current daily budget is already \u2264$50, making the budget change moot",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "$50/day hard cap is required as spike guardrail \u2014 Jul 6 ($172.82) and Jul 12 ($152.70) show the campaign can 2-3x its average spend; this is a >20% change requiring explicit user confirm before execution",
+      "severity": "medium",
+      "confidence": 0.95,
+      "sources": [
+        "15-day daily table: Jul 6 $172.82, Jul 12 $152.70",
+        "Account rule: >20% budge

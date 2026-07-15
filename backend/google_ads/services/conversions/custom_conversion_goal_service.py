@@ -258,9 +258,26 @@ def register_custom_conversion_goal_tools(mcp: FastMCP[Any]) -> None:
             else:
                 raise ValueError(f"Invalid custom conversion goal status: {status_str}")
 
+        # conversion_actions must be full resource names
+        # (customers/{cid}/conversionActions/{id}); accept bare numeric IDs and
+        # expand them so a raw id does not yield RESOURCE_NAME_MALFORMED.
+        def _to_conversion_action_rn(value: str) -> str:
+            v = str(value).strip()
+            if "/" in v:
+                return v
+            if v.isdigit():
+                return f"customers/{customer_id}/conversionActions/{v}"
+            raise ValueError(
+                "conversion_actions entries must be a conversion-action resource "
+                f"name (customers/{{cid}}/conversionActions/{{id}}) or a numeric "
+                f"conversion action id; got {value!r}."
+            )
+
+        normalized_actions = [_to_conversion_action_rn(a) for a in conversion_actions]
+
         operation = service.create_custom_conversion_goal_operation(
             name=name,
-            conversion_actions=conversion_actions,
+            conversion_actions=normalized_actions,
             status=_get_status_enum(status),
         )
 
@@ -268,6 +285,10 @@ def register_custom_conversion_goal_tools(mcp: FastMCP[Any]) -> None:
             customer_id=customer_id, operations=[operation]
         )
 
+        # results is empty under validate_only (and any empty response) — guard
+        # the [0] index so it does not raise IndexError.
+        if not response.results:
+            return "Validated custom conversion goal create (no result returned)"
         result = response.results[0]
         return f"Created custom conversion goal: {result.resource_name}"
 

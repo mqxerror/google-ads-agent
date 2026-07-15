@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { addAccount, onboardAccount } from '@/lib/api';
-import type { OnboardingResult, CampaignGoal } from '@/types';
+import type { OnboardingResult } from '@/types';
 
 interface SetupData {
   developerToken: string;
@@ -44,7 +44,7 @@ export default function SetupWizard() {
   const [data, setData] = useState<SetupData>(INITIAL_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [accountId, setAccountId] = useState('');
+  const [, setAccountId] = useState('');
   const [onboardResult, setOnboardResult] = useState<OnboardingResult | null>(null);
   const navigate = useNavigate();
 

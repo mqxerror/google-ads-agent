@@ -22,6 +22,10 @@ from google.ads.googleads.v23.services.types.ad_group_ad_service import (
     MutateAdGroupAdsRequest,
     MutateAdGroupAdsResponse,
 )
+from google.ads.googleads.v23.services.types.ad_service import (
+    AdOperation,
+    MutateAdsRequest,
+)
 from google.protobuf import field_mask_pb2
 
 from google_ads.sdk_client import get_sdk_client
@@ -296,6 +300,107 @@ class AdService:
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
+    async def update_ad_final_urls(
+        self,
+        ctx: Context,
+        customer_id: str,
+        final_urls: List[str],
+        ad_group_id: Optional[str] = None,
+        ad_id: Optional[str] = None,
+        ad_resource_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update the final URLs (landing pages) of an existing ad in place.
+
+        Uses an AdOperation update with an update_mask covering only
+        ``final_urls`` on the shared ``ad`` resource, so headline/description
+        pins, ad history, and the ad ID are all preserved — unlike a
+        delete-and-recreate. Works for any ad type (RSA, ETA, etc.).
+
+        Args:
+            ctx: FastMCP context
+            customer_id: The customer ID
+            final_urls: New list of landing page URLs (each must be a
+                non-empty http/https URL)
+            ad_group_id: The ad group ID (required with ``ad_id`` when
+                ``ad_resource_name`` is not supplied)
+            ad_id: The ad ID (required with ``ad_group_id`` when
+                ``ad_resource_name`` is not supplied)
+            ad_resource_name: Full ad resource name
+                (``customers/{cid}/ads/{ad_id}``). Overrides
+                ``ad_group_id``/``ad_id`` when provided.
+
+        Returns:
+            Updated ad details
+        """
+        try:
+            customer_id = format_customer_id(customer_id)
+
+            # ── Validate final URLs ──────────────────────────────────
+            if not final_urls:
+                raise ValueError("final_urls must contain at least one URL")
+            cleaned_urls: List[str] = []
+            for url in final_urls:
+                if not isinstance(url, str) or not url.strip():
+                    raise ValueError("Each final URL must be a non-empty string")
+                stripped = url.strip()
+                if not (
+                    stripped.startswith("http://")
+                    or stripped.startswith("https://")
+                ):
+                    raise ValueError(
+                        f"Final URL must start with http:// or https://: {url!r}"
+                    )
+                cleaned_urls.append(stripped)
+
+            # ── Resolve the ad resource name ─────────────────────────
+            if ad_resource_name:
+                resource_name = ad_resource_name
+            else:
+                if not (ad_group_id and ad_id):
+                    raise ValueError(
+                        "Provide either ad_resource_name, or both "
+                        "ad_group_id and ad_id"
+                    )
+                resource_name = f"customers/{customer_id}/ads/{ad_id}"
+
+            # ── Build the in-place update on the Ad resource ─────────
+            ad_service_client = get_sdk_client().client.get_service("AdService")
+
+            ad = Ad()
+            ad.resource_name = resource_name
+            ad.final_urls.extend(cleaned_urls)
+
+            operation = AdOperation()
+            operation.update = ad
+            operation.update_mask.CopyFrom(
+                field_mask_pb2.FieldMask(paths=["final_urls"])
+            )
+
+            request = MutateAdsRequest()
+            request.customer_id = customer_id
+            request.operations = [operation]
+
+            response = ad_service_client.mutate_ads(request=request)
+
+            await ctx.log(
+                level="info",
+                message=(
+                    f"Updated final URLs for ad {resource_name} "
+                    f"to {cleaned_urls}"
+                ),
+            )
+
+            return serialize_proto_message(response)
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to update ad final URLs: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
 
 def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
     """Create tool functions for the ad service.
@@ -425,8 +530,49 @@ def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
             status=status_enum,
         )
 
+    async def update_ad_final_urls(
+        ctx: Context,
+        customer_id: str,
+        final_urls: List[str],
+        ad_group_id: Optional[str] = None,
+        ad_id: Optional[str] = None,
+        ad_resource_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update an existing ad's final URLs (landing pages) IN PLACE.
+
+        Switches the landing page(s) an ad points to without deleting and
+        recreating it, so RSA headline/description pins, ad history, and the
+        ad ID are all preserved. Works for any ad type (RSA, ETA). Provide
+        either ``ad_resource_name`` OR both ``ad_group_id`` and ``ad_id``.
+
+        Args:
+            customer_id: The customer ID
+            final_urls: New list of landing page URLs (each non-empty,
+                must start with http:// or https://)
+            ad_group_id: The ad group ID (with ad_id, if no ad_resource_name)
+            ad_id: The ad ID (with ad_group_id, if no ad_resource_name)
+            ad_resource_name: Full ad resource name
+                (customers/{cid}/ads/{ad_id}); overrides ad_group_id/ad_id
+
+        Returns:
+            Updated ad details
+        """
+        return await service.update_ad_final_urls(
+            ctx=ctx,
+            customer_id=customer_id,
+            final_urls=final_urls,
+            ad_group_id=ad_group_id,
+            ad_id=ad_id,
+            ad_resource_name=ad_resource_name,
+        )
+
     tools.extend(
-        [create_responsive_search_ad, create_expanded_text_ad, update_ad_status]
+        [
+            create_responsive_search_ad,
+            create_expanded_text_ad,
+            update_ad_status,
+            update_ad_final_urls,
+        ]
     )
     return tools
 

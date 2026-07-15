@@ -28,7 +28,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, Check, ChevronDown, ChevronRight, Loader2,
-  Lock, Sparkles, Wand2, X,
+  Lock, Music, Sparkles, Wand2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,9 @@ import {
   studioGenerateVideo,
   studioGetJob,
   studioListSouls,
+  videoEngineEstimate,
+  videoEngineRender,
+  videoEngineRenderStatus,
   type BriefVariant,
   type SoulCharacter,
   type StudioJobStatus,
@@ -120,7 +123,33 @@ export default function StudioPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [usePending, setUsePending] = useState(false);
 
+  // ── Soul talking intro (Epic 11 P2) — video mode only ──────────
+  // Presenter-style segment from a trained Soul, rendered ahead of
+  // the clip via the video-engine timeline. Motion + voiceover, NO
+  // lip-sync (§1a fallback — see backend services/video_engine.py).
+  const [talkingIntro, setTalkingIntro] = useState(false);
+  const [introSoulId, setIntroSoulId] = useState('');
+  const [introScript, setIntroScript] = useState('');
+  const [engineJobId, setEngineJobId] = useState<string | null>(null);
+  const [engineMsg, setEngineMsg] = useState<string | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const engineBusy = engineJobId !== null;
+
+  // ── Finished video (video-engine planner) — video mode only ────
+  // Sub-mode toggle. "Single clip" keeps today's behavior verbatim;
+  // "Finished video" hands a target length + model + prompt to the
+  // backend planner, which builds N Higgsfield clips and stitches one
+  // MP4 (music bed + VO optional). Default 'single' so nothing regresses.
+  const [videoSubMode, setVideoSubMode] = useState<'single' | 'finished'>('single');
+  const [targetSeconds, setTargetSeconds] = useState<15 | 30 | 60>(30);
+  const [musicOn, setMusicOn] = useState(false);
+  const [voOn, setVoOn] = useState(false);
+  const [musicFilename, setMusicFilename] = useState<string | null>(null);
+  const [voScript, setVoScript] = useState('');
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
+
   const genKind: 'image' | 'video' = mode === 'video' ? 'video' : 'image';
+  const finishedActive = genKind === 'video' && videoSubMode === 'finished';
   const { models } = useModelCatalog(genKind);
   const jobs = useStudioJobs(onJobSettled);
 
@@ -158,6 +187,23 @@ export default function StudioPanel({
   const lockedAspect = context?.aspect;
   const effectiveAspect = lockedAspect ?? (modelAspects.includes(aspect) ? aspect : modelAspects[0]);
 
+  // Finished-video helpers. maxClip mirrors the backend planner: enum →
+  // longest legal duration, int → max_duration, null-duration → 1 clip.
+  // estClips = ceil(target / maxClip) so the "≈ N clips" hint matches
+  // what the planner will build.
+  const maxClip = useMemo(() => {
+    const c = modelInfo?.constraints;
+    if (c?.duration_type === 'enum' && c.durations?.length) return Math.max(...c.durations);
+    if (c?.duration_type === 'int' && c.max_duration) return c.max_duration;
+    return null; // null-duration model → one clip covers the whole target
+  }, [modelInfo]);
+  const estClips = maxClip ? Math.max(1, Math.ceil(targetSeconds / maxClip)) : 1;
+  const modelOrigin = model
+    ? (/^(kling|seedance|minimax|hailuo|wan)/.test(model) ? 'Chinese'
+      : /^(veo|grok)/.test(model) ? 'American'
+      : model === 'soul_cast' || /soul/.test(model) ? 'Soul' : null)
+    : null;
+
   const handleModelChange = useCallback((id: string, info: StudioModelInfo | undefined) => {
     setModel(id);
     setModelInfo(info);
@@ -172,16 +218,59 @@ export default function StudioPanel({
     }
   }, []);
 
-  // ── soul library (only when the model supports it) ─────────────
+  // ── soul library (soul-aware model OR the talking-intro toggle) ─
   const supportsSoul = !!modelInfo?.constraints?.supports_soul;
+  const wantsSouls = supportsSoul || (genKind === 'video' && talkingIntro);
   const [souls, setSouls] = useState<SoulCharacter[]>([]);
   useEffect(() => {
-    if (!supportsSoul) return;
+    if (!wantsSouls) return;
     studioListSouls(accountId).then(setSouls).catch(() => setSouls([]));
-  }, [supportsSoul, accountId]);
+  }, [wantsSouls, accountId]);
+  const readySouls = souls.filter((s) => s.status === 'ready' && s.soul_id);
+  const introActive = genKind === 'video' && talkingIntro && !!introSoulId;
+
+  // ── finished-video audio pickers (mirror VideoCreator's sources) ─
+  // Music from the account's audio asset library; voices from the TTS
+  // voice list. Both are direct fetches (same endpoints VideoCreator
+  // uses); loaded lazily when the finished-video audio controls appear.
+  const [libraryAudio, setLibraryAudio] = useState<Array<{ id: string; filename: string; url: string }>>([]);
+  const [audioLoading, setAudioLoading] = useState(false);
+  useEffect(() => {
+    if (!showMusicPicker || !accountId) return;
+    let cancelled = false;
+    setAudioLoading(true);
+    const qs = new URLSearchParams({ account_id: accountId, asset_type: 'audio', limit: '60' });
+    fetch(`/api/assets?${qs}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => { if (!cancelled) setLibraryAudio(rows); })
+      .catch(() => { if (!cancelled) setLibraryAudio([]); })
+      .finally(() => { if (!cancelled) setAudioLoading(false); });
+    return () => { cancelled = true; };
+  }, [showMusicPicker, accountId]);
+
+  const [voices, setVoices] = useState<Array<{ voice_id: string; name: string }>>([]);
+  const [voiceId, setVoiceId] = useState('');
+  useEffect(() => {
+    if (!finishedActive || !voOn || voices.length) return;
+    let cancelled = false;
+    fetch('/api/video/voices')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((vo: Array<{ voice_id: string; name: string }>) => {
+        if (cancelled) return;
+        setVoices(vo);
+        const sarah = vo.find((v) => v.name === 'Sarah');
+        if (sarah) setVoiceId((id) => id || sarah.voice_id);
+        else if (vo[0]) setVoiceId((id) => id || vo[0].voice_id);
+      })
+      .catch(() => { if (!cancelled) setVoices([]); });
+    return () => { cancelled = true; };
+  }, [finishedActive, voOn, voices.length]);
 
   // ── live cost (debounced; soft errors surfaced inline) ─────────
   const [costCredits, setCostCredits] = useState<number | null>(null);
+  // Timeline estimates can be partial (a stage the CLI couldn't
+  // price) — shown as "N+" instead of pretending N is the total.
+  const [costPartial, setCostPartial] = useState(false);
   const [costLoading, setCostLoading] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
   const costAbortRef = useRef<AbortController | null>(null);
@@ -200,20 +289,50 @@ export default function StudioPanel({
       const ac = new AbortController();
       costAbortRef.current = ac;
       setCostLoading(true);
-      studioCostEstimate({
-        prompt: trimmed,
-        model,
-        aspect_ratio: effectiveAspect,
-        duration_seconds: genKind === 'video' ? duration : undefined,
-        mode: isKling ? klingMode : undefined,
-      })
-        .then((r) => {
-          if (ac.signal.aborted) return;
-          setCostCredits(r.credits);
-          setCostError(r.credits === null && r.error_message
-            ? r.error_message.split('\n').filter(Boolean).slice(0, 2).join(' · ').slice(0, 200)
-            : null);
-        })
+      // Finished video → the planner prices N clips from the target
+      // length; talking intro → summed soul+motion+clip timeline; both
+      // replace the single-clip lookup so the number by Generate covers
+      // everything about to burn.
+      const lookup = finishedActive
+        ? videoEngineEstimate({
+            target_seconds: targetSeconds,
+            model_id: model,
+            prompt: trimmed,
+            aspect: effectiveAspect,
+          }).then((r) => {
+            if (ac.signal.aborted) return;
+            setCostCredits(r.total_credits);
+            setCostPartial(r.unknown_count > 0);
+            setCostError(null);
+          })
+        : introActive
+        ? videoEngineEstimate({
+            segments: [
+              { engine: 'soul', soul_id: introSoulId, script: introScript.trim() || 'Intro' },
+              { engine: 'higgsfield', prompt: trimmed, model, duration },
+            ],
+            aspect: effectiveAspect,
+          }).then((r) => {
+            if (ac.signal.aborted) return;
+            setCostCredits(r.total_credits);
+            setCostPartial(r.unknown_count > 0);
+            setCostError(null);
+          })
+        : studioCostEstimate({
+            prompt: trimmed,
+            model,
+            aspect_ratio: effectiveAspect,
+            duration_seconds: genKind === 'video' ? duration : undefined,
+            mode: isKling ? klingMode : undefined,
+          }).then((r) => {
+            if (ac.signal.aborted) return;
+            setCostCredits(r.credits);
+            setCostPartial(false);
+            setCostError(r.credits === null && r.error_message
+              ? r.error_message.split('\n').filter(Boolean).slice(0, 2).join(' · ').slice(0, 200)
+              : null);
+          });
+      lookup
         .catch((e) => {
           if (ac.signal.aborted) return;
           setCostCredits(null);
@@ -222,7 +341,7 @@ export default function StudioPanel({
         .finally(() => { if (!ac.signal.aborted) setCostLoading(false); });
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [prompt, model, effectiveAspect, duration, klingMode, isKling, genKind, mode]);
+  }, [prompt, model, effectiveAspect, duration, klingMode, isKling, genKind, mode, introActive, introSoulId, introScript, finishedActive, targetSeconds]);
 
   // ── Enhance (Visual Director) — same 2-stage drafter as Studio ──
   const [enhancing, setEnhancing] = useState(false);
@@ -263,10 +382,52 @@ export default function StudioPanel({
   // ── Generate ────────────────────────────────────────────────────
   const submit = async () => {
     const trimmed = prompt.trim();
-    if (!trimmed || busy || !model) return;
+    if (!trimmed || busy || engineBusy || !model) return;
     setBusy(true);
     setSelectedId(null);
     try {
+      if (finishedActive) {
+        // Planner-built finished video: backend derives N clips from the
+        // target length + model + prompt, stitches one MP4, and layers
+        // the chosen audio. Same job+poll path as the talking-intro render
+        // (the finished asset joins the tiles below on completion).
+        setEngineError(null);
+        const res = await videoEngineRender({
+          account_id: accountId,
+          campaign_id: context?.campaignId,
+          target_seconds: targetSeconds,
+          model_id: model,
+          prompt: trimmed,
+          aspect: effectiveAspect,
+          quality: 'draft',
+          music_filename: musicOn && musicFilename ? musicFilename : undefined,
+          voiceover_script: voOn && voScript.trim() ? voScript.trim() : undefined,
+          voice_id: voOn && voiceId ? voiceId : undefined,
+          brief: `Finished video — ${targetSeconds}s ${model}`,
+        });
+        setEngineJobId(res.job_id);
+        setEngineMsg(`Planning ${estClips} clip${estClips > 1 ? 's' : ''} + stitching… can take several minutes.`);
+        return;
+      }
+      if (genKind === 'video' && introActive) {
+        // Segment-timeline render: Soul intro + this clip in one MP4
+        // (job+poll — the finished asset joins the tiles below).
+        setEngineError(null);
+        const res = await videoEngineRender({
+          account_id: accountId,
+          campaign_id: context?.campaignId,
+          segments: [
+            { engine: 'soul', soul_id: introSoulId, script: introScript.trim() },
+            { engine: 'higgsfield', prompt: trimmed, model, duration, speak: '' },
+          ],
+          aspect: effectiveAspect,
+          quality: 'draft',
+          brief: `Soul intro + AI clip${context?.businessName ? ` — ${context.businessName}` : ''}`,
+        });
+        setEngineJobId(res.job_id);
+        setEngineMsg('Rendering intro + clip… can take several minutes.');
+        return;
+      }
       if (genKind === 'video') {
         const res = await studioGenerateVideo({
           prompt: trimmed,
@@ -325,6 +486,43 @@ export default function StudioPanel({
       }
     } catch { /* tile keeps its error state */ }
   };
+
+  // Poll the engine render job; on done, hand the finished asset to
+  // the normal job watcher so it appears as a completed result tile
+  // (the row is written by record_generated_video, so studioGetJob
+  // reconciles it instantly). Panel stays mounted while closed, so
+  // renders survive close/reopen like every other job here.
+  useEffect(() => {
+    if (!engineJobId) return;
+    const startedAt = Date.now();
+    let cancelled = false;
+    const handle = window.setInterval(async () => {
+      if (cancelled) return;
+      if (Date.now() - startedAt > 20 * 60_000) {
+        setEngineJobId(null);
+        setEngineMsg(null);
+        setEngineError('Render timed out after 20 minutes — check the Studio library; it may still finish.');
+        return;
+      }
+      try {
+        const job = await videoEngineRenderStatus(engineJobId);
+        if (cancelled) return;
+        if (job.status === 'done' && job.asset_id) {
+          setEngineJobId(null);
+          setEngineMsg(null);
+          jobs.watch([job.asset_id]);
+        } else if (job.status === 'error') {
+          setEngineJobId(null);
+          setEngineMsg(null);
+          setEngineError(job.message || 'render failed');
+        } else if (job.message) {
+          setEngineMsg(job.message);
+        }
+      } catch { /* transient — next tick retries */ }
+    }, 3000);
+    return () => { cancelled = true; window.clearInterval(handle); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engineJobId]);
 
   const handleUse = async () => {
     if (!selectedId || !onUse) return;
@@ -464,6 +662,169 @@ export default function StudioPanel({
             </p>
           )}
 
+          {/* Video sub-mode: Single clip (today's behavior) vs Finished
+              video (planner stitches N clips into one MP4). */}
+          {mode === 'video' && (
+            <div className="inline-flex rounded-md border border-border p-0.5 gap-0.5">
+              {([['single', 'Single clip'], ['finished', 'Finished video']] as const).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setVideoSubMode(m)}
+                  disabled={busy || engineBusy}
+                  className={cn(
+                    'px-2.5 py-0.5 rounded text-xs transition-colors disabled:opacity-50',
+                    videoSubMode === m ? 'bg-accent-soft text-accent font-medium' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Finished video — target length + flexible audio. Model +
+              aspect live in the bottom row (shared with single-clip). */}
+          {finishedActive && (
+            <div className="border border-border rounded-md px-3 py-2.5 space-y-3">
+              {/* Target length */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-muted-foreground">Length</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md border border-border p-0.5 gap-0.5">
+                    {([15, 30, 60] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setTargetSeconds(s)}
+                        disabled={busy || engineBusy}
+                        className={cn(
+                          'px-2.5 py-0.5 rounded text-xs font-mono transition-colors disabled:opacity-50',
+                          targetSeconds === s ? 'bg-accent-soft text-accent font-medium' : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {s}s
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    ≈ {estClips} clip{estClips > 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Flexible audio: music bed and/or voiceover (either/both/none) */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-mono text-muted-foreground">Audio</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                    <input type="checkbox" checked={musicOn} disabled={busy || engineBusy}
+                      onChange={(e) => setMusicOn(e.target.checked)} />
+                    Music bed
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                    <input type="checkbox" checked={voOn} disabled={busy || engineBusy}
+                      onChange={(e) => setVoOn(e.target.checked)} />
+                    Voiceover
+                  </label>
+                </div>
+
+                {musicOn && (
+                  <div className="flex items-center gap-2">
+                    {musicFilename ? (
+                      <span className="inline-flex items-center gap-1 h-7 rounded border border-border bg-secondary/40 px-2 text-[11px]">
+                        <Music className="h-3 w-3" />
+                        <span className="truncate max-w-[160px]">{musicFilename}</span>
+                        <button type="button" onClick={() => setMusicFilename(null)} disabled={busy || engineBusy}
+                          className="ml-0.5 text-muted-foreground hover:text-foreground" aria-label="Remove music">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-7 gap-1.5"
+                        onClick={() => setShowMusicPicker(true)} disabled={busy || engineBusy}>
+                        <Music className="h-3 w-3" /> Pick music
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {voOn && (
+                  <div className="space-y-1.5">
+                    <textarea
+                      value={voScript}
+                      onChange={(e) => setVoScript(e.target.value)}
+                      rows={2}
+                      disabled={busy || engineBusy}
+                      placeholder="Voiceover script — the narration read over the finished video."
+                      className="w-full rounded-md bg-secondary/40 border border-border px-2.5 py-1.5 text-xs resize-none disabled:opacity-50 placeholder:text-muted-foreground/60"
+                    />
+                    {voices.length > 0 && (
+                      <select
+                        value={voiceId}
+                        onChange={(e) => setVoiceId(e.target.value)}
+                        disabled={busy || engineBusy}
+                        className="h-7 rounded border border-border bg-background px-2 text-xs disabled:opacity-50"
+                      >
+                        {voices.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Soul talking intro (Epic 11 P2). Honest copy — the §1a
+              fallback is motion + voiceover, NOT lip-sync. Single-clip
+              only — the finished-video planner owns its own audio. */}
+          {mode === 'video' && videoSubMode === 'single' && (
+            <div className="border border-border rounded-md px-3 py-2 space-y-2">
+              <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={talkingIntro}
+                  onChange={(e) => setTalkingIntro(e.target.checked)}
+                  disabled={busy || engineBusy}
+                />
+                <span className="font-medium">Add talking intro (Soul presenter)</span>
+              </label>
+              {talkingIntro && (
+                <>
+                  <select
+                    value={introSoulId}
+                    onChange={(e) => setIntroSoulId(e.target.value)}
+                    disabled={busy || engineBusy || !readySouls.length}
+                    className="h-7 w-full rounded border border-border bg-background px-2 text-xs disabled:opacity-50"
+                  >
+                    <option value="">{readySouls.length ? 'Pick a ready Soul…' : 'No ready Soul yet'}</option>
+                    {readySouls.map((s) => (
+                      <option key={s.id} value={s.soul_id ?? ''}>{s.name}</option>
+                    ))}
+                  </select>
+                  {!readySouls.length && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Train one in Studio → Souls first (5-15 min), then it appears here.
+                    </p>
+                  )}
+                  <textarea
+                    value={introScript}
+                    onChange={(e) => setIntroScript(e.target.value)}
+                    rows={2}
+                    disabled={busy || engineBusy}
+                    placeholder="Intro line the presenter speaks (8-20 words)"
+                    className="w-full rounded-md bg-secondary/40 border border-border px-2.5 py-1.5 text-xs resize-none disabled:opacity-50 placeholder:text-muted-foreground/60"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Presenter-style: your Soul on camera with motion and a voiceover of
+                    this line — no lip-sync. Renders as intro + clip in one video; the
+                    intro clip is cached, so re-renders are free.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {/* 3-angle picker */}
           {angleVariants.length > 0 && (
             <div className="border border-border rounded-md divide-y divide-border">
@@ -500,6 +861,16 @@ export default function StudioPanel({
                 />
               ))}
             </div>
+          )}
+          {mode !== 'copy' && engineBusy && engineMsg && (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin shrink-0" /> {engineMsg}
+            </p>
+          )}
+          {mode !== 'copy' && engineError && (
+            <p className="text-[11px] text-danger flex items-center gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0" /> {engineError}
+            </p>
           )}
           {mode !== 'copy' && emptyCredits && (
             <p className="text-[11px] text-warning flex items-center gap-1.5">
@@ -552,6 +923,9 @@ export default function StudioPanel({
             <>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <ModelPicker kind={genKind} value={model} onChange={handleModelChange} disabled={busy} />
+                {finishedActive && modelOrigin && (
+                  <span className="text-[10px] text-muted-foreground" title="Model origin">{modelOrigin}</span>
+                )}
                 {/* Aspect — locked from context, else model-constrained */}
                 {lockedAspect ? (
                   <span
@@ -578,22 +952,35 @@ export default function StudioPanel({
                       ? 'border-danger/40 text-danger'
                       : 'border-border text-muted-foreground',
                   )}
-                  title={costError ? `Model rejected the params: ${costError}` : (modelInfo?.cost_text || '')}
+                  title={costError ? `Model rejected the params: ${costError}` : costPartial ? 'Some stages could not be priced — total is partial' : (modelInfo?.cost_text || '')}
                 >
-                  {costError ? 'incompatible' : `≈ ${costLoading ? '…' : costCredits ?? '—'} credits`}
+                  {costError ? 'incompatible' : `≈ ${costLoading ? '…' : costCredits !== null ? `${costCredits}${costPartial ? '+' : ''}` : '—'} credits`}
                 </span>
                 <Button
                   onClick={submit}
-                  disabled={busy || !prompt.trim() || !model || jobs.runningCount > 0}
+                  disabled={busy || engineBusy || !prompt.trim() || !model || jobs.runningCount > 0
+                    || (genKind === 'video' && videoSubMode === 'single' && talkingIntro && (!introSoulId || !introScript.trim()))
+                    || (finishedActive && ((musicOn && !musicFilename) || (voOn && !voScript.trim())))}
                   size="sm"
                   className="ml-auto gap-1.5"
+                  title={finishedActive
+                    ? (musicOn && !musicFilename ? 'Pick a music file first'
+                      : voOn && !voScript.trim() ? 'Add a voiceover script first'
+                      : `Confirms the render — burns ≈ ${costCredits ?? '…'} credits`)
+                    : undefined}
                 >
-                  {busy || jobs.runningCount > 0
+                  {busy || engineBusy || jobs.runningCount > 0
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <Sparkles className="h-3.5 w-3.5" />}
-                  {jobs.runningCount > 0
-                    ? `${jobs.settledCount}/${jobs.variants.length}`
-                    : genKind === 'video' ? `Generate ${duration}s clip` : variantsCount > 1 ? `Generate ${variantsCount}` : 'Generate'}
+                  {engineBusy
+                    ? 'Rendering…'
+                    : jobs.runningCount > 0
+                      ? `${jobs.settledCount}/${jobs.variants.length}`
+                      : finishedActive
+                        ? `Generate finished video (≈ ${costLoading ? '…' : costCredits !== null ? `${costCredits}${costPartial ? '+' : ''}` : '—'} cr)`
+                        : genKind === 'video'
+                          ? (introActive ? `Render intro + ${duration}s clip` : `Generate ${duration}s clip`)
+                          : variantsCount > 1 ? `Generate ${variantsCount}` : 'Generate'}
                 </Button>
               </div>
 
@@ -623,7 +1010,7 @@ export default function StudioPanel({
                         </select>
                       </label>
                     )}
-                    {genKind === 'video' && modelInfo?.constraints?.duration_type === 'enum' && (
+                    {genKind === 'video' && videoSubMode === 'single' && modelInfo?.constraints?.duration_type === 'enum' && (
                       <label className="flex items-center gap-1.5">
                         <span className="text-[10px] uppercase font-mono text-muted-foreground">Duration</span>
                         <select
@@ -638,7 +1025,7 @@ export default function StudioPanel({
                         </select>
                       </label>
                     )}
-                    {genKind === 'video' && modelInfo?.constraints?.duration_type === 'int' && (
+                    {genKind === 'video' && videoSubMode === 'single' && modelInfo?.constraints?.duration_type === 'int' && (
                       <label className="flex items-center gap-1.5">
                         <span className="text-[10px] uppercase font-mono text-muted-foreground">Duration</span>
                         <Input
@@ -726,6 +1113,55 @@ export default function StudioPanel({
             </Button>
           )}
         </div>
+
+        {/* Music-bed picker (finished video). Pulls the account's audio
+            library — same source VideoCreator uses. */}
+        {showMusicPicker && (
+          <div
+            className="absolute inset-0 z-10 bg-black/20 flex items-center justify-center p-4"
+            onClick={() => setShowMusicPicker(false)}
+          >
+            <div
+              className="w-full max-w-sm max-h-[80%] flex flex-col rounded-md border border-border bg-card shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                <Music className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Pick a music bed</span>
+                <button onClick={() => setShowMusicPicker(false)} className="ml-auto p-1 hover:bg-secondary rounded" aria-label="Close">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {audioLoading ? (
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 px-1 py-2">
+                    <Loader2 className="h-3 w-3 animate-spin" /> loading audio…
+                  </p>
+                ) : libraryAudio.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground px-1 py-2">
+                    No audio in your library yet. Upload royalty-free tracks in the asset library first.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {libraryAudio.map((a) => (
+                      <li key={a.id}>
+                        <button
+                          type="button"
+                          onClick={() => { setMusicFilename(a.filename); setShowMusicPicker(false); }}
+                          className="w-full text-left px-2 py-1.5 text-xs hover:bg-secondary/50 rounded flex items-center gap-1.5"
+                          title={a.filename}
+                        >
+                          <Music className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{a.filename}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

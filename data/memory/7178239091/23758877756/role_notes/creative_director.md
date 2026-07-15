@@ -1,6 +1,6 @@
 # Creative Director Notes
 
-**Last updated:** 2026-06-02 15:39
+**Last updated:** 2026-07-14 16:57
 
 **Task:** we need English rsa to English keywords and Turkish for Turkish we need massively reduce the cpu and increase the Qs
 Agreed — language-matched ads are the single biggest QS lever right now. Let me create the Turkish RSAs and flag one targeting issue I spotted.Creating both Turkish RSAs now — one per Turkish ad group, same LP, each with keyword-matched headlines.Both Turkish RSAs created. Now pausing the old English RSAs in those two Turkish ad groups.All executed. Here's the full summary:
@@ -126,3 +126,46 @@ Every specialist said the LP form fix is the dominant lever. Nobody assigned it 
 Jun 4 language fix and headline addition are on the same day — one is a targeting change, one is a copy change. These are different change types and different systems (campaign targeting vs. ad copy), so they don't violate the one-change-per-day rule as long as they're not both in the same category.
 **Bottom line on the central conflict:** It's a landing-page problem (dominant, 3x leverage), with a secondary traffic-quality problem (8.8% waste, fixable cheaply), and a structural copy gap (QS-1 keywords, fixable Jun 4). It is not a tracking problem — the Analytics Analyst settled that. It is not a bidding problem — the PPC Strategist settled that. Everything points to the form. Get the LP brie
 — *Creative Director*
+
+### 2026-07-14 16:55 — Answer the English-terms fork ONLY: remove the English terms entirely vs point t
+
+**Task:** Answer the English-terms fork ONLY: remove the English terms entirely vs point them at an English LP. Cite your Jun 2 audit (reuse — do not redo): greece-golden-visa-en (198513892027) now $361 lifetim
+
+**Critical Details:** GTM-KWFH5X9T, GTM-WZKDXFH8
+**Recommendation: Pause and remove the EN group. Do not redirect to the US LP.**
+Three decisive reasons:
+- **Conversion action contamination.** `mercan.com/greece-golden-visa/` fires label `hMe8CLPl184aELCTg4oD` (conversion action 7144337715, GTM-KWFH5X9T) — the US campaign's tag. Sending Turkey EN traffic there means any lead records against the *US campaign's* conversion action, not this campaign's `fxvWCM-vu6scELCTg4oD`. You'd inflate US numbers, leave Turkey dark, and pollute both bidding algorit
+- **Audience/messaging mismatch.** The US LP is calibrated for American HNW investors — pricing in USD context, English-first copy, US-trust signals. English-searchers in Türkiye are bilingual Turkish investors. They need the same investor framing as the Turkish groups; the US LP doesn't serve them and has no Turkish cultural anchors.
+- **Demand doesn't justify a build.** $361 / 0 conversions lifetime; the Jun 2 audit showed the top EN search term was "greece golden visa properties for sale" — real estate browsing. Volume and intent don't warrant a dedicated Turkey-English LP + dedicated conversion action. If English demand in Turkey grows, it earns its own LP and own label at that point.
+The contingent EN RSA copy I drafted Jun 2 was gated on a clean English LP existing. The only English LP available is contaminated. Gate not met.
+
+### 2026-07-14 16:57 — Orchestrated finding
+
+{
+  "summary": "Pause the EN group \u2014 redirecting to the US LP contaminates the US conversion action, the audience/messaging is mismatched, and the volume ($361 / 0 conv) doesn't justify a dedicated Turkey-English LP build.",
+  "findings": [
+    {
+      "claim": "Redirecting greece-golden-visa-en to mercan.com/greece-golden-visa/ would contaminate the US campaign's conversion action (7144337715 / GTM-KWFH5X9T) with Turkey EN traffic, poisoning attribution for both campaigns",
+      "severity": "high",
+      "confidence": 0.97,
+      "sources": [
+        "Campaign guidelines: Greece GV USA CP conversion action 7144337715 on GTM-KWFH5X9T, fires on /greece-golden-visa/",
+        "Turkey campaign uses separate label fxvWCM-vu6scELCTg4oD on GTM-WZKDXFH8"
+      ],
+      "disconfirmed_by": "A GTM audit showing the Turkey conversion label also fires on /greece-golden-visa/ (it does not per session context)",
+      "id": "c2-f0"
+    },
+    {
+      "claim": "EN ad group (198513892027) should be paused \u2014 $361 lifetime / 0 conversions, no clean English LP available for Turkey, and English demand in T\u00fcrkiye doesn't justify a new LP + dedicated conversion action build at this volume",
+      "severity": "high",
+      "confidence": 0.93,
+      "sources": [
+        "Ad group data: $361.22 lifetime / 0 conv",
+        "Jun 2 Creative Director audit: top EN search term was 'greece golden visa properties for sale' \u2014 real estate browsing",
+        "No Turkey-English LP exists independent of the US LP"
+      ],
+      "disconfirmed_by": "Evidence that English-searching users in Turkey are converting at meaningful rates in any other Mercan campaign",
+      "id": "c2-f1"
+    }
+  ]
+}

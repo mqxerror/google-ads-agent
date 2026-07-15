@@ -75,7 +75,8 @@ class CustomInterestService:
                     {"type": "URL", "value": "example.com/shoes"}
                 ]
             type_: Type - CUSTOM_AFFINITY or CUSTOM_INTENT
-            status: Status - ENABLED or REMOVED
+            status: Ignored on create — status is immutable at creation and
+                defaults to ENABLED; kept for signature compatibility.
 
         Returns:
             Created custom interest details
@@ -90,9 +91,9 @@ class CustomInterestService:
             custom_interest.type_ = getattr(
                 CustomInterestTypeEnum.CustomInterestType, type_
             )
-            custom_interest.status = getattr(
-                CustomInterestStatusEnum.CustomInterestStatus, status
-            )
+            # NOTE: status is IMMUTABLE on CREATE — Google rejects setting it
+            # ("IMMUTABLE_FIELD 'status' cannot be modified by CREATE"). Let the
+            # API default it (ENABLED); status is only settable via update.
 
             # Add members
             for member in members:

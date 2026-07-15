@@ -61,6 +61,24 @@ TYPE_TO_TEMPLATE = {
 }
 
 
+def _classify_scene_error(exc: BaseException) -> tuple[str, str]:
+    """Map a per-scene render exception into (error_class, message).
+
+    HiggsfieldError carries a `.code` ∈ {auth, cli, nsfw, run, shape}; use it
+    verbatim as the error_class so the frontend can distinguish a login problem
+    (auth → show the login banner) from a param/upstream problem. Anything else
+    is `other` with a truncated str(). Imported lazily to keep this module free
+    of a hard higgsfield dependency for pure-hyperframes renders.
+    """
+    try:
+        from app.services.higgsfield_client import HiggsfieldError
+    except Exception:  # pragma: no cover — import should never fail
+        HiggsfieldError = ()  # type: ignore
+    if HiggsfieldError and isinstance(exc, HiggsfieldError):  # type: ignore[arg-type]
+        return (exc.code or "run"), (exc.message or str(exc))[:300]
+    return "other", str(exc)[:300]
+
+
 def _template_for_scene(scene: dict) -> Path:
     """Return the template directory to use for a given scene. For broll
     scenes, picks the composition variant; for everything else, returns the
@@ -279,8 +297,27 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
         # render phase so it can run inside the same batched gather).
         prepared: list[tuple[int, str, Any, float]] = []
         n_higgsfield = 0
+        n_soul = 0
         for i, scene in enumerate(req.scenes):
             stype = (scene.get("type") or "").lower()
+            if stype == "soul":
+                # Epic 11 P2 — Soul presenter clip (NON-LIPSYNC fallback;
+                # see services/video_engine.py §1a note). Same credit-guard
+                # shape as higgsfield scenes: hard cap per render, defense
+                # in depth with video_engine.enforce_caps and pmax_video's
+                # _clean_scenes (this path also covers hand-edited
+                # storyboards).
+                from app.services.video_engine import MAX_SOUL_SEGMENTS
+                if not (scene.get("soul_id") or "").strip():
+                    logger.warning("storyboard scene %d soul without soul_id — skipping", i)
+                    continue
+                if n_soul >= MAX_SOUL_SEGMENTS:
+                    yield {"type": "status", "stage": "soul-capped",
+                           "message": f"Scene {i+1} skipped — max {MAX_SOUL_SEGMENTS} Soul presenter clip per render (credit guard)."}
+                    continue
+                n_soul += 1
+                prepared.append((i, "soul", dict(scene), 6.0))
+                continue
             if stype == "higgsfield":
                 # Epic 11 P1 — generative clip spliced into the stitch.
                 # Cap per render: credit-burn guard (defense in depth
@@ -335,6 +372,25 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
             (or cache-hit) a clip and mezzanine-normalize it so the
             xfade chain accepts it next to the 1920x1080/30fps HTML
             scenes."""
+            if stype == "soul":
+                # Epic 11 P2 — presenter clip (still + motion, no lip-sync).
+                # The script's TTS rides the storyboard VO bed; the clip's
+                # own audio (if any) is stripped by normalize_clip.
+                from app.services.higgsfield_scene import normalize_clip
+                from app.services.video_engine import resolve_soul_clip
+                raw_clip, was_cached = await resolve_soul_clip(
+                    payload,
+                    aspect=req.aspect,
+                    account_id=req.account_id,
+                    campaign_id=req.campaign_id,
+                )
+                if was_cached:
+                    logger.info("scene %d reusing cached soul presenter clip", idx)
+                min_dur: Optional[float] = None
+                if sync_active and per_scene_duration[idx]:
+                    min_dur = per_scene_duration[idx] + 0.3
+                dest = work_root / f"s{idx:02d}_soul_norm.mp4"
+                return await normalize_clip(raw_clip, dest, min_duration=min_dur)
             if stype == "higgsfield":
                 from app.services.higgsfield_scene import (
                     normalize_clip,
@@ -359,16 +415,20 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
             return await _render_with_hyperframes(payload, quality=req.quality)
 
         scene_mp4s: list[Path] = [None] * len(prepared)  # type: ignore
+        # Honest render failures: collect the CLASSIFIED cause of every
+        # skipped scene so a partial/empty reel reports WHY (auth vs cli vs
+        # nsfw vs run vs shape vs other) rather than an opaque "all failed".
+        scene_failures: list[dict] = []
         total = len(prepared)
         for batch_start in range(0, total, req.parallel_workers):
             batch = prepared[batch_start:batch_start + req.parallel_workers]
-            n_hf_batch = sum(1 for (_, t, _, _) in batch if t == "higgsfield")
+            n_gen_batch = sum(1 for (_, t, _, _) in batch if t in ("higgsfield", "soul"))
             yield {
                 "type": "status", "stage": f"render-batch-{batch_start//req.parallel_workers + 1}",
                 "message": (
                     f"Rendering scenes {batch_start+1}-{batch_start+len(batch)}/{total}"
                     + (" (includes an AI clip — can take several minutes)…"
-                       if n_hf_batch else " (Hyperframes · GSAP · headless Chrome)…")
+                       if n_gen_batch else " (Hyperframes · GSAP · headless Chrome)…")
                 ),
             }
             results = await asyncio.gather(
@@ -379,9 +439,16 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
                 if isinstance(res, Exception):
                     # Don't kill the whole reel for one bad scene — surface a warning
                     # event and stitch what we have. A 12/13 scene reel is still a win.
-                    logger.warning("scene %d (%s) render failed: %s", idx, stype, res)
+                    error_class, err_msg = _classify_scene_error(res)
+                    logger.warning("scene %d (%s) render failed [%s]: %s", idx, stype, error_class, res)
+                    scene_failures.append({
+                        "scene_index": idx,
+                        "error_class": error_class,
+                        "message": err_msg,
+                    })
                     yield {
                         "type": "status", "stage": "scene-skipped",
+                        "error_class": error_class,
                         "message": f"Scene {idx+1} ({stype}) failed to render — continuing with remaining scenes.",
                     }
                     continue
@@ -390,7 +457,22 @@ async def generate_storyboard_reel(req: StoryboardReelRequest) -> AsyncIterator[
         # Filter the ones that actually rendered
         ordered_mp4s = [m for m in scene_mp4s if m is not None]
         if not ordered_mp4s:
-            raise RuntimeError("all scenes failed to render")
+            # ALL scenes failed. Emit a STRUCTURED error carrying the classified
+            # per-scene failures so the SSE stream (and the frontend) can show
+            # the real cause instead of an opaque RuntimeError. If any failure
+            # was auth-class, lead with that so the FE shows the login banner.
+            has_auth = any(f["error_class"] == "auth" for f in scene_failures)
+            top_msg = (
+                "All scenes failed to render — Higgsfield is not logged in "
+                "(run `higgsfield login`)."
+                if has_auth else "All scenes failed to render."
+            )
+            yield {
+                "type": "error", "stage": "error",
+                "message": top_msg,
+                "scene_failures": scene_failures,
+            }
+            return
 
         # ── 3. Voiceover ──
         audio_path: Optional[Path] = None

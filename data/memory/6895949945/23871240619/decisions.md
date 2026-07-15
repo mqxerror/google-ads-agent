@@ -1,0 +1,45 @@
+# Decision Log: Campaign 23871240619
+
+<!-- FORMAT: | Date | Action | Reason | Outcome | Role | -->
+
+| Date | Action | Reason | Outcome | Role |
+|------|--------|--------|---------|------|
+| 2026-07-14 12:08 | "task": "Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocation) and lead item 7 (Top 3 recommendations). Use ONLY the LIVE CAMPAIGN DATA in context: 14-day daily table (note the CPC inflection ~Jul 8:  | User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question about this campaign.
+
+USER QUESTION: Deep performance | pending | director |
+| 2026-07-14 12:08 | "task": "Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables already in context. Map keywords into: converters (panama residency for americans 3 conv/419 clicks, residency visa panama 1 conv/546 clicks), z | User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question about this campaign.
+
+USER QUESTION: Deep performance | pending | director |
+| 2026-07-14 12:08 | "task": "Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verified working, form works, Wassim confirmed zero CRM leads, so 4 lifetime conversions / ~$5.8K lifetime spend / 0 conv in the last 14 days ($1,5 | User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question about this campaign.
+
+USER QUESTION: Deep performance | pending | director |
+| 2026-07-14 12:09 | / AG4 Real Estate / $487 / 0 / Already paused ✓ / | User asked: Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocati | pending | ppc_strategist |
+| 2026-07-14 12:09 | "disconfirmed_by": "AG1 converts within 7 days after the /lp/ switch is live" | User asked: Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocati | pending | ppc_strategist |
+| 2026-07-14 12:09 | "disconfirmed_by": "A rebuilt campaign with /lp/ + lead-form asset converts while the current campaign does not under identical conditions" | User asked: Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocati | pending | ppc_strategist |
+| 2026-07-14 12:09 | "disconfirmed_by": "CPC normalizes below $3.60 within 7 days without any change" | User asked: Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocati | pending | ppc_strategist |
+| 2026-07-14 12:09 | "disconfirmed_by": "AG2's 4 conversions are confirmed as tracking artifacts not reflected in the CRM" | User asked: Answer the 'recreate the campaign with a better strategy?' question head-on, plus items 1 (Trend Analysis), 2 (Ad Group Breakdown), 6 (Budget Allocati | pending | ppc_strategist |
+| 2026-07-14 12:10 | **The verified premise (do not re-open):** tracking is confirmed working, the form is confirmed functional, and Wassim confirmed **B** (zero CRM leads). What Google Ads reports is real. | User asked: Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verifi | pending | analytics_analyst |
+| 2026-07-14 12:10 | "claim": "Lifetime CPA of ~$1,447 is 7–10× over the $150–200 tolerance band, confirmed by CRM verification — this is not a tracking gap", | User asked: Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verifi | pending | analytics_analyst |
+| 2026-07-14 12:10 | "disconfirmed_by": "CRM records surface delayed leads that were attributed to this campaign" | User asked: Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verifi | pending | analytics_analyst |
+| 2026-07-14 12:10 | "disconfirmed_by": "Conversion volume reaches 30+ events, enabling meaningful segmentation" | User asked: Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verifi | pending | analytics_analyst |
+| 2026-07-14 12:10 | "disconfirmed_by": "The direct consult CTA begins converting at ≥5 conv/month after the /lp/ URL switch" | User asked: Ground the whole analysis in the conversion truth so the team doesn't re-litigate it: cite (reuse, do not redo) the settled findings — tracking verifi | pending | analytics_analyst |
+| 2026-07-14 12:10 | - **Dead weight (0 clicks by luck):** `best place to buy` (generic mismatch, flagged prior session, still live), `panama territorial tax`, `second residency for us citizens` | User asked: Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables alr | pending | search_term_hunter |
+| 2026-07-14 12:10 | / `panama golden visa` + `golden visa panama` / **$43.60** / Panama has no "golden visa" — different product frame, EU searcher expectation; **flagged May 25 + Jun 24, still un-actioned** / | User asked: Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables alr | pending | search_term_hunter |
+| 2026-07-14 12:10 | "claim": "Add [EXACT] panama golden visa and [EXACT] golden visa panama as campaign negatives — $43.60 in 7 days on a product that doesn't exist; flagged twice, still un-actioned", | User asked: Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables alr | pending | search_term_hunter |
+| 2026-07-14 12:10 | "disconfirmed_by": "If Mercan is rebranding QIP as a 'golden visa' product in its own marketing (it currently is not)" | User asked: Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables alr | pending | search_term_hunter |
+| 2026-07-14 12:10 | "disconfirmed_by": "If the QS 3 is driven by landing page experience rather than ad relevance (pinning the headline won't help in that case)" | User asked: Cover items 3 (Keyword Efficiency), 4 (Quality Score Audit) and 5 (Search Term Quality / wasted spend %) from the KEYWORDS and SEARCH TERMS tables alr | pending | search_term_hunter |
+| 2026-07-14 12:12 | / AG4 Real Estate / 101 / $487 / 0 / $4.82 / Already paused ✓ / | User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voice, for the user's question.
+
+USER QUESTION: Deep  | pending | director |
+| 2026-07-14 12:12 | The number that should bother you most isn't AG1's zero — it's **AG1's $5.58 CPC, 2.25× what AG2 pays per click, for nothing.** AG1 is 37% of lifetime spend, buying the most expensive clicks in the account, and has never produced. AG1 + AG3 together are **45% of currently-enabled spend at zero retur | User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voice, for the user's question.
+
+USER QUESTION: Deep  | pending | director |
+| 2026-07-14 12:12 | Zero-conversion spenders with real click volume: `panama residency by investment` (85), `panama tax residency` (53), `panamanian residency` (50), `panama investment property` (50), `invest in panama real estate` (43) — **~280 clicks, $0 back.** Dead weight that has simply been lucky not to spend: `b | User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voice, for the user's question.
+
+USER QUESTION: Deep  | pending | director |
+| 2026-07-14 12:12 | / `panama golden visa` + `golden visa panama` / **$43.60** / **Panama has no golden visa.** Wrong product frame, EU-searcher expectation. **Flagged May 25 AND Jun 24 — still un-actioned.** / | User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voice, for the user's question.
+
+USER QUESTION: Deep  | pending | director |
+| 2026-07-14 12:12 | You're spending **~$104/day**, and **45% of enabled spend flows to two ad groups that have produced nothing.** But you don't need to touch the budget line to fix that. Pause AG1 + AG3 and spend **self-corrects onto AG2 at roughly $60–70/day** — AG2 alone won't come near the cap. Same outcome as a th | User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voice, for the user's question.
+
+USER QUESTION: Deep  | pending | director |

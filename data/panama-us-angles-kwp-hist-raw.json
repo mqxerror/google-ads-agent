@@ -1,0 +1,926 @@
+{
+  "meta": {
+    "customer_id": "7178239091",
+    "geo": "US/2840",
+    "lang": "EN/1000",
+    "network": "GOOGLE_SEARCH",
+    "api_version": "v23",
+    "fetched": "2026-07-15 11:43"
+  },
+  "angles": {
+    "panama_program": [
+      "panama qualified investor program",
+      "panama qualified investor visa",
+      "panama golden visa",
+      "panama residency by investment",
+      "panama residency by investment program",
+      "panama investor visa",
+      "panama investment visa",
+      "panama permanent residency",
+      "panama permanent residency by investment",
+      "panama residency",
+      "panama residency requirements",
+      "panama residency visa",
+      "residency visa panama",
+      "panama residency for americans",
+      "panama residency program",
+      "how to get residency in panama",
+      "panama residency cost",
+      "panama immigration lawyer",
+      "panama immigration lawyers",
+      "immigrate to panama from us",
+      "panama visa for us citizens"
+    ],
+    "property": [
+      "buy property in panama",
+      "buying property in panama",
+      "buy real estate in panama",
+      "buying real estate in panama",
+      "buy house in panama",
+      "buy apartment in panama",
+      "buy condo in panama",
+      "panama real estate",
+      "panama real estate for sale",
+      "panama real estate investment",
+      "real estate investment in panama",
+      "investing in panama real estate",
+      "invest in panama real estate",
+      "panama investment property",
+      "panama property for sale",
+      "homes for sale in panama",
+      "houses for sale in panama",
+      "panama city panama real estate",
+      "panama city panama condos for sale",
+      "apartments for sale in panama city panama",
+      "santa maria panama real estate",
+      "panama real estate for expats",
+      "best place to buy real estate in panama",
+      "panama beachfront property for sale"
+    ],
+    "friendly_nations": [
+      "panama friendly nations visa",
+      "friendly nations visa",
+      "panama friendly nations visa requirements",
+      "friendly nations visa panama requirements"
+    ],
+    "golden_visa_generic": [
+      "golden visa",
+      "golden visa program",
+      "golden visa programs",
+      "golden visa countries",
+      "best golden visa",
+      "best golden visa programs",
+      "cheapest golden visa",
+      "golden visa real estate",
+      "real estate golden visa",
+      "golden visa cost"
+    ],
+    "rbi_generic": [
+      "residency by investment",
+      "residency by investment programs",
+      "residence by investment",
+      "best residency by investment",
+      "permanent residency by investment",
+      "residency by investment countries",
+      "cheapest residency by investment"
+    ],
+    "second_residency": [
+      "second residency",
+      "second residency program",
+      "second residence",
+      "plan b residency",
+      "plan b citizenship",
+      "backup residency"
+    ],
+    "investor_visa_generic": [
+      "investor visa",
+      "investment visa",
+      "investor residency",
+      "investment residency",
+      "countries with investment visa",
+      "real estate investment visa",
+      "property investment visa"
+    ],
+    "tax": [
+      "territorial tax countries",
+      "panama tax residency",
+      "tax residency panama",
+      "panama taxes for expats",
+      "countries with no tax on foreign income",
+      "no tax on foreign income",
+      "best tax residency countries",
+      "panama territorial tax"
+    ],
+    "citizenship_flag": [
+      "citizenship by investment",
+      "citizenship by investment programs",
+      "second passport",
+      "second citizenship",
+      "golden passport",
+      "panama citizenship",
+      "panama citizenship by investment",
+      "panama passport",
+      "panama passport by investment",
+      "panama dual citizenship",
+      "cheapest citizenship by investment"
+    ],
+    "retirement_excluded": [
+      "panama retirement visa",
+      "panama pensionado visa",
+      "pensionado visa panama",
+      "retiring to panama"
+    ]
+  },
+  "metrics": {
+    "apartments for sale in panama city panama": {
+      "avg_monthly_searches": 320,
+      "competition": "MEDIUM",
+      "competition_index": 36,
+      "low_bid_usd": 0.03,
+      "high_bid_usd": 1.2,
+      "close_variants": []
+    },
+    "best golden visa": {
+      "avg_monthly_searches": 90,
+      "competition": "MEDIUM",
+      "competition_index": 46,
+      "low_bid_usd": 1.35,
+      "high_bid_usd": 4.59,
+      "close_variants": []
+    },
+    "best golden visa programs": {
+      "avg_monthly_searches": 140,
+      "competition": "MEDIUM",
+      "competition_index": 59,
+      "low_bid_usd": 1.62,
+      "high_bid_usd": 6.11,
+      "close_variants": []
+    },
+    "best place to buy real estate in panama": {
+      "avg_monthly_searches": 70,
+      "competition": "MEDIUM",
+      "competition_index": 42,
+      "low_bid_usd": 0.22,
+      "high_bid_usd": 1.86,
+      "close_variants": []
+    },
+    "buy apartment in panama": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 26,
+      "low_bid_usd": 0.03,
+      "high_bid_usd": 1.67,
+      "close_variants": []
+    },
+    "buy condo in panama": {
+      "avg_monthly_searches": 590,
+      "competition": "MEDIUM",
+      "competition_index": 41,
+      "low_bid_usd": 0.06,
+      "high_bid_usd": 2.16,
+      "close_variants": []
+    },
+    "buy house in panama": {
+      "avg_monthly_searches": 6600,
+      "competition": "LOW",
+      "competition_index": 28,
+      "low_bid_usd": 0.04,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "buy property in panama": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 41,
+      "low_bid_usd": 0.21,
+      "high_bid_usd": 1.56,
+      "close_variants": [
+        "buying property in panama"
+      ]
+    },
+    "buy real estate in panama": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 41,
+      "low_bid_usd": 0.21,
+      "high_bid_usd": 1.56,
+      "close_variants": [
+        "buying real estate in panama"
+      ]
+    },
+    "cheapest citizenship by investment": {
+      "avg_monthly_searches": 390,
+      "competition": "MEDIUM",
+      "competition_index": 40,
+      "low_bid_usd": 0.94,
+      "high_bid_usd": 3.67,
+      "close_variants": []
+    },
+    "cheapest golden visa": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 40,
+      "low_bid_usd": 1.37,
+      "high_bid_usd": 5.78,
+      "close_variants": []
+    },
+    "cheapest residency by investment": {
+      "avg_monthly_searches": 30,
+      "competition": "MEDIUM",
+      "competition_index": 54,
+      "low_bid_usd": 1.34,
+      "high_bid_usd": 3.41,
+      "close_variants": []
+    },
+    "citizenship by investment": {
+      "avg_monthly_searches": 2400,
+      "competition": "MEDIUM",
+      "competition_index": 40,
+      "low_bid_usd": 1.06,
+      "high_bid_usd": 5.1,
+      "close_variants": []
+    },
+    "citizenship by investment programs": {
+      "avg_monthly_searches": 1300,
+      "competition": "LOW",
+      "competition_index": 7,
+      "low_bid_usd": 1.49,
+      "high_bid_usd": 8.26,
+      "close_variants": []
+    },
+    "countries with investment visa": {
+      "avg_monthly_searches": 50,
+      "competition": "MEDIUM",
+      "competition_index": 54,
+      "low_bid_usd": 0.72,
+      "high_bid_usd": 5.57,
+      "close_variants": []
+    },
+    "countries with no tax on foreign income": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "friendly nations visa": {
+      "avg_monthly_searches": 390,
+      "competition": "LOW",
+      "competition_index": 22,
+      "low_bid_usd": 0.25,
+      "high_bid_usd": 0.94,
+      "close_variants": []
+    },
+    "friendly nations visa panama requirements": {
+      "avg_monthly_searches": 20,
+      "competition": "MEDIUM",
+      "competition_index": 33,
+      "low_bid_usd": 0.45,
+      "high_bid_usd": 1.48,
+      "close_variants": []
+    },
+    "golden passport": {
+      "avg_monthly_searches": 5400,
+      "competition": "LOW",
+      "competition_index": 24,
+      "low_bid_usd": 1.41,
+      "high_bid_usd": 7.93,
+      "close_variants": []
+    },
+    "golden visa": {
+      "avg_monthly_searches": 8100,
+      "competition": "MEDIUM",
+      "competition_index": 36,
+      "low_bid_usd": 1.41,
+      "high_bid_usd": 6.02,
+      "close_variants": []
+    },
+    "golden visa cost": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 22,
+      "low_bid_usd": 1.4,
+      "high_bid_usd": 5.77,
+      "close_variants": []
+    },
+    "golden visa countries": {
+      "avg_monthly_searches": 1600,
+      "competition": "MEDIUM",
+      "competition_index": 58,
+      "low_bid_usd": 0.5,
+      "high_bid_usd": 3.55,
+      "close_variants": []
+    },
+    "golden visa program": {
+      "avg_monthly_searches": 720,
+      "competition": "MEDIUM",
+      "competition_index": 43,
+      "low_bid_usd": 1.31,
+      "high_bid_usd": 6.39,
+      "close_variants": [
+        "golden visa programs"
+      ]
+    },
+    "golden visa real estate": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 10,
+      "low_bid_usd": 0.96,
+      "high_bid_usd": 4.98,
+      "close_variants": []
+    },
+    "homes for sale in panama": {
+      "avg_monthly_searches": 6600,
+      "competition": "LOW",
+      "competition_index": 28,
+      "low_bid_usd": 0.04,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "houses for sale in panama": {
+      "avg_monthly_searches": 6600,
+      "competition": "LOW",
+      "competition_index": 28,
+      "low_bid_usd": 0.04,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "how to get residency in panama": {
+      "avg_monthly_searches": 90,
+      "competition": "MEDIUM",
+      "competition_index": 51,
+      "low_bid_usd": 1.06,
+      "high_bid_usd": 3.25,
+      "close_variants": []
+    },
+    "immigrate to panama from us": {
+      "avg_monthly_searches": 50,
+      "competition": "MEDIUM",
+      "competition_index": 60,
+      "low_bid_usd": 0.53,
+      "high_bid_usd": 2.5,
+      "close_variants": []
+    },
+    "invest in panama real estate": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 20,
+      "low_bid_usd": 1.46,
+      "high_bid_usd": 3.55,
+      "close_variants": [
+        "investing in panama real estate"
+      ]
+    },
+    "investment residency": {
+      "avg_monthly_searches": 260,
+      "competition": "LOW",
+      "competition_index": 27,
+      "low_bid_usd": 2.04,
+      "high_bid_usd": 6.92,
+      "close_variants": [
+        "investor residency"
+      ]
+    },
+    "investment visa": {
+      "avg_monthly_searches": 720,
+      "competition": "LOW",
+      "competition_index": 23,
+      "low_bid_usd": 1.83,
+      "high_bid_usd": 7.74,
+      "close_variants": [
+        "investor visa"
+      ]
+    },
+    "backup residency": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "best residency by investment": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "best tax residency countries": {
+      "avg_monthly_searches": 10,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "investor residency": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "investor visa": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "no tax on foreign income": {
+      "avg_monthly_searches": 10,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama beachfront property for sale": {
+      "avg_monthly_searches": 40,
+      "competition": "MEDIUM",
+      "competition_index": 39,
+      "low_bid_usd": 0.07,
+      "high_bid_usd": 1.84,
+      "close_variants": []
+    },
+    "panama citizenship": {
+      "avg_monthly_searches": 590,
+      "competition": "LOW",
+      "competition_index": 19,
+      "low_bid_usd": 0.53,
+      "high_bid_usd": 4.44,
+      "close_variants": []
+    },
+    "panama citizenship by investment": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 48,
+      "low_bid_usd": 1.96,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama city panama condos for sale": {
+      "avg_monthly_searches": 720,
+      "competition": "MEDIUM",
+      "competition_index": 45,
+      "low_bid_usd": 0.03,
+      "high_bid_usd": 1.67,
+      "close_variants": []
+    },
+    "panama city panama real estate": {
+      "avg_monthly_searches": 1000,
+      "competition": "MEDIUM",
+      "competition_index": 40,
+      "low_bid_usd": 0.03,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "panama dual citizenship": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 16,
+      "low_bid_usd": 1.08,
+      "high_bid_usd": 5.66,
+      "close_variants": []
+    },
+    "panama friendly nations visa": {
+      "avg_monthly_searches": 880,
+      "competition": "LOW",
+      "competition_index": 18,
+      "low_bid_usd": 0.5,
+      "high_bid_usd": 1.51,
+      "close_variants": []
+    },
+    "panama friendly nations visa requirements": {
+      "avg_monthly_searches": 40,
+      "competition": "MEDIUM",
+      "competition_index": 34,
+      "low_bid_usd": 0.48,
+      "high_bid_usd": 1.44,
+      "close_variants": []
+    },
+    "panama golden visa": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 63,
+      "low_bid_usd": 1.74,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama immigration lawyer": {
+      "avg_monthly_searches": 70,
+      "competition": "MEDIUM",
+      "competition_index": 46,
+      "low_bid_usd": 2.93,
+      "high_bid_usd": 7.85,
+      "close_variants": []
+    },
+    "panama immigration lawyers": {
+      "avg_monthly_searches": 210,
+      "competition": "MEDIUM",
+      "competition_index": 53,
+      "low_bid_usd": 3.06,
+      "high_bid_usd": 8.8,
+      "close_variants": []
+    },
+    "panama investment property": {
+      "avg_monthly_searches": 20,
+      "competition": "MEDIUM",
+      "competition_index": 54,
+      "low_bid_usd": 2.08,
+      "high_bid_usd": 4.85,
+      "close_variants": []
+    },
+    "panama investment visa": {
+      "avg_monthly_searches": 40,
+      "competition": "HIGH",
+      "competition_index": 77,
+      "low_bid_usd": 1.77,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama passport": {
+      "avg_monthly_searches": 720,
+      "competition": "LOW",
+      "competition_index": 1,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama passport by investment": {
+      "avg_monthly_searches": 20,
+      "competition": "MEDIUM",
+      "competition_index": 56,
+      "low_bid_usd": 1.18,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama pensionado visa": {
+      "avg_monthly_searches": 880,
+      "competition": "LOW",
+      "competition_index": 10,
+      "low_bid_usd": 0.53,
+      "high_bid_usd": 1.65,
+      "close_variants": []
+    },
+    "panama permanent residency": {
+      "avg_monthly_searches": 170,
+      "competition": "MEDIUM",
+      "competition_index": 44,
+      "low_bid_usd": 0.93,
+      "high_bid_usd": 2.83,
+      "close_variants": []
+    },
+    "panama permanent residency by investment": {
+      "avg_monthly_searches": 10,
+      "competition": "HIGH",
+      "competition_index": 69,
+      "low_bid_usd": 1.49,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama property for sale": {
+      "avg_monthly_searches": 2400,
+      "competition": "MEDIUM",
+      "competition_index": 35,
+      "low_bid_usd": 0.05,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "panama real estate": {
+      "avg_monthly_searches": 3600,
+      "competition": "LOW",
+      "competition_index": 33,
+      "low_bid_usd": 0.04,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "panama real estate for expats": {
+      "avg_monthly_searches": 320,
+      "competition": "MEDIUM",
+      "competition_index": 51,
+      "low_bid_usd": 0.05,
+      "high_bid_usd": 1.49,
+      "close_variants": []
+    },
+    "panama real estate for sale": {
+      "avg_monthly_searches": 2400,
+      "competition": "MEDIUM",
+      "competition_index": 35,
+      "low_bid_usd": 0.05,
+      "high_bid_usd": 1.5,
+      "close_variants": []
+    },
+    "panama real estate investment": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 20,
+      "low_bid_usd": 1.46,
+      "high_bid_usd": 3.55,
+      "close_variants": []
+    },
+    "panama residency": {
+      "avg_monthly_searches": 260,
+      "competition": "MEDIUM",
+      "competition_index": 51,
+      "low_bid_usd": 0.87,
+      "high_bid_usd": 2.7,
+      "close_variants": []
+    },
+    "panama residency by investment": {
+      "avg_monthly_searches": 50,
+      "competition": "MEDIUM",
+      "competition_index": 47,
+      "low_bid_usd": 2.44,
+      "high_bid_usd": 6.0,
+      "close_variants": []
+    },
+    "panama residency cost": {
+      "avg_monthly_searches": 10,
+      "competition": "HIGH",
+      "competition_index": 86,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama residency program": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 26,
+      "low_bid_usd": 0.64,
+      "high_bid_usd": 4.61,
+      "close_variants": []
+    },
+    "panama residency requirements": {
+      "avg_monthly_searches": 320,
+      "competition": "MEDIUM",
+      "competition_index": 52,
+      "low_bid_usd": 0.71,
+      "high_bid_usd": 2.5,
+      "close_variants": []
+    },
+    "panama residency visa": {
+      "avg_monthly_searches": 90,
+      "competition": "MEDIUM",
+      "competition_index": 49,
+      "low_bid_usd": 0.8,
+      "high_bid_usd": 2.5,
+      "close_variants": []
+    },
+    "panama retirement visa": {
+      "avg_monthly_searches": 1300,
+      "competition": "LOW",
+      "competition_index": 12,
+      "low_bid_usd": 0.31,
+      "high_bid_usd": 1.2,
+      "close_variants": []
+    },
+    "panama tax residency": {
+      "avg_monthly_searches": 10,
+      "competition": "LOW",
+      "competition_index": 18,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama taxes for expats": {
+      "avg_monthly_searches": 40,
+      "competition": "LOW",
+      "competition_index": 22,
+      "low_bid_usd": 0.02,
+      "high_bid_usd": 2.5,
+      "close_variants": []
+    },
+    "panama visa for us citizens": {
+      "avg_monthly_searches": 720,
+      "competition": "LOW",
+      "competition_index": 14,
+      "low_bid_usd": 0.07,
+      "high_bid_usd": 2.0,
+      "close_variants": []
+    },
+    "panama investor visa": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama qualified investor program": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama qualified investor visa": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama residency by investment program": {
+      "avg_monthly_searches": 70,
+      "competition": "LOW",
+      "competition_index": 14,
+      "low_bid_usd": 5.81,
+      "high_bid_usd": 10.96,
+      "close_variants": []
+    },
+    "panama residency for americans": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "panama territorial tax": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "pensionado visa panama": {
+      "avg_monthly_searches": 1000,
+      "competition": "LOW",
+      "competition_index": 14,
+      "low_bid_usd": 0.36,
+      "high_bid_usd": 1.73,
+      "close_variants": []
+    },
+    "permanent residency by investment": {
+      "avg_monthly_searches": 70,
+      "competition": "MEDIUM",
+      "competition_index": 48,
+      "low_bid_usd": 1.67,
+      "high_bid_usd": 4.07,
+      "close_variants": []
+    },
+    "plan b citizenship": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 1,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "property investment visa": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 3,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "real estate golden visa": {
+      "avg_monthly_searches": 140,
+      "competition": "MEDIUM",
+      "competition_index": 40,
+      "low_bid_usd": 1.87,
+      "high_bid_usd": 7.26,
+      "close_variants": []
+    },
+    "real estate investment in panama": {
+      "avg_monthly_searches": 210,
+      "competition": "LOW",
+      "competition_index": 20,
+      "low_bid_usd": 1.46,
+      "high_bid_usd": 3.55,
+      "close_variants": []
+    },
+    "real estate investment visa": {
+      "avg_monthly_searches": 20,
+      "competition": "LOW",
+      "competition_index": 3,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "residence by investment": {
+      "avg_monthly_searches": 260,
+      "competition": "LOW",
+      "competition_index": 27,
+      "low_bid_usd": 2.04,
+      "high_bid_usd": 6.92,
+      "close_variants": [
+        "residency by investment"
+      ]
+    },
+    "residency by investment countries": {
+      "avg_monthly_searches": 140,
+      "competition": "MEDIUM",
+      "competition_index": 57,
+      "low_bid_usd": 1.26,
+      "high_bid_usd": 5.16,
+      "close_variants": []
+    },
+    "residency by investment programs": {
+      "avg_monthly_searches": 320,
+      "competition": "LOW",
+      "competition_index": 24,
+      "low_bid_usd": 3.15,
+      "high_bid_usd": 9.13,
+      "close_variants": []
+    },
+    "residency visa panama": {
+      "avg_monthly_searches": 90,
+      "competition": "MEDIUM",
+      "competition_index": 49,
+      "low_bid_usd": 0.8,
+      "high_bid_usd": 2.5,
+      "close_variants": []
+    },
+    "retiring to panama": {
+      "avg_monthly_searches": 1600,
+      "competition": "LOW",
+      "competition_index": 25,
+      "low_bid_usd": 0.03,
+      "high_bid_usd": 2.31,
+      "close_variants": []
+    },
+    "santa maria panama real estate": {
+      "avg_monthly_searches": 50,
+      "competition": "LOW",
+      "competition_index": 19,
+      "low_bid_usd": 0.31,
+      "high_bid_usd": 1.62,
+      "close_variants": []
+    },
+    "second citizenship": {
+      "avg_monthly_searches": 2900,
+      "competition": "LOW",
+      "competition_index": 2,
+      "low_bid_usd": 1.24,
+      "high_bid_usd": 5.71,
+      "close_variants": []
+    },
+    "second passport": {
+      "avg_monthly_searches": 590,
+      "competition": "MEDIUM",
+      "competition_index": 37,
+      "low_bid_usd": 2.22,
+      "high_bid_usd": 9.43,
+      "close_variants": []
+    },
+    "second residence": {
+      "avg_monthly_searches": 170,
+      "competition": "LOW",
+      "competition_index": 1,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "second residency": {
+      "avg_monthly_searches": 40,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "territorial tax countries": {
+      "avg_monthly_searches": 70,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "plan b residency": {
+      "avg_monthly_searches": 10,
+      "competition": "LOW",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "second residency program": {
+      "avg_monthly_searches": 0,
+      "competition": "UNSPECIFIED",
+      "competition_index": 0,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    },
+    "tax residency panama": {
+      "avg_monthly_searches": 10,
+      "competition": "LOW",
+      "competition_index": 14,
+      "low_bid_usd": null,
+      "high_bid_usd": null,
+      "close_variants": []
+    }
+  }
+}

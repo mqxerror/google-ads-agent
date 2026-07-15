@@ -1,5 +1,5 @@
 # Campaign Chronicle: Build: https://www.mercan.com/panama-qualified-investor-program
-Last updated: 2026-06-03
+Last updated: 2026-07-14
 
 ## Timeline
 
@@ -37,6 +37,10 @@ Brief: Target audiences: US-based HNW investors
 - **May 20** — [CRO Specialist] CRO analysis of mercan.com/panama-qualified-investor-program for Panama QIP campaign build: identified 13-field form as #1 conversion killer (est. 50-70% lead loss), flagged "Submit" CTA as generic, recommended reducing to 3 fields and rewriting button copy; trust signals and H1 value prop rated strong (8/10).
 
 ### June 2026
+- **Jun 24** — [CRO Specialist] CRO + SEO dual-page review run on Panama QIP paid LP and organic page; found 0.33% CVR gap is partly a form-rejection issue (Gravity Forms silently rejects international phone formats +1/+44/+971) and partly an intent mismatch — page leads with investor framing but converting search terms show residency-research intent.
+- **Jun 24** — [Creative Director] Panama QIP ad copy audit: AG1 (Core Investor, $962/0 conv) and AG3 (Tax & Expat, $179/0 conv) flagged for priority rewrite; AG2 (Residency, $1,992/3 conv) incremental test; AG4 deferred (paused ad group).
+- **Jun 24** — [Analytics Analyst] Panama QIP daily review (Jun 23): cost $168.30 flagged as anomaly — 120% above 7-day avg ($76.60) and 12% over $150/day cap; CPC spiked to $4.01 (30% above avg, 14-day high), zero conversions. Monthly pacing healthy at ~$78.50/day avg ($1,099/14 days vs $4,500 cap).
+- **Jun 24** — [PPC Strategist] Panama QIP weekly report (Jun 17–23): spend +33% WoW ($628 vs $471), CPC inflated +9% to $3.24, zero conversions for 21 consecutive days; budget under-delivering at 60% utilization ($89.70/day avg vs $150 cap) — bids are the binding constraint, not budget.
 - **Jun 03** — [PPC Strategist] User asked: Analyze the currently selected campaign "Greece Golden Visa V2" — its structure, keywords, match typ. Every piece of LIVE CAMPAIGN DATA in my context (the day-by-day metrics, AG1–AG4, the 19 Panama keyw
 - **Jun 03** — [Agency Director] Drafted Panama QIP investor guide lead-magnet (8–10 page PDF outline) and three hero H1 A/B test variants for the golden visa landing page, targeting $300K investment threshold and October 2026 deadline.
 - **Jun 03** — [Creative Director] Creative Director + Copywriter drafted full Panama QIP landing page copy targeting fix of three conversion failures: wrong-intent traffic (capital qualifier in H1), conversion wall (sticky CTAs + soft offer), and weak emotional copy (Plan B/family-safety angle); Oct 2026 deadline deployed as urgency moat.
@@ -47,6 +51,39 @@ Brief: Target audiences: US-based HNW investors
 - **Jun 01** — [Analytics Analyst] User asked: why this step 7. Enhanced Conversions — needs the UI, no API path. There is no MCP tool to toggle En
 - **Jun 01** — [Analytics Analyst] User asked: do all except the funnel redesign I need to think about it
 - **Jun 01** — [Agency Director] Panama QIV campaign (12-day review): 543 clicks, $1,718.70 spend, 1 conversion, CPA $1,718.70, CVR 0.18%. PPC Strategist flagged structural failure — AG2 eating 50% spend ($865 CPA), AG4 burning 28% at zero conversions, AG1 (core investor intent) starved at 13% — inverse of the original plan.
+
+### July 2026
+- **Jul 14** — [Agency Director] Campaign diagnosed as spending $5,300+ for 4 lifetime leads (CPA ≈ $1,300) with 0 conversions in the last 14 days; root cause = AG1 (Investor Core, $2,158/387 clicks/0 conv) and AG3 (Tax & Expat, $245/100 clicks/0 conv) burning ~45% of spend while AG2 (Panama Residency) holds all 4 conversions — the July 8 decision to pause AG1/AG3 was never executed, and CPC has since inflated +32% ($3.31 → $4.38). Tracking ruled out as the cause (GTM-WZKDXFH8 + AW-826329520 verified firing live; the "no form detected" crawl result was a false negative from React-rendered DOM).
+- **Jul 14** — [PPC Strategist] User asked: Using ONLY the in-context data, explain structurally why campaign 23871240619 has produced just 4 li. **Spend leakage (last 14 days, $1,569 total)**
+- AG1+AG3 lifetime spend share: ($2,158+$245) / ($2,1. No structural changes were executed to explain this; AG1's higher-bid keywords are the likely driver
+- **Jul 14** — [Analytics Analyst] User asked: Answer the funnel half of 'why no leads': is this a measurement problem or a genuine conversion prob. The 4 recorded lifetime conversions confirm the tag fires on real submissions
+- **Jul 14** — [Agency Director] Diagnosed campaign 23871240619 (0 leads lifetime-4 conversions total, $1,569/421 clicks): root cause is unexecuted Jul 8 fixes — AG1 Investor Core ($2,158 lifetime, 0 conv) and AG3 ($245, 0 conv) still ENABLED, burning ~half of daily spend on zero-signal lanes while AG2 owns all 4 conversions; CPC also drifted from ~$3.20 to $4.00-$4.60 since Jul 8.
+- **Jul 14** — [Agency Director] Verified `/lp/` landing page in a real browser (the automated fetch's "no form detected" was a false negative — client-rendered): two 4-field consultation forms, one-field email-guide soft offer, and GTM-WZKDXFH8 + AW-826329520 gtag + Clarity all firing. Decision: do NOT rebuild the campaign — last 14 days ($1,569 / 421 clicks / 0 conversions) trace to ad-group-level spend leakage (AG1 Investor Core: $2,158 lifetime, 0 conversions), not the landing page.
+- **Jul 14** — [Agency Director] User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign an
+- **Jul 14** — [Agency Director] User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign an
+- **Jul 14** — [Agency Director] User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign an
+- **Jul 14** — [Agency Director] User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign an
+- **Jul 08** — [Analytics Analyst] Analyzed Google Keyword Planner recommendations for Panama QIP campaign: rejected "get eu citizenship by investment" (wrong product — Panama ≠ EU), flagged "panama resident visa" as redundant near-duplicate of existing phrase-match, identified "panamanian residency" as the only incremental add worth testing.
+- **Jul 08** — [Agency Director] Confirmed no MCP tool exists to edit an existing ad's final URL — only ad status updates and deletions are available on the google-ads MCP server; creating a new ad is the only path to change final_urls.
+- **Jul 08** — [CRO Specialist] Landing page switch initiated for Panama QIP campaign: all 4 serving ads moving from `/panama-qualified-investor-program` → `/lp/panama-qualified-investor-program` (Plan B hook + email-capture); no MCP tool for final URL edits confirmed, executing via Google Ads UI in Chrome as with Jul 5 sitelink surgery.
+- **Jul 08** — [Creative Director] Creative Director audit found all 6 Panama QIP ads pointing to `/panama-qualified-investor-program` instead of `/lp/panama-qualified-investor-program`; the `/lp/` page already has the soft-offer email capture the team planned to build — fix final URLs across all ads to unlock the better page immediately.
+- **Jul 08** — [Agency Director] Team session confirmed real leads ≈ 0 (4 lifetime conv / $5,122 spend / $1,280 CPA, none reached CRM); PPC Strategist recommended pausing AG1 (293 clicks, $1,629, 0 conv) and AG3 to concentrate spend on AG2, which owns all 4 conversions.
+- **Jul 08** — [PPC Strategist] Clarified that budget-cut-triggers-learning-phase concern doesn't apply: campaign runs Manual CPC (not Smart Bidding), so no algorithm to reset; also surfaced that campaign already under-spends at ~$100/day vs $150 cap (67% utilization), making the budget line a non-binding constraint.
+- **Jul 08** — [Agency Director] Panama QIP campaign diagnosed with zero form interactions despite 60% of visitors reading 1+ min — root cause identified as offer-to-visitor mismatch (research-intent traffic vs. single bottom-funnel CTA), not tracking or form failure.
+- **Jul 08** — [Analytics Analyst] Analytics Analyst re-checked live DOM of `mercan.com/panama-qualified-investor-program` (2026-07-08) after being called out on stale June 1 data; confirmed phone field is optional (`type="tel"`, not required) — prior thesis about phone friction was based on outdated findings and retracted.
+- **Jul 08** — [PPC Strategist] PPC Strategist diagnosed $3K+/1-lead conversion crisis: 447 clicks at $3.20 CPC with 8–14% CTR confirm healthy traffic; root cause is form silently rejecting international phone numbers (+1/+44/+971), proven by GTM Specialist live test June 1. Decision: throttle spend ~50%, fix form validation before resuming full budget.
+- **Jul 08** — [Agency Director] User asked: which campaign you are working on?. com/panama-qualified-investor-program`
+
+This conversation is locked to that one campaign for its ent
+- **Jul 06** — [Agency Director] Deep keyword research delivered for Panama QIP Gulf expansion (Qatar, Kuwait, Saudi Arabia, Abu Dhabi, Bahrain) — real Keyword Planner data + HNW market intelligence run in parallel against campaign `23871240619`; recommended sibling campaign structure (not geo-bolting) to preserve bid control and Quality Score.
+- **Jul 05** — [Agency Director] Tested new asset MCP for sitelink tools after Wassim added it — full ToolSearch across the live `google-ads` server returned zero asset/sitelink/callout/extension tools; only budgets, campaigns, ad groups, keywords, RSAs, and bidding tools present. Gap confirmed: MCP description advertises ad extensions but they are not registered in the running server's tool surface.
+- **Jul 05** — [Agency Director] Wassim approved removal of 4 duplicate Jul-5 "Under review" sitelinks on Panama QIP campaign (23871240619); Agency Director initiated live Chrome MCP surgery to delete them, leaving the May-24 originals (Eligible/serving) intact.
+- **Jul 05** — [Agency Director] User asked: yrd
+- **Jul 05** — [Agency Director] Enabled new AG1 RSA (ad 815620819818) — residency-first + Oct-2026 deadline copy — flipped PAUSED → ENABLED via API; left old June-1 RSA (811374497020) running in parallel for A/B rotation; plan to pause old ad after ~1,000 impressions on new one.
+- **Jul 05** — [Agency Director] Tier 2 keyword hygiene + AG1 RSA rewrite execution initiated; live criterion fetch revealed `best place to buy` already removed and `panama resident visa` is in AG2 (not AG1) with QS 5 and 0 conversions — corrected before any writes.
+- **Jul 05** — [Agency Director] Team Session audit surfaced AG1 as dead weight ($1,478.04 / 267 clicks / 0 conversions — 31% of lifetime spend); PPC Strategist called for budget cut (not hold) and confirmed Manual CPC must stay with only 4 lifetime conversions, well below the 15-conv/30-day floor for automated bidding.
+- **Jul 05** — [Search Term Hunter] Panama QIP deep analysis: campaign in flat-declining equilibrium (WoW −10% impr/clicks/cost, 0 conv Jun 28–Jul 4) with CPC holding at ~$3.26 and CTR ~9.3%; lifestyle/relocation leak + QS-1 `panama golden visa` keyword flagged since May 25 and Jun 24 remain live and unactioned.
+- **Jul 04** — [Analytics Analyst] Analytics Analyst audited Panama QIP (23871240619) period-over-period (Jun 20–26 vs Jun 27–Jul 3): spend up +6.9% ($702→$751), clicks +8% (213→230), but zero conversions in the recent window vs 1 prior; lifetime CVR 0.27% (4 conv / 1,487 clicks), budget utilization only 71% ($107/day vs $150 cap), bids are the binding constraint not budget.
 
 ## Key Metrics Milestones
 

@@ -24,7 +24,7 @@ interface SuggestEditsDialogProps {
 }
 
 export default function SuggestEditsDialog({
-  open, onClose, filename, accountId, currentContent, onApplied,
+  open, onClose, filename, accountId, onApplied,
 }: SuggestEditsDialogProps) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [generating, setGenerating] = useState(false);

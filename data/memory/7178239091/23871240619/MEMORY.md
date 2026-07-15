@@ -9,3 +9,5 @@
 - [Gtm Specialist Notes](role_notes/gtm_specialist.md) — Latest findings from Gtm Specialist
 - [Script Generator Notes](role_notes/script_generator.md) — Latest findings from Script Generator
 - [Analytics Analyst Notes](role_notes/analytics_analyst.md) — Latest findings from Analytics Analyst
+- [Cro Specialist Notes](role_notes/cro_specialist.md) — Latest findings from Cro Specialist
+- [Video Director Notes](role_notes/video_director.md) — Latest findings from Video Director

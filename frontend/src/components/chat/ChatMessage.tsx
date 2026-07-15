@@ -1,18 +1,20 @@
-import { useState, type ComponentPropsWithoutRef } from 'react';
+import { useState, useEffect, type ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChevronRight, ChevronDown, Check, Loader2, Trash2, Terminal, CalendarPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
 import AgentAvatar from './AgentAvatar';
+import OrchestrationLedger from './OrchestrationLedger';
 import { getAgentProfile } from '@/lib/agentProfiles';
 import { getToolDescription } from '@/lib/toolDescriptions';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { extractPlan } from '@/lib/api';
+import { extractPlan, fetchTurnEvents } from '@/lib/api';
 import { setPendingScheduleDraft } from '@/components/plans/planHelpers';
 import type { PlanFormDraft } from '@/components/plans/PlanForm';
 import type { ChatMessage as ChatMessageType, ToolCall } from '@/types';
+import type { OrchestrationEvent } from '@/types/orchestration';
 
 /** Markdown component map shared by every render path so links open safely
  *  and there's no layout shift between streaming and persisted bubbles. */
@@ -34,6 +36,16 @@ interface ChatMessageProps {
    *  conversation so Claude Code (the user's terminal session) sees
    *  the handoff via MCP. */
   conversationId?: string;
+  /** v2 orchestration (story 3.2). Live-accumulated turn events for THIS
+   *  message's turn, supplied by ChatPanel while the turn streams. When absent
+   *  but `message.turnId` is set (history replay), the ledger lazily fetches
+   *  `/turns/{id}/events`. */
+  turnEvents?: OrchestrationEvent[];
+  /** Terminal flag for the live turn — feeds the ledger's collapsed summary. */
+  turnComplete?: boolean;
+  /** Per-specialist stop (story 3.4). Present only for a LIVE turn; undefined in
+   *  history replay so per-row stop buttons hide (the ledger handles undefined). */
+  onStopCall?: (callId: string) => void;
 }
 
 /** Internal tools the user doesn't care about (chain-of-thought noise) */
@@ -142,11 +154,33 @@ function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
   );
 }
 
-export default function ChatMessage({ message, onDelete, conversationId, isStreaming }: ChatMessageProps) {
+export default function ChatMessage({ message, onDelete, conversationId, isStreaming, turnEvents, turnComplete, onStopCall }: ChatMessageProps) {
   const [handoffState, setHandoffState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [scheduleState, setScheduleState] = useState<'idle' | 'loading' | 'error'>('idle');
   const accountId = useClientAccountId();
   const { selectedCampaignId } = useAppStore();
+
+  // v2 orchestration ledger (story 3.2). A bubble carrying a `turnId` renders
+  // the OrchestrationLedger. Live turns get their events from ChatPanel via
+  // `turnEvents`; a persisted history bubble (turnId set, no live events)
+  // lazily fetches the replay from `/turns/{id}/events`.
+  const hasLiveEvents = !!turnEvents && turnEvents.length > 0;
+  const [replayEvents, setReplayEvents] = useState<OrchestrationEvent[] | null>(null);
+  useEffect(() => {
+    if (!message.turnId || hasLiveEvents || !conversationId) return;
+    let cancelled = false;
+    fetchTurnEvents(conversationId, message.turnId)
+      .then((evs) => { if (!cancelled) setReplayEvents(evs); })
+      .catch(() => { if (!cancelled) setReplayEvents([]); });
+    return () => { cancelled = true; };
+  }, [message.turnId, conversationId, hasLiveEvents]);
+
+  const ledgerEvents = hasLiveEvents ? turnEvents! : (replayEvents ?? []);
+  // Live turns pass an explicit complete flag; a history-replayed turn is always
+  // terminal (it's persisted). onStopCall is undefined on history replay, so the
+  // ledger hides per-row stops there (its contract).
+  const ledgerComplete = hasLiveEvents ? !!turnComplete : true;
+  const showLedger = !!message.turnId && ledgerEvents.length > 0;
 
   // "Schedule this" — ask the backend to draft a plan from this message, then
   // hand the draft to PlansPanel's inline form via a window event. The campaign
@@ -213,6 +247,16 @@ export default function ChatMessage({ message, onDelete, conversationId, isStrea
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
       ) : (
         <div>
+          {/* v2 orchestration ledger — sits ABOVE the Director prose (§6.1). Only
+              on turns that carry a turnId AND have events; direct-mode turns
+              render exactly as before (no ledger, no layout shift). */}
+          {showLedger && (
+            <OrchestrationLedger
+              events={ledgerEvents}
+              isComplete={ledgerComplete}
+              onStopCall={onStopCall}
+            />
+          )}
           <TeamOrRegularContent content={message.content} />
           {isStreaming && <span className="studio-caret ml-0.5 align-baseline">▍</span>}
         </div>

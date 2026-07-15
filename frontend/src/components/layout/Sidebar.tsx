@@ -10,6 +10,8 @@ import {
   Users,
   Briefcase,
   RefreshCw,
+  Layers,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
@@ -79,11 +81,13 @@ function AccountNode({
   filter,
   depth,
   mccAccountId,
+  clientAccountId,
 }: {
   account: Account;
   filter: string;
   depth: number;
   mccAccountId: string;
+  clientAccountId: string;
 }) {
   const [expanded, setExpanded] = useState(true);
   const { selectedCampaignId, setSelectedCampaign, setSelectedAccount } = useAppStore();
@@ -166,7 +170,7 @@ function AccountNode({
             </button>
           ))}
           {(account.children ?? []).map((child) => (
-            <AccountNode key={child.id} account={child} filter={filter} depth={depth + 1} mccAccountId={mccAccountId} />
+            <AccountNode key={child.id} account={child} filter={filter} depth={depth + 1} mccAccountId={mccAccountId} clientAccountId={clientAccountId} />
           ))}
         </>
       )}
@@ -192,11 +196,30 @@ function timeAgo(sqliteUtc: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export default function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar, selectedAccountId, setSelectedAccount, connectedAccounts } = useAppStore();
+export default function Sidebar({ isHome = false, bare = false }: { isHome?: boolean; bare?: boolean }) {
+  const {
+    sidebarCollapsed, toggleSidebar, selectedAccountId, setSelectedAccount, connectedAccounts,
+    setSelectedCampaign, setShowDashboard, setShowStudio, setShowChangelog, setShowGuidelines, setShowConversations,
+  } = useAppStore();
+
+  // Home rail affordance (C3): clear the campaign selection + every takeover
+  // panel — the same move the Header's Home button and the `g h` chord make.
+  const goHome = () => {
+    setSelectedCampaign(null);
+    setShowDashboard(false);
+    setShowStudio(false);
+    setShowChangelog(false);
+    setShowGuidelines(false);
+    setShowConversations(false);
+  };
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ENABLED');
   const [refreshing, setRefreshing] = useState(false);
+  // Home (Story 13.5): the sidebar is an icon rail; the campaign tree
+  // opens as a flyout on hover (or click-to-pin), reclaiming width for
+  // the fix list. `flyoutOpen` = hover state; `flyoutPinned` = clicked.
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const [flyoutPinned, setFlyoutPinned] = useState(false);
   const queryClient = useQueryClient();
 
   // Determine which client account to query for campaigns
@@ -339,18 +362,10 @@ export default function Sidebar() {
     }
   }, [selectedAccountId, clientAccountId, setSelectedAccount]);
 
-  if (sidebarCollapsed) {
-    return (
-      <div className="w-12 bg-sidebar border-r border-border flex flex-col items-center py-2 shrink-0">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSidebar}>
-          <PanelLeft className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-70 bg-sidebar border-r border-border flex flex-col shrink-0">
+  // The search + status filter + sync signal + campaign tree — shared
+  // between the full sidebar and the home flyout so there's one tree.
+  const panelBody = (
+    <>
       {/* Search */}
       <div className="p-2 space-y-2">
         <div className="relative">
@@ -418,9 +433,92 @@ export default function Sidebar() {
       {/* Account tree */}
       <ScrollArea className="flex-1 px-1">
         {accounts.map((acc) => (
-          <AccountNode key={acc.id} account={acc} filter={filter} depth={0} mccAccountId={mccAccountId} />
+          <AccountNode key={acc.id} account={acc} filter={filter} depth={0} mccAccountId={mccAccountId} clientAccountId={clientAccountId} />
         ))}
       </ScrollArea>
+    </>
+  );
+
+  // ── Home + Studio: icon rail + campaign-tree flyout (Story 13.5) ──
+  // `bare` (home OR studio, decided route-side in App.tsx) collapses the
+  // sidebar to the 14px rail; the campaign tree stays reachable as the
+  // flyout. The rail's Home button (goHome) also exits studio, so it's the
+  // one-click way back. No per-surface state to leak — the mode is derived,
+  // never persisted.
+  if (isHome || bare) {
+    const showFlyout = flyoutOpen || flyoutPinned;
+    return (
+      <div
+        className="relative shrink-0"
+        onMouseLeave={() => setFlyoutOpen(false)}
+      >
+        <div className="w-14 h-full bg-sidebar border-r border-border flex flex-col items-center py-3 gap-1">
+          {/* Home — the rail's top item; active (highlighted) when already
+              home, and the one-click way back from anywhere else. */}
+          <button
+            onClick={goHome}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
+              isHome ? 'bg-accent-soft text-accent' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+            )}
+            title="Home"
+            aria-label="Home"
+            aria-current={isHome ? 'page' : undefined}
+          >
+            <Home className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setFlyoutPinned((v) => !v)}
+            onMouseEnter={() => setFlyoutOpen(true)}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
+              showFlyout ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+            )}
+            title="Campaigns"
+            aria-label="Campaigns"
+            aria-expanded={showFlyout}
+          >
+            <Layers className="h-4 w-4" />
+          </button>
+        </div>
+
+        {showFlyout && (
+          <div
+            className="absolute left-14 top-0 z-30 flex h-full w-70 flex-col bg-sidebar border-r border-border"
+            style={{ boxShadow: 'var(--shadow-elevated)' }}
+            onMouseEnter={() => setFlyoutOpen(true)}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Campaigns</span>
+              <button
+                onClick={() => { setFlyoutPinned(false); setFlyoutOpen(false); }}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                title="Close"
+                aria-label="Close campaigns flyout"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {panelBody}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (sidebarCollapsed) {
+    return (
+      <div className="w-12 bg-sidebar border-r border-border flex flex-col items-center py-2 shrink-0">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSidebar}>
+          <PanelLeft className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-70 bg-sidebar border-r border-border flex flex-col shrink-0">
+      {panelBody}
 
       {/* Collapse button */}
       <div className="p-2 border-t border-border">

@@ -194,17 +194,19 @@ class SpliceIntoStoryboard(unittest.TestCase):
         # 3 scenes x 2s minus 2 x 0.6s crossfade ≈ 4.8s
         self.assertGreater(dur, 3.5)
 
-    def test_third_higgsfield_scene_capped(self):
-        events = self._run([
-            {"type": "hero", "headline": "H"},
-            {"type": "higgsfield", "prompt": "shot one"},
-            {"type": "higgsfield", "prompt": "shot two"},
-            {"type": "higgsfield", "prompt": "shot three"},   # over cap
-        ])
+    def test_ninth_higgsfield_scene_capped(self):
+        # Cap is now MAX_HIGGSFIELD_SCENES = 8. Feed 1 hero + 9 clips;
+        # exactly the 9th is dropped, so 1 hero + 8 clips = 9 scenes.
+        # (fake_resolve reuses one shared clip-raw.mp4 for every clip, so
+        # 9 stub "renders" is still cheap and fast.)
+        events = self._run(
+            [{"type": "hero", "headline": "H"}]
+            + [{"type": "higgsfield", "prompt": f"shot {i}"} for i in range(9)]
+        )
         capped = [e for e in events if e.get("stage") == "higgsfield-capped"]
         self.assertEqual(len(capped), 1)
         done = [e for e in events if e["type"] == "done"]
-        self.assertEqual(done[0]["scene_count"], 3)           # hero + 2 clips
+        self.assertEqual(done[0]["scene_count"], 9)           # hero + 8 clips
 
 
 if __name__ == "__main__":

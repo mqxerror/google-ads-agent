@@ -73,6 +73,17 @@ export const AGENT_PROFILES: Record<string, AgentProfile> = {
     emoji: '📊',
     specialty: 'Attribution, funnel analysis, data insights',
   },
+  video_director: {
+    id: 'video_director',
+    name: 'Video Director',
+    title: 'Video Director',
+    initials: 'VD',
+    color: '#4F46E5',
+    bgColor: '#EEF0FF',
+    borderColor: '#818CF8',
+    emoji: '🎬',
+    specialty: 'Storyboarding, scene direction, generative video',
+  },
   competitor_intel: {
     id: 'competitor_intel',
     name: 'Nadia Kowalski',

@@ -40,3 +40,6 @@ backend/uv.lock
 # Hyperframes installed kit (vendored — too large to commit)
 backend/hyperframes/node_modules/
 backend/hyperframes/video-projects/*/renders/
+data/agent.db
+backend/data/mcp_config.json
+data/ad_assets/

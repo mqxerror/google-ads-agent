@@ -1053,7 +1053,7 @@ async def script_generate(body: ScriptGenerateRequest):
             ):
                 # Pass through text + status; drop tool_call events (scripts don't use tools)
                 et = event.get("type")
-                if et == "text":
+                if et in ("text", "text_delta"):  # relabel token-level delta → text for the v1 client (story 1.4)
                     yield f"data: {json.dumps({'type': 'text', 'content': event.get('content', '')})}\n\n"
                 elif et == "done":
                     yield f"data: {json.dumps({'type': 'done'})}\n\n"

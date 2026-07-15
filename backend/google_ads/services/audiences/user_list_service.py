@@ -74,44 +74,23 @@ class UserListService:
             Created user list details
         """
         try:
-            customer_id = format_customer_id(customer_id)
-
-            # Create user list
-            user_list = UserList()
-            user_list.name = name
-            if description:
-                user_list.description = description
-
-            user_list.membership_status = getattr(
-                UserListMembershipStatusEnum.UserListMembershipStatus, membership_status
+            # A "basic" user list is a RULE-BASED remarketing list: it requires
+            # a UserListRuleInfo (URL/tag membership rules with rule item groups
+            # and operands) that define who joins the list. Sending an empty
+            # BasicUserListInfo makes the API reject the create with
+            # FIELD_CANNOT_BE_CLEARED. Modeling those visitor rules is a
+            # dedicated input this minimal tool does not accept, so it sends no
+            # request rather than emit an invalid one.
+            raise NotImplementedError(
+                "create_basic_user_list is not implemented: a basic (rule-based) "
+                "remarketing list requires membership rule definitions "
+                "(UserListRuleInfo — URL/tag rules with rule item groups), which "
+                "this tool does not model, so the API would reject an empty rule "
+                "with FIELD_CANNOT_BE_CLEARED. No mutate was sent. Use "
+                "create_crm_based_user_list (Customer Match) or "
+                "create_logical_user_list (combine existing lists), or build the "
+                "rule-based list in the Google Ads UI."
             )
-            user_list.membership_life_span = membership_life_span
-
-            # Create basic user list info
-            basic_user_list = BasicUserListInfo()
-            user_list.basic_user_list = basic_user_list
-
-            # Create operation
-            operation = UserListOperation()
-            operation.create = user_list
-
-            # Create request
-            request = MutateUserListsRequest()
-            request.customer_id = customer_id
-            request.operations = [operation]
-
-            # Make the API call
-            response: MutateUserListsResponse = self.client.mutate_user_lists(
-                request=request
-            )
-
-            await ctx.log(
-                level="info",
-                message=f"Created basic user list '{name}' with {membership_life_span} day membership",
-            )
-
-            # Return serialized response
-            return serialize_proto_message(response)
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"
@@ -226,50 +205,19 @@ class UserListService:
             Created user list details
         """
         try:
-            customer_id = format_customer_id(customer_id)
-
-            # Create user list
-            user_list = UserList()
-            user_list.name = name
-            if description:
-                user_list.description = description
-
-            user_list.membership_status = (
-                UserListMembershipStatusEnum.UserListMembershipStatus.OPEN
+            # Google deprecated and REMOVED Similar Audiences (similar user
+            # lists) — the API rejects creating them with
+            # USER_LIST_MUTATE_NOT_SUPPORTED. This tool is not implemented and
+            # sends no request. Use first-party lists (CRM/customer match,
+            # rule-based) or Google's automated audience expansion / optimized
+            # targeting instead.
+            raise NotImplementedError(
+                "create_similar_user_list is not implemented: Google removed "
+                "Similar Audiences, so similar user lists can no longer be "
+                "created (the API returns USER_LIST_MUTATE_NOT_SUPPORTED). No "
+                "mutate was sent. Use Customer Match / rule-based lists plus "
+                "optimized targeting or audience expansion instead."
             )
-
-            # Create similar user list info
-            similar_user_list = SimilarUserListInfo()
-            # SimilarUserListInfo only supports a single seed user list
-            if seed_user_list_ids:
-                seed_resource = (
-                    f"customers/{customer_id}/userLists/{seed_user_list_ids[0]}"
-                )
-                similar_user_list.seed_user_list = seed_resource
-
-            user_list.similar_user_list = similar_user_list
-
-            # Create operation
-            operation = UserListOperation()
-            operation.create = user_list
-
-            # Create request
-            request = MutateUserListsRequest()
-            request.customer_id = customer_id
-            request.operations = [operation]
-
-            # Make the API call
-            response: MutateUserListsResponse = self.client.mutate_user_lists(
-                request=request
-            )
-
-            await ctx.log(
-                level="info",
-                message=f"Created similar user list '{name}' based on seed list {seed_user_list_ids[0] if seed_user_list_ids else 'none'}",
-            )
-
-            # Return serialized response
-            return serialize_proto_message(response)
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"

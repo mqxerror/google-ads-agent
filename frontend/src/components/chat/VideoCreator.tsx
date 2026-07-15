@@ -207,7 +207,7 @@ export default function VideoCreator({ open, onClose, onVideoReady, initialScrip
   }, [accountId, campaignId, updateScene]);
 
   // Music bed (royalty-free). Picked from the user's audio library. Plays under VO if present, else solo at -6dB.
-  const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [, setMusicUrl] = useState<string | null>(null);
   const [musicFilename, setMusicFilename] = useState<string | null>(null);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [libraryAudio, setLibraryAudio] = useState<Array<{ id: string; filename: string; url: string; size_bytes?: number | null }>>([]);
@@ -1602,7 +1602,6 @@ export default function VideoCreator({ open, onClose, onVideoReady, initialScrip
                     </div>
                   ) : (
                     libraryAudio.map((a) => {
-                      const stored = (a.url || '').split('/').pop() || a.filename;
                       const sizeKb = a.size_bytes ? Math.round(a.size_bytes / 1024) : null;
                       return (
                         <div

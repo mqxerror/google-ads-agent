@@ -72,6 +72,8 @@ export interface ChatMessage {
   isPending?: boolean;     // queued message waiting to be sent
   videoUrl?: string;       // rendered ad video (MP4) — shown inline in chat
   videoThumbnail?: string; // optional poster image
+  turnId?: string;         // v2 orchestration turn id — when set, the message
+                           // renders an OrchestrationLedger over its v2 events
 }
 
 export interface ToolCall {

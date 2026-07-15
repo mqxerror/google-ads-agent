@@ -13,7 +13,7 @@ track: 'bmad-method'
 **Author:** Wassim
 **Date:** 2026-04-03
 **Version:** 2.0
-**Status:** Draft
+**Status:** Living — last Tier-2 reconcile 2026-07-14 (Phase 1.5/1.6 marked shipped; Phase 1.7 documented retroactively)
 **Previous Version:** docs/prd.md (V1)
 
 ---
@@ -611,6 +611,102 @@ is sellable, not just an internal tool. Source: `research/product-roadmap.md`
 > stays local-first for individual users, but the MCP bridge will additionally
 > be hostable (token-secured) per the productization roadmap.
 
+> **Status (reconciled 2026-07-14):** PMax Finalization **SHIPPED 2026-06-10→11**
+> (Epic 8 — asset bridge with exact-aspect auto-crop, audience signals, atomic
+> asset-group create, rollback surfacing, Creative-Director draft copy, Story 8.4
+> video generator + YouTube upload/metadata/thumbnails; live-verified create on
+> account 7178239091). MCP Plan Tools **SHIPPED 2026-06-10** (Epic 9 — 10 tools
+> registered on the bearer-auth bridge). Shopping Campaigns **NOT STARTED** —
+> Epic 10 is the only open Phase-1.5 item.
+
+### Phase 1.6: Account Director Audit + Homepage v2 (added 2026-07-04)
+
+**Goal:** Make the homepage the surface of ONE owned agent flow — the Account
+Director reads ALL active campaigns and produces ONE money-ranked, approvable
+fix list — and reform the home layout to "clean" (fix lists, not reports).
+Source: `research/homepage-redesign-brief.md` (THE ENGINE and DESIGN DIRECTION
+sections are Wassim-locked requirements, 2026-07-04).
+
+**Problem:** the current home is an archive, not a command center — KPI cards
+are context-free lifetime totals, "Agent Performance 0% (0/0)" renders before
+data exists, the Conversation Map (an archive) dominates the page, and nothing
+demands action: pending approvals, budget pacing, wasted spend, upcoming
+Scheduled Plans are all unsurfaced. The NotFair teardown (2026-07-04)
+validated the demand framing ("Fix lists, not reports"; Approve / Approve once
+/ Deny; undo-able change log; money-ranked recoverable spend) while confirming
+they rent Claude's chat with no owned orchestration — our Team Audit engine is
+the structural moat this phase surfaces.
+
+**Decision (Wassim, 2026-07-04):** the centerpiece is the **Account Director
+global audit**; the homepage is its surface; and the interface must be CLEAN
+("not like i have now — bulky, not clear, not modern like notfair").
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| Account Director global audit | Account-wide planning mode in the existing workflow orchestrator (`campaign_id=None` already flows through; Director plans across active campaigns → per-campaign specialist fan-out → cross-campaign rollup + debate → synthesis into a ranked account report), with a campaigns-per-run cap and the existing per-run cost-cap degradation | P0 |
+| Findings → approvable actions | Every finding = quantified ACTION with $-impact/wk estimate + affected campaign(s) + [Approve / Approve once / Deny] wired into the existing Scheduled Plans approval + campaign scope-guard path — shortcuts to it, never bypasses | P0 |
+| Account report persistence | Account-level report rows (analogous to campaign reports) + latest-report read API with staleness metadata, so the homepage strip renders instantly from local DB (no live run on page load); "audited 2h ago · Run again" | P0 |
+| Homepage v2 (clean UI) | One column led by the fix-list strip; icon-rail sidebar on home (campaign tree as flyout); chat summoned via floating button + ⌘K overlay instead of a parked rail; 4 KPI cards max w/ period deltas + sparklines; ranked campaigns section; agent activity w/ undo-able change log; Conversation Map moves to its own page | P0 |
+| Weekly account audit ritual | Scheduled Plans entry "Weekly account audit" (auto lane) that fires the account-wide audit and refreshes the persisted report — the NotFair-validated cadence, actually executed by our team | P1 |
+
+**Non-goals (Phase 1.6):** no re-skin — existing Shopify-calm light OKLCH
+tokens (`frontend/DESIGN.md`) only; this is layout/density reform, not a new
+visual language. No multi-platform (Google Ads only). The always-open chat
+rail stays on campaign pages — only the HOME summons chat as an overlay. No
+homepage write path outside the existing plans approval + scope-guard flow.
+No live audit runs on page load — the strip reads persisted reports.
+
+**Success criteria:**
+
+- Home leads with the money-ranked fix list; header shows "Total recoverable:
+  $X/wk" when findings exist; empty strip = strip absent (zero-state
+  discipline — the "0% (0/0)" class of render is banned).
+- Latest account report renders from local persistence in under 1 second with
+  a staleness label; "Run again" streams a fresh account-wide run.
+- Every persona/audit output reaching the home page is a quantified,
+  approvable ACTION; 100% of homepage-initiated writes go through the existing
+  approval/scope-guard path.
+- Account-wide runs respect the campaigns-per-run cap and the per-run cost cap
+  (degrade to synthesis-with-what-we-have, never hard-fail).
+- Every metric on the home shows a time window + comparison delta (4 KPI cards
+  max); no naked lifetime totals anywhere.
+
+> **Epic mapping:** Epic 13 in `epics-v2.md` (8 stories, added 2026-07-04).
+
+> **Status (reconciled 2026-07-14):** **SHIPPED 2026-07-04→05** — all 8 stories
+> landed (13.1–13.4 backend engine + contracts + weekly ritual; 13.5–13.8
+> homepage surfaces), plus a 13.5 tighten pass and an active-campaigns-only
+> default on 2026-07-05. Two spec deviations, both honesty-driven: the 13.8
+> change log renders **read-only** (no [Revert] — no inverse-op endpoint exists,
+> so no affordance that would 404) and the trend-spark column was dropped (the
+> campaigns payload carries no per-day field — not faked). The homepage's data
+> pipeline was subsequently found silently stale and rebuilt under Dashboard
+> v2.1 (see Phase 1.7).
+
+### Phase 1.7: Reliability, Orchestration & Studio (shipped 2026-06-11 → 2026-07-14; documented retroactively at the 2026-07-14 reconcile)
+
+**Goal:** Harden the agent's truthfulness and process control after the Panama
+QIP post-mortem (2026-07-08), make dashboard data provably fresh, and grow the
+Studio into a two-studio creative surface with its own Video Director. This
+phase was executed from `research/` plans and the feature log rather than
+pre-written epics in `epics-v2.md`; this section documents it post-hoc.
+
+| Track | What shipped | Source plan | Dates |
+|---------|-------------|----------|-------|
+| Agent quality hardening (WS1–WS5) | In-place ad final-URL update tool (kills the destructive delete+recreate); verify-before-diagnose live landing-page fetch on every campaign chat; role-notes staleness labels (⚠️ STALE >7d); ID-integrity rules (no conversion/GTM/AW- ID unless live-pulled this session); Team Audit premise gate + ~200-word specialist brevity cap | `research/agent-quality-hardening-plan.md` | 2026-07-08 |
+| Chat Orchestration v2 (MVP + accuracy gate) | Epic 0 stop/bleed P0 hotfix (process-group kill, stop-flag, frontend identity guards); turn runner + event protocol (`chat_turns`/`chat_turn_events`, V22); orchestrated chat mode (TRIAGE → RECALL → VERIFY → PLAN ≤3 specialists → DISPATCH → RESOLVE → SYNTHESIZE, Director-only voice) behind a per-conversation toggle, default OFF; live activity ledger UI; Epic 4 deterministic claim gate + provenance manifest — unverified IDs rewritten in place, the **gated** text is what persists | `research/chat-orchestration-v2-plan.md` | 2026-07-12 → 14 |
+| Dashboard v2.1 always-fresh data | Metrics sync rewrite (1 GAQL search_stream per run, was ~3,300 ops → the 429 poison); `sync_state` ledger (V21) + watchdog/heartbeat/backoff; freshness envelopes + `<FreshnessChip>` everywhere; self-heal sync on open; live-truth campaign header + scheduler live pre-read; SSE `/accounts/{id}/events` push; home-as-default-route, keyboard chords, skeletons + prefetch | `research/dashboard-freshness-clarity-plan.md` | 2026-07-12 |
+| Studio track (Epics 11/12 + redesign) | Higgsfield scene engine with prompt-hash clip cache (V18); Soul talking segments + segment-timeline dispatcher; 15/30/60s finished-video planner; StudioPanel + server-side model catalog + AssetLibrary + SoulCreator; the two-studio fork (`/studio/ai-video` + `/studio/kinetic`) with the model-aware **Video Director** agent (`studio_video_projects`/`brand_avatars`, V23–V24) | `research/video-engine-plan.md` · `research/studio-redesign-brief.md` · `research/studio-redesign-plan.md` | 2026-06-11 → 2026-07-14 |
+| MCP tool-surface hardening | Keyword pause/enable status tool; sitelink/callout/structured-snippet/call asset creators; fake-success stubs converted to honest errors (un-stubbed shared-set attach); fail-closed dry-run harness forcing `validate_only` on every mutate (90 PASS / 0 FAIL / 147 SKIP after fixes); 9 real mutate-tool bugs found and fixed | feature-log rows (2026-07-05) | 2026-07-05 |
+
+> **Epic mapping:** no pre-written epics — reconciled as story-style entries in
+> `epics-v2.md` § "Shipped Unplanned" (added 2026-07-14). Deferred remainders
+> stay in their source plans: Chat-orch token-level previews (1.4), conflict/
+> decision ledger rows (3.3 partial), Epics 5–8 (writeback polish, persona
+> overhaul, migration/eval, Director of Directors); Dashboard `new`-campaign
+> chip, change-event attribution, currency/tz context bar; Studio Virality +
+> Clipper (MCP-only) and lipsync-model presenter.
+
 ### Phase 2: Agency Features
 
 **Goal:** Full agency workflow support with team knowledge sharing and client reporting.
@@ -898,6 +994,13 @@ is sellable, not just an internal tool. Source: `research/product-roadmap.md`
 | `SearchTermService` | AI-powered categorization, negative keyword suggestions |
 | `BulkOperationsService` | Multi-entity operations with preview and confirmation |
 | `ExportService` | CSV/PDF generation for reports |
+
+> **Note (2026-07-14 reconcile):** this table is the April plan. The as-shipped
+> service inventory is far larger (chat runner/orchestrator, task ledger,
+> provenance + claim gate, workflow runner, sync engine + freshness, video
+> director/engine, model catalog, and more) — see `architecture-v2.md` §11
+> "Shipped Delta Ledger" for the authoritative as-built list, migration ledger
+> (schema V24), and operational model.
 
 ### Data Model Changes
 

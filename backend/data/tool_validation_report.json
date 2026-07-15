@@ -1,0 +1,2687 @@
+{
+  "timestamp": "2026-07-06T01:31:06+00:00",
+  "api_version": "v23",
+  "customer_id": "7178239091",
+  "groups": "all",
+  "totals": {
+    "discovered_total": 314,
+    "discovered_mutate": 237,
+    "pass": 90,
+    "fail": 0,
+    "skip": 147,
+    "skip_safety_blocked": 1
+  },
+  "safety": {
+    "mutates_forced_validate_only": 123,
+    "mutates_blocked_unforced": 1,
+    "forced_method_breakdown": {
+      "mutate_ad_group_ad_labels": 1,
+      "mutate_ad_group_ads": 5,
+      "mutate_ad_group_assets": 4,
+      "mutate_ad_group_bid_modifiers": 5,
+      "mutate_ad_group_criteria": 9,
+      "mutate_ad_group_criterion_labels": 4,
+      "mutate_ad_group_labels": 4,
+      "mutate_ad_groups": 2,
+      "mutate_asset_group_assets": 3,
+      "mutate_asset_group_signals": 3,
+      "mutate_asset_groups": 3,
+      "mutate_asset_sets": 1,
+      "mutate_assets": 6,
+      "mutate_audiences": 3,
+      "mutate_bidding_data_exclusions": 1,
+      "mutate_bidding_seasonality_adjustments": 1,
+      "mutate_bidding_strategies": 4,
+      "mutate_campaign_assets": 3,
+      "mutate_campaign_bid_modifiers": 3,
+      "mutate_campaign_budgets": 2,
+      "mutate_campaign_conversion_goals": 1,
+      "mutate_campaign_criteria": 5,
+      "mutate_campaign_drafts": 3,
+      "mutate_campaign_labels": 4,
+      "mutate_campaign_shared_sets": 5,
+      "mutate_campaigns": 2,
+      "mutate_conversion_actions": 2,
+      "mutate_conversion_custom_variables": 2,
+      "mutate_conversion_goal_campaign_configs": 1,
+      "mutate_custom_audiences": 1,
+      "mutate_custom_conversion_goals": 2,
+      "mutate_custom_interests": 1,
+      "mutate_customer_assets": 4,
+      "mutate_customer_conversion_goals": 1,
+      "mutate_customer_labels": 2,
+      "mutate_customer_negative_criteria": 2,
+      "mutate_customizer_attributes": 1,
+      "mutate_experiment_arms": 2,
+      "mutate_experiments": 1,
+      "mutate_keyword_plan_campaigns": 2,
+      "mutate_keyword_plans": 1,
+      "mutate_labels": 2,
+      "mutate_remarketing_actions": 2,
+      "mutate_shared_criteria": 2,
+      "mutate_shared_sets": 2,
+      "mutate_user_lists": 3
+    },
+    "safety_ok": true,
+    "post_run_read_counts": {
+      "campaigns": 153,
+      "assets": 200
+    },
+    "note": "Every Google Ads mutate was forced to validate_only=True at the SDK layer, OR fail-closed quarantined (DryRunBlocked) when its request proto had no validate_only field (mutate_batch_job, mutate_billing_setup). blocked_unforced is the count of quarantined (never-sent) mutates \u2014 it is a success signal, NOT a violation. Zero unflagged mutates executed; nothing was created/updated/removed."
+  },
+  "harvested_resources": {
+    "ad_group_id": "56011821504",
+    "keyword_pair": [
+      "192400794941",
+      "326337106008"
+    ],
+    "campaign_id": "1027287835",
+    "campaign_name": "Study in Canada (Brazil)",
+    "campaign_budget_rn": "customers/7178239091/campaignBudgets/1309565711",
+    "ad_group_ad_rn": "customers/7178239091/adGroupAds/56011821504~234496877694",
+    "ad_id": "234496877694",
+    "asset_id": "27261931",
+    "asset_rn": "customers/7178239091/assets/27261931",
+    "label_id": "11985055182",
+    "label_rn": "customers/7178239091/labels/11985055182",
+    "bidding_strategy_id": "1710273017",
+    "bidding_strategy_rn": "customers/7178239091/biddingStrategies/1710273017",
+    "shared_set_id": "7017112368",
+    "shared_set_rn": "customers/7178239091/sharedSets/7017112368",
+    "conversion_action_id": "848894779",
+    "conversion_action_rn": "customers/7178239091/conversionActions/848894779",
+    "user_list_id": "592834018",
+    "user_list_rn": "customers/7178239091/userLists/592834018",
+    "experiment_id": "10055040522",
+    "experiment_rn": "customers/7178239091/experiments/10055040522",
+    "asset_group_id": "6478052304",
+    "asset_group_rn": "customers/7178239091/assetGroups/6478052304",
+    "campaign_asset_rn": "customers/7178239091/campaignAssets/21089259108~130176479984~DESCRIPTION",
+    "ad_group_asset_rn": "customers/7178239091/adGroupAssets/56199331817~34070433047~SITELINK",
+    "customer_asset_rn": "customers/7178239091/customerAssets/304627278492~STRUCTURED_SNIPPET",
+    "customer_asset_field_type": "STRUCTURED_SNIPPET",
+    "campaign_criterion_rn": "customers/7178239091/campaignCriteria/1027287835~1014",
+    "campaign_criterion_id": "1014",
+    "ad_group_bid_modifier_rn": "customers/7178239091/adGroupBidModifiers/56011821504~30000",
+    "campaign_bid_modifier_rn": "customers/7178239091/campaignBidModifiers/1443317682~8000",
+    "audience_id": "102447100",
+    "audience_rn": "customers/7178239091/audiences/102447100",
+    "campaign_draft_rn": "customers/7178239091/campaignDrafts/11207217308~281474976710656",
+    "campaign_draft_id": "281474976710656",
+    "recommendation_rn": "customers/7178239091/recommendations/MjQ3ODg5MTc2LTEwMi0xNzgzMTUyMDEyOTkxLSsyMzc1ODg3Nzc1Ng",
+    "recommendation_type": "CALL_ASSET",
+    "conversion_custom_variable_id": "24087262",
+    "image_asset_id": "27261931",
+    "image_asset_rn": "customers/7178239091/assets/27261931",
+    "text_asset_id": "579360101",
+    "sitelink_asset_id": "34070432999",
+    "youtube_video_id": "TsSLg1W30Po",
+    "pmax_campaign_id": "20592131652",
+    "remarketing_action_id": "6949874601",
+    "keyword_plan_id": "997511280",
+    "keyword_plan_rn": "customers/7178239091/keywordPlans/997511280",
+    "geo_target_id": "21132",
+    "language_id": "1000"
+  },
+  "real_ids_used": {
+    "ad_group_id": "56011821504",
+    "keyword_pair": [
+      "192400794941",
+      "326337106008"
+    ],
+    "campaign_id": "1027287835",
+    "campaign_name": "Study in Canada (Brazil)",
+    "campaign_budget_rn": "customers/7178239091/campaignBudgets/1309565711",
+    "ad_group_ad_rn": "customers/7178239091/adGroupAds/56011821504~234496877694",
+    "ad_id": "234496877694",
+    "asset_id": "27261931",
+    "asset_rn": "customers/7178239091/assets/27261931",
+    "label_id": "11985055182",
+    "label_rn": "customers/7178239091/labels/11985055182",
+    "bidding_strategy_id": "1710273017",
+    "bidding_strategy_rn": "customers/7178239091/biddingStrategies/1710273017",
+    "shared_set_id": "7017112368",
+    "shared_set_rn": "customers/7178239091/sharedSets/7017112368",
+    "conversion_action_id": "848894779",
+    "conversion_action_rn": "customers/7178239091/conversionActions/848894779",
+    "user_list_id": "592834018",
+    "user_list_rn": "customers/7178239091/userLists/592834018",
+    "experiment_id": "10055040522",
+    "experiment_rn": "customers/7178239091/experiments/10055040522",
+    "asset_group_id": "6478052304",
+    "asset_group_rn": "customers/7178239091/assetGroups/6478052304",
+    "campaign_asset_rn": "customers/7178239091/campaignAssets/21089259108~130176479984~DESCRIPTION",
+    "ad_group_asset_rn": "customers/7178239091/adGroupAssets/56199331817~34070433047~SITELINK",
+    "customer_asset_rn": "customers/7178239091/customerAssets/304627278492~STRUCTURED_SNIPPET",
+    "customer_asset_field_type": "STRUCTURED_SNIPPET",
+    "campaign_criterion_rn": "customers/7178239091/campaignCriteria/1027287835~1014",
+    "campaign_criterion_id": "1014",
+    "ad_group_bid_modifier_rn": "customers/7178239091/adGroupBidModifiers/56011821504~30000",
+    "campaign_bid_modifier_rn": "customers/7178239091/campaignBidModifiers/1443317682~8000",
+    "audience_id": "102447100",
+    "audience_rn": "customers/7178239091/audiences/102447100",
+    "campaign_draft_rn": "customers/7178239091/campaignDrafts/11207217308~281474976710656",
+    "campaign_draft_id": "281474976710656",
+    "recommendation_rn": "customers/7178239091/recommendations/MjQ3ODg5MTc2LTEwMi0xNzgzMTUyMDEyOTkxLSsyMzc1ODg3Nzc1Ng",
+    "recommendation_type": "CALL_ASSET",
+    "conversion_custom_variable_id": "24087262",
+    "image_asset_id": "27261931",
+    "image_asset_rn": "customers/7178239091/assets/27261931",
+    "text_asset_id": "579360101",
+    "sitelink_asset_id": "34070432999",
+    "youtube_video_id": "TsSLg1W30Po",
+    "pmax_campaign_id": "20592131652",
+    "remarketing_action_id": "6949874601",
+    "keyword_plan_id": "997511280",
+    "keyword_plan_rn": "customers/7178239091/keywordPlans/997511280",
+    "geo_target_id": "21132",
+    "language_id": "1000"
+  },
+  "results": [
+    {
+      "tool": "account_budget_proposal_create_account_budget_proposal",
+      "namespace": "account_budget_proposal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "MCC/billing-only \u2014 no billing_setup or payments account on this test account"
+    },
+    {
+      "tool": "account_budget_proposal_remove_account_budget_proposal",
+      "namespace": "account_budget_proposal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'proposal_resource_name'"
+    },
+    {
+      "tool": "account_budget_proposal_update_account_budget_proposal",
+      "namespace": "account_budget_proposal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "unclassified required string 'account_budget' \u2014 skipping to avoid a false FAIL"
+    },
+    {
+      "tool": "account_link_create_account_link",
+      "namespace": "account_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'app_analytics_provider_id'"
+    },
+    {
+      "tool": "account_link_remove_account_link",
+      "namespace": "account_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'account_link_resource_name'"
+    },
+    {
+      "tool": "account_link_update_account_link",
+      "namespace": "account_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "ad_create_expanded_text_ad",
+      "namespace": "ad",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "headline1": "Immigration Help",
+        "headline2": "Free Consultation",
+        "headline3": "Apply Today",
+        "description1": "Expert guidance for your visa and residency journey.",
+        "description2": "Trusted immigration advisors ready to help you now.",
+        "final_urls": [
+          "https://goldenvisas.mercan.com"
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE; ad_group_ad_error=CANNOT_CREATE_DEPRECATED_ADS] The operation is not allowed for removed resources. | An ad of this type is deprecated and cannot be created. Only deletions are permitted."
+    },
+    {
+      "tool": "ad_create_responsive_search_ad",
+      "namespace": "ad",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "headlines": [
+          "Test"
+        ],
+        "descriptions": [
+          "Test"
+        ],
+        "final_urls": [
+          "https://goldenvisas.mercan.com"
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE; collection_size_error=TOO_FEW; collection_size_error=TOO_FEW] The operation is not allowed for removed resources. | Too few. | Too few."
+    },
+    {
+      "tool": "ad_group_ad_create_ad_group_ad",
+      "namespace": "ad_group_ad",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'ad_resource_name'"
+    },
+    {
+      "tool": "ad_group_ad_label_create_ad_group_ad_label",
+      "namespace": "ad_group_ad_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_ad_resource_name": "customers/7178239091/adGroupAds/56011821504~234496877694",
+        "label_resource_name": "customers/7178239091/labels/11985055182"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_ad_label_remove_ad_group_ad_label",
+      "namespace": "ad_group_ad_label",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'ad_group_ad_label_resource_name'"
+    },
+    {
+      "tool": "ad_group_ad_remove_ad_group_ad",
+      "namespace": "ad_group_ad",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_ad_resource_name": "customers/7178239091/adGroupAds/56011821504~234496877694"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_ad_update_ad_group_ad_status",
+      "namespace": "ad_group_ad",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_ad_resource_name": "customers/7178239091/adGroupAds/56011821504~234496877694",
+        "status": "PAUSED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_asset_link_asset_to_ad_group",
+      "namespace": "ad_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "asset_id": "34070432999",
+        "field_type": "SITELINK"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_asset_link_multiple_assets_to_ad_group",
+      "namespace": "ad_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "asset_links": [
+          {
+            "asset_id": "34070432999",
+            "field_type": "SITELINK"
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_asset_remove_asset_from_ad_group",
+      "namespace": "ad_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "asset_id": "34070432999",
+        "field_type": "SITELINK"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "ad_group_asset_set_create_ad_group_asset_set",
+      "namespace": "ad_group_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'ad_group_resource_name'"
+    },
+    {
+      "tool": "ad_group_asset_set_remove_ad_group_asset_set",
+      "namespace": "ad_group_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'ad_group_asset_set_resource_name'"
+    },
+    {
+      "tool": "ad_group_asset_update_ad_group_asset_status",
+      "namespace": "ad_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "asset_id": "34070432999",
+        "field_type": "SITELINK",
+        "status": "PAUSED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [field_error=IMMUTABLE_FIELD; field_error=IMMUTABLE_FIELD; mutate_error=RESOURCE_NOT_FOUND; context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The field attempted to be mutated is immutable. | The field attempted to be mutated is immutable. | Resource was not found. | The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_bid_modifier_create_ad_group_device_bid_modifier",
+      "namespace": "ad_group_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "device_type": "MOBILE",
+        "bid_modifier": 1.1
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_bid_modifier_create_ad_group_hotel_check_in_day_bid_modifier",
+      "namespace": "ad_group_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "day_of_week": "MONDAY",
+        "bid_modifier": 1.1
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_CONTEXT; context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for the given context. | The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_bid_modifier_create_ad_group_hotel_date_selection_bid_modifier",
+      "namespace": "ad_group_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "date_selection_type": "USER_SELECTED",
+        "bid_modifier": 1.1
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_CONTEXT] The operation is not allowed for the given context."
+    },
+    {
+      "tool": "ad_group_bid_modifier_remove_ad_group_bid_modifier",
+      "namespace": "ad_group_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "bid_modifier_resource_name": "customers/7178239091/adGroupBidModifiers/56011821504~30000"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "ad_group_bid_modifier_update_ad_group_bid_modifier",
+      "namespace": "ad_group_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "bid_modifier_resource_name": "customers/7178239091/adGroupBidModifiers/56011821504~30000",
+        "new_bid_modifier": 1.2
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "ad_group_create_ad_group",
+      "namespace": "ad_group",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_add_audience_criteria",
+      "namespace": "ad_group_criterion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "user_list_ids": [
+          "592834018"
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [criterion_error=CANNOT_ADD_CLOSED_USER_LIST] Not allowed to target a closed user list."
+    },
+    {
+      "tool": "ad_group_criterion_add_demographic_criteria",
+      "namespace": "ad_group_criterion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "demographics": [
+          {
+            "type": "AGE_RANGE",
+            "value": "AGE_RANGE_25_34"
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_criterion_add_keywords",
+      "namespace": "ad_group_criterion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "keywords": [
+          {
+            "text": "immigration lawyer",
+            "match_type": "BROAD"
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_group_criterion_customizer_mutate_ad_group_criterion_customizers",
+      "namespace": "ad_group_criterion_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "ad_group_criterion_label_assign_label_to_criterion",
+      "namespace": "ad_group_criterion_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_criterion": "customers/7178239091/adGroupCriteria/192400794941~326337106008",
+        "label": "customers/7178239091/labels/11985055182"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_label_assign_label_to_multiple_criteria",
+      "namespace": "ad_group_criterion_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_criteria": [
+          "customers/7178239091/adGroupCriteria/192400794941~326337106008"
+        ],
+        "label": "customers/7178239091/labels/11985055182"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_label_assign_multiple_labels_to_criterion",
+      "namespace": "ad_group_criterion_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_criterion": "customers/7178239091/adGroupCriteria/192400794941~326337106008",
+        "labels": [
+          "customers/7178239091/labels/11985055182"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_label_mutate_ad_group_criterion_labels",
+      "namespace": "ad_group_criterion_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "create",
+            "ad_group_criterion": "customers/7178239091/adGroupCriteria/192400794941~326337106008",
+            "label": "customers/7178239091/labels/11985055182"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_label_remove_label_from_criterion",
+      "namespace": "ad_group_criterion_label",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "ad_group_criterion_remove_ad_group_criterion",
+      "namespace": "ad_group_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "criterion_resource_name": "customers/7178239091/adGroupCriteria/192400794941~326337106008"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_update_ad_group_criterion_status",
+      "namespace": "ad_group_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "192400794941",
+        "criterion_id": "326337106008",
+        "status": "PAUSED"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_criterion_update_criterion_bid",
+      "namespace": "ad_group_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "criterion_resource_name": "customers/7178239091/adGroupCriteria/192400794941~326337106008",
+        "cpc_bid_micros": 1000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_customizer_create_ad_group_customizer",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "ad_group_customizer_create_number_customizer",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "ad_group_customizer_create_price_customizer",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "ad_group_customizer_create_text_customizer",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "ad_group_customizer_mutate_ad_group_customizers",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "ad_group_customizer_remove_ad_group_customizer",
+      "namespace": "ad_group_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "ad_group_label_apply_label_to_ad_group",
+      "namespace": "ad_group_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_label_apply_labels_to_ad_groups",
+      "namespace": "ad_group_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_label_pairs": [
+          {
+            "ad_group_id": "56011821504",
+            "label_id": "11985055182"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "ad_group_label_remove_label_from_ad_group",
+      "namespace": "ad_group_label",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "ad_group_update_ad_group",
+      "namespace": "ad_group",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "status": "PAUSED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "ad_parameter_mutate_ad_parameters",
+      "namespace": "ad_parameter",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "ad_update_ad_status",
+      "namespace": "ad",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "ad_id": "234496877694",
+        "status": "PAUSED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "asset_create_call_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "phone_number": "+1 800 555 0100",
+        "country_code": "US"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_create_callout_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "callout_text": "Free consult"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_create_image_asset",
+      "namespace": "asset",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "unclassified required string 'image_data' \u2014 skipping to avoid a false FAIL"
+    },
+    {
+      "tool": "asset_create_sitelink_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "link_text": "Learn more",
+        "final_urls": [
+          "https://goldenvisas.mercan.com"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_create_structured_snippet_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "header": "Services",
+        "values": [
+          "Visas",
+          "Residency",
+          "Citizenship"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_create_text_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "text": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_create_youtube_video_asset",
+      "namespace": "asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "youtube_video_id": "TsSLg1W30Po"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_asset_create_asset_group_asset",
+      "namespace": "asset_group_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group_id": "6478052304",
+        "asset_id": "579360101",
+        "field_type": "HEADLINE"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_asset_remove_asset_group_asset",
+      "namespace": "asset_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group_id": "6478052304",
+        "asset_id": "579360101",
+        "field_type": "HEADLINE"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "asset_group_asset_update_asset_group_asset_status",
+      "namespace": "asset_group_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group_id": "6478052304",
+        "asset_id": "579360101",
+        "field_type": "HEADLINE",
+        "status": "PAUSED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "asset_group_create_asset_group",
+      "namespace": "asset_group",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "20592131652",
+        "name": "Harness Asset Group",
+        "final_urls": [
+          "https://goldenvisas.mercan.com"
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [asset_group_error=NOT_ENOUGH_HEADLINE_ASSET; asset_group_error=NOT_ENOUGH_LONG_HEADLINE_ASSET; asset_group_error=NOT_ENOUGH_DESCRIPTION_ASSET; asset_group_error=NOT_ENOUGH_MARKETING_IMAGE_ASSET; asset_group_error=NOT_ENOUGH_SQUARE_MARKETING_IMAGE_ASSET] Headline asset for a valid asset group is not enough. | Long headline asset for a valid asset group is not enough. | Description headline asset for a valid asset group is not enough. | Marketing image asset for a valid asset group is not enough. | Square marketing image asset for a valid asset group is not enough."
+    },
+    {
+      "tool": "asset_group_remove_asset_group",
+      "namespace": "asset_group",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group_id": "6478052304"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_signal_create_audience_signal",
+      "namespace": "asset_group_signal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group": "customers/7178239091/assetGroups/6478052304",
+        "audience_resource_name": "customers/7178239091/audiences/102447100"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_signal_create_search_theme_signal",
+      "namespace": "asset_group_signal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group": "customers/7178239091/assetGroups/6478052304",
+        "search_theme": "immigration to canada"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_signal_mutate_asset_group_signals",
+      "namespace": "asset_group_signal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "create",
+            "asset_group": "customers/7178239091/assetGroups/6478052304",
+            "audience_resource_name": "customers/7178239091/audiences/102447100"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_group_signal_remove_asset_group_signal",
+      "namespace": "asset_group_signal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "asset_group_update_asset_group",
+      "namespace": "asset_group",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset_group_id": "6478052304",
+        "name": "Harness Asset Group Renamed"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_set_create_asset_set",
+      "namespace": "asset_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Asset Set",
+        "asset_set_type": "PAGE_FEED"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "asset_set_remove_asset_set",
+      "namespace": "asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (asset_set count=0)"
+    },
+    {
+      "tool": "asset_set_update_asset_set",
+      "namespace": "asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (asset_set count=0)"
+    },
+    {
+      "tool": "audience_create_combined_audience",
+      "namespace": "audience",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Combined Audience",
+        "description": "harness test",
+        "dimensions": [
+          {
+            "type": "AGE",
+            "age_ranges": [
+              {
+                "min_age": 25,
+                "max_age": 34
+              }
+            ]
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "audience_remove_audience",
+      "namespace": "audience",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "audience_id": "102447100"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "audience_update_audience",
+      "namespace": "audience",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "audience_id": "102447100",
+        "description": "harness updated description"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "batch_job_add_operations_to_batch_job",
+      "namespace": "batch_job",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'batch_job_resource_name'"
+    },
+    {
+      "tool": "batch_job_create_batch_job",
+      "namespace": "batch_job",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091"
+      },
+      "error_or_reason": "SAFETY-BLOCK (fail-closed; mutate not executed): Exception: Failed to create batch job: Refusing to call mutate method 'mutate_batch_job': could not positively force validate_only=True (no flaggable request proto and no injectable validate_only kwarg). Fail-closed \u2014 the real mutate was NOT executed. args=[] kwargs=['request']"
+    },
+    {
+      "tool": "batch_job_run_batch_job",
+      "namespace": "batch_job",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'batch_job_resource_name'"
+    },
+    {
+      "tool": "bidding_data_exclusion_create_bidding_data_exclusion",
+      "namespace": "bidding_data_exclusion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Data Exclusion",
+        "scope": "CUSTOMER",
+        "start_date_time": "2030-01-01 00:00:00",
+        "end_date_time": "2030-01-02 00:00:00"
+      },
+      "error_or_reason": "account-constraint: CUSTOMER-scope data exclusions are not permitted for this account/config (a valid enum, rejected by API policy): [request_error=UNKNOWN] The scope value is not allowed to be used."
+    },
+    {
+      "tool": "bidding_data_exclusion_remove_bidding_data_exclusion",
+      "namespace": "bidding_data_exclusion",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (bidding_data_exclusion)"
+    },
+    {
+      "tool": "bidding_data_exclusion_update_bidding_data_exclusion",
+      "namespace": "bidding_data_exclusion",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (bidding_data_exclusion)"
+    },
+    {
+      "tool": "bidding_seasonality_adjustment_create_bidding_seasonality_adjustment",
+      "namespace": "bidding_seasonality_adjustment",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Seasonality",
+        "scope": "CUSTOMER",
+        "start_date_time": "2030-01-01 00:00:00",
+        "end_date_time": "2030-01-05 00:00:00",
+        "conversion_rate_modifier": 1.5
+      },
+      "error_or_reason": "account-constraint: CUSTOMER-scope seasonality adjustments are not permitted for this account/config (valid enum, rejected by API): [request_error=UNKNOWN] The scope value is not allowed to be used."
+    },
+    {
+      "tool": "bidding_seasonality_adjustment_remove_bidding_seasonality_adjustment",
+      "namespace": "bidding_seasonality_adjustment",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (bidding_seasonality_adjustment)"
+    },
+    {
+      "tool": "bidding_seasonality_adjustment_update_bidding_seasonality_adjustment",
+      "namespace": "bidding_seasonality_adjustment",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (bidding_seasonality_adjustment)"
+    },
+    {
+      "tool": "bidding_strategy_create_maximize_conversions_strategy",
+      "namespace": "bidding_strategy",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "bidding_strategy_create_target_cpa_strategy",
+      "namespace": "bidding_strategy",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test",
+        "target_cpa_micros": 1000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "bidding_strategy_create_target_impression_share_strategy",
+      "namespace": "bidding_strategy",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Target IS",
+        "location": "ANYWHERE_ON_PAGE",
+        "location_fraction_micros": 650000,
+        "max_cpc_bid_ceiling_micros": 2000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "bidding_strategy_create_target_roas_strategy",
+      "namespace": "bidding_strategy",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test",
+        "target_roas": 1.0
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "billing_setup_create_billing_setup",
+      "namespace": "billing_setup",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'payments_account_id'"
+    },
+    {
+      "tool": "budget_create_campaign_budget",
+      "namespace": "budget",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test",
+        "amount_micros": 1000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "budget_update_campaign_budget",
+      "namespace": "budget",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "budget_id": "1309565711",
+        "name": "Harness Budget Renamed"
+      },
+      "error_or_reason": "account/version: the ENABLED budget rejects a rename with a server error code newer than the installed client lib; the request (field-mask=name) is well-formed \u2014 not a tool bug: [request_error=UNKNOWN] The error code is not in this version."
+    },
+    {
+      "tool": "campaign_asset_link_asset_to_campaign",
+      "namespace": "campaign_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "asset_id": "34070432999",
+        "field_type": "SITELINK"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_asset_link_multiple_assets_to_campaign",
+      "namespace": "campaign_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "asset_links": [
+          {
+            "asset_id": "34070432999",
+            "field_type": "SITELINK"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_asset_remove_asset_from_campaign",
+      "namespace": "campaign_asset",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "asset_id": "34070432999",
+        "field_type": "SITELINK"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_asset_set_link_asset_set_to_campaign",
+      "namespace": "campaign_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (asset_set count=0)"
+    },
+    {
+      "tool": "campaign_asset_set_link_asset_set_to_multiple_campaigns",
+      "namespace": "campaign_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (asset_set count=0)"
+    },
+    {
+      "tool": "campaign_asset_set_link_multiple_asset_sets_to_campaign",
+      "namespace": "campaign_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (asset_set count=0)"
+    },
+    {
+      "tool": "campaign_asset_set_mutate_campaign_asset_sets",
+      "namespace": "campaign_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "campaign_asset_set_unlink_asset_set_from_campaign",
+      "namespace": "campaign_asset_set",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "campaign_bid_modifier_create_interaction_type_bid_modifier",
+      "namespace": "campaign_bid_modifier",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "interaction_type": "CALLS",
+        "bid_modifier": 1.1
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_bid_modifier_remove_bid_modifier",
+      "namespace": "campaign_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "bid_modifier_resource_name": "customers/7178239091/campaignBidModifiers/1443317682~8000"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_bid_modifier_update_bid_modifier",
+      "namespace": "campaign_bid_modifier",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "bid_modifier_resource_name": "customers/7178239091/campaignBidModifiers/1443317682~8000",
+        "new_bid_modifier": 1.2
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_conversion_goal_update_campaign_conversion_goal",
+      "namespace": "campaign_conversion_goal",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "category": "DEFAULT",
+        "origin": "WEBSITE",
+        "biddable": true
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_create_campaign",
+      "namespace": "campaign",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test",
+        "budget_resource_name": "customers/7178239091/campaignBudgets/1309565711"
+      },
+      "error_or_reason": "account-state: the only ENABLED budget available is already attached to a campaign (implicitly shared) so it cannot seed a new campaign; the request itself is well-formed: [campaign_budget_error=CANNOT_USE_IMPLICITLY_SHARED_CAMPAIGN_BUDGET_WITH_MULTIPLE_CAMPAIGNS] Only explicitly shared campaign budgets can be used with multiple campaigns."
+    },
+    {
+      "tool": "campaign_criterion_add_device_criteria",
+      "namespace": "campaign_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "device_types": [
+          "MOBILE"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_criterion_add_language_criteria",
+      "namespace": "campaign_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "language_ids": [
+          "1000"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_criterion_add_location_criteria",
+      "namespace": "campaign_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "location_ids": [
+          "21132"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_criterion_add_negative_keyword_criteria",
+      "namespace": "campaign_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "keywords": [
+          {
+            "text": "free",
+            "match_type": "BROAD"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_criterion_remove_campaign_criterion",
+      "namespace": "campaign_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "criterion_resource_name": "customers/7178239091/campaignCriteria/1027287835~1014"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_customizer_create_campaign_customizer",
+      "namespace": "campaign_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'customizer_attribute_id'"
+    },
+    {
+      "tool": "campaign_customizer_remove_campaign_customizer",
+      "namespace": "campaign_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'customizer_attribute_id'"
+    },
+    {
+      "tool": "campaign_draft_create_campaign_draft",
+      "namespace": "campaign_draft",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "base_campaign": "customers/7178239091/campaigns/1027287835",
+        "draft_name": "Harness Draft"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_draft_promote_campaign_draft",
+      "namespace": "campaign_draft",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "draft_resource_name": "customers/7178239091/campaignDrafts/11207217308~281474976710656"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [campaign_draft_error=INVALID_STATUS_TRANSITION_FROM_REMOVED] The draft cannot be transitioned to another status once it has been removed."
+    },
+    {
+      "tool": "campaign_draft_remove_campaign_draft",
+      "namespace": "campaign_draft",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "draft_resource_name": "customers/7178239091/campaignDrafts/11207217308~281474976710656"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_draft_update_campaign_draft",
+      "namespace": "campaign_draft",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "draft_resource_name": "customers/7178239091/campaignDrafts/11207217308~281474976710656",
+        "draft_name": "Harness Draft Renamed"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_label_apply_label_to_campaign",
+      "namespace": "campaign_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_label_apply_labels_to_campaigns",
+      "namespace": "campaign_label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_label_pairs": [
+          {
+            "campaign_id": "1027287835",
+            "label_id": "11985055182"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_label_remove_label_from_campaign",
+      "namespace": "campaign_label",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_shared_set_attach_shared_set_to_campaign",
+      "namespace": "campaign_shared_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "shared_set_id": "7017112368"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_shared_set_attach_shared_sets_to_campaigns",
+      "namespace": "campaign_shared_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "attachments": [
+          {
+            "campaign_id": "1027287835",
+            "shared_set_id": "7017112368"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "campaign_shared_set_detach_shared_set_from_campaign",
+      "namespace": "campaign_shared_set",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "shared_set_id": "7017112368"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_shared_set_update_campaign_shared_set_status",
+      "namespace": "campaign_shared_set",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "shared_set_id": "7017112368",
+        "status": "ENABLED"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "campaign_update_campaign",
+      "namespace": "campaign",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "campaign_id": "1027287835",
+        "status": "PAUSED"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_adjustment_upload_create_restatement_adjustment",
+      "namespace": "conversion_adjustment_upload",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversion_action": "customers/7178239091/conversionActions/848894779",
+        "gclid": "TeSter123gclidExample",
+        "conversion_date_time": "2026-01-01 12:00:00+00:00",
+        "adjustment_date_time": "2026-01-02 12:00:00+00:00",
+        "adjusted_value": 10.0,
+        "currency_code": "USD"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_adjustment_upload_create_retraction_adjustment",
+      "namespace": "conversion_adjustment_upload",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversion_action": "customers/7178239091/conversionActions/848894779",
+        "gclid": "TeSter123gclidExample",
+        "conversion_date_time": "2026-01-01 12:00:00+00:00",
+        "adjustment_date_time": "2026-01-02 12:00:00+00:00"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_adjustment_upload_upload_conversion_adjustments",
+      "namespace": "conversion_adjustment_upload",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "adjustments": [
+          {
+            "conversion_action": "customers/7178239091/conversionActions/848894779",
+            "adjustment_type": "RETRACTION",
+            "gclid": "TeSter123gclidExample",
+            "conversion_date_time": "2026-01-01 12:00:00+00:00",
+            "adjustment_date_time": "2026-01-02 12:00:00+00:00"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_create_conversion_action",
+      "namespace": "conversion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_custom_variable_create_conversion_custom_variable",
+      "namespace": "conversion_custom_variable",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Custom Var",
+        "tag": "harness_var"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_custom_variable_update_conversion_custom_variable",
+      "namespace": "conversion_custom_variable",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "custom_variable_id": 24087262,
+        "name": "Harness Custom Var Renamed"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_goal_campaign_config_mutate_conversion_goal_campaign_configs",
+      "namespace": "conversion_goal_campaign_config",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "update",
+            "resource_name": "customers/7178239091/conversionGoalCampaignConfigs/1027287835",
+            "goal_config_level": "CAMPAIGN"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_goal_campaign_config_update_conversion_goal_campaign_config",
+      "namespace": "conversion_goal_campaign_config",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "conversion_update_conversion_action",
+      "namespace": "conversion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversion_action_id": "848894779",
+        "status": "ENABLED"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_upload_upload_call_conversions",
+      "namespace": "conversion_upload",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversions": [
+          {
+            "caller_id": "+18005550100",
+            "call_start_date_time": "2026-01-01 12:00:00+00:00",
+            "conversion_action_id": "848894779",
+            "conversion_date_time": "2026-01-01 13:00:00+00:00",
+            "conversion_value": 10.0
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_upload_upload_click_conversions",
+      "namespace": "conversion_upload",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversions": [
+          {
+            "gclid": "TeSter123gclidExample",
+            "conversion_action_id": "848894779",
+            "conversion_date_time": "2026-01-01 13:00:00+00:00",
+            "conversion_value": 10.0
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "conversion_value_rule_create_basic_conversion_value_rule",
+      "namespace": "conversion_value_rule",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'conversion_value_rule_set_id'"
+    },
+    {
+      "tool": "conversion_value_rule_remove_conversion_value_rule",
+      "namespace": "conversion_value_rule",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'rule_resource_name'"
+    },
+    {
+      "tool": "conversion_value_rule_update_basic_conversion_value_rule",
+      "namespace": "conversion_value_rule",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "custom_audience_create_custom_audience",
+      "namespace": "custom_audience",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Custom Audience",
+        "description": "harness",
+        "members": [
+          {
+            "type": "KEYWORD",
+            "keyword": "running shoes"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "custom_audience_update_custom_audience",
+      "namespace": "custom_audience",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (custom_audience)"
+    },
+    {
+      "tool": "custom_conversion_goal_create_custom_conversion_goal",
+      "namespace": "custom_conversion_goal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Custom Conversion Goal",
+        "conversion_actions": [
+          "customers/7178239091/conversionActions/848894779"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "custom_conversion_goal_mutate_custom_conversion_goals",
+      "namespace": "custom_conversion_goal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "create",
+            "name": "Harness Custom Goal",
+            "conversion_actions": [
+              "customers/7178239091/conversionActions/848894779"
+            ]
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "custom_conversion_goal_remove_custom_conversion_goal",
+      "namespace": "custom_conversion_goal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "custom_conversion_goal_update_custom_conversion_goal",
+      "namespace": "custom_conversion_goal",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "custom_interest_create_custom_interest",
+      "namespace": "custom_interest",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Custom Interest",
+        "description": "harness",
+        "members": [
+          {
+            "type": "KEYWORD",
+            "value": "running shoes"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "custom_interest_update_custom_interest",
+      "namespace": "custom_interest",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (custom_interest)"
+    },
+    {
+      "tool": "customer_asset_create_customer_asset",
+      "namespace": "customer_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "asset": "customers/7178239091/assets/34070432999",
+        "field_type": "SITELINK"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_asset_mutate_customer_assets",
+      "namespace": "customer_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "create",
+            "asset": "customers/7178239091/assets/34070432999",
+            "field_type": "SITELINK"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_asset_remove_customer_asset",
+      "namespace": "customer_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "resource_name": "customers/7178239091/customerAssets/304627278492~STRUCTURED_SNIPPET"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_asset_update_customer_asset_status",
+      "namespace": "customer_asset",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "resource_name": "customers/7178239091/customerAssets/304627278492~STRUCTURED_SNIPPET",
+        "status": "ENABLED"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_client_link_create_customer_client_link",
+      "namespace": "customer_client_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "MCC-only \u2014 creating a client link requires a real external client customer id under this manager"
+    },
+    {
+      "tool": "customer_client_link_update_customer_client_link",
+      "namespace": "customer_client_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "customer_conversion_goal_mutate_customer_conversion_goals",
+      "namespace": "customer_conversion_goal",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "update": {
+              "resource_name": "customers/7178239091/customerConversionGoals/PURCHASE~WEBSITE",
+              "biddable": true
+            }
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_create_customer_client",
+      "namespace": "customer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'manager_customer_id'"
+    },
+    {
+      "tool": "customer_customizer_create_customer_customizer",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "customer_customizer_create_number_customizer",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "customer_customizer_create_price_customizer",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "customer_customizer_create_text_customizer",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customizer_attribute count=0)"
+    },
+    {
+      "tool": "customer_customizer_mutate_customer_customizers",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "customer_customizer_remove_customer_customizer",
+      "namespace": "customer_customizer",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "customer_label_create_customer_label",
+      "namespace": "customer_label",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [label_error=CANNOT_ATTACH_NON_MANAGER_LABEL_TO_CUSTOMER] Only labels from a manager account may be applied to the customer resource."
+    },
+    {
+      "tool": "customer_label_remove_customer_label",
+      "namespace": "customer_label",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "label_id": "11985055182"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [mutate_error=RESOURCE_NOT_FOUND] Resource was not found."
+    },
+    {
+      "tool": "customer_manager_link_accept_manager_invitation",
+      "namespace": "customer_manager_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'manager_customer_id'"
+    },
+    {
+      "tool": "customer_manager_link_decline_manager_invitation",
+      "namespace": "customer_manager_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'manager_customer_id'"
+    },
+    {
+      "tool": "customer_manager_link_move_client_to_new_manager",
+      "namespace": "customer_manager_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'previous_manager_customer_id'"
+    },
+    {
+      "tool": "customer_manager_link_terminate_manager_link",
+      "namespace": "customer_manager_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'manager_customer_id'"
+    },
+    {
+      "tool": "customer_negative_criterion_add_content_label_exclusions",
+      "namespace": "customer_negative_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "content_labels": [
+          "TRAGEDY"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_negative_criterion_add_negative_keywords",
+      "namespace": "customer_negative_criterion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "keywords": [
+          {
+            "text": "free",
+            "match_type": "BROAD"
+          }
+        ]
+      },
+      "error_or_reason": "tool not implemented (honest stub): Exception: Failed to add negative keywords: add_negative_keywords is not implemented: Google Ads does NOT support negative KEYWORDS at the customer/account level (CustomerNegativeCriterion has no 'keyword' field \u2014 only content_label, placement, mobile_app, and youtube). Add negative keywords at the campaign level, ad-group level, or via a shared negative-keyword list instead. No mutate was sent."
+    },
+    {
+      "tool": "customer_negative_criterion_add_placement_exclusions",
+      "namespace": "customer_negative_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "placement_urls": [
+          "https://goldenvisas.mercan.com"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customer_negative_criterion_remove_negative_criterion",
+      "namespace": "customer_negative_criterion",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (customer_negative_criterion)"
+    },
+    {
+      "tool": "customer_user_access_invitation_create_customer_user_access_invitation",
+      "namespace": "customer_user_access_invitation",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "needs a real external invitee email + access flow \u2014 not safely fabricable"
+    },
+    {
+      "tool": "customer_user_access_invitation_remove_customer_user_access_invitation",
+      "namespace": "customer_user_access_invitation",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'invitation_resource_name'"
+    },
+    {
+      "tool": "customer_user_access_revoke_user_access",
+      "namespace": "customer_user_access",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'user_access_resource_name'"
+    },
+    {
+      "tool": "customer_user_access_update_user_access",
+      "namespace": "customer_user_access",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "customizer_attribute_create_customizer_attribute",
+      "namespace": "customizer_attribute",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Customizer",
+        "attribute_type": "TEXT"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "customizer_attribute_remove_customizer_attribute",
+      "namespace": "customizer_attribute",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'attribute_resource_name'"
+    },
+    {
+      "tool": "customizer_attribute_update_customizer_attribute",
+      "namespace": "customizer_attribute",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "data_link_create_basic_data_link",
+      "namespace": "data_link",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "data_link_name": "Harness Data Link",
+        "data_link_type": "VIDEO",
+        "external_id": "TsSLg1W30Po"
+      },
+      "error_or_reason": "tool not implemented (honest stub): Exception: Failed to create data link: create_basic_data_link is not implemented: constructing a DataLink requires the per-type payload (e.g. YouTube/advertiser link details) which is not built, so no CreateDataLinkRequest is sent. Set up data links in the Google Ads UI."
+    },
+    {
+      "tool": "experiment_arm_create_experiment_arm",
+      "namespace": "experiment_arm",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "experiment": "customers/7178239091/experiments/10055040522",
+        "name": "Harness Arm",
+        "control": false,
+        "traffic_split": 50
+      },
+      "error_or_reason": "account-state: the harvested experiment does not accept new arms in its current status (API returned a newer error code): [request_error=UNKNOWN] The error code is not in this version."
+    },
+    {
+      "tool": "experiment_arm_mutate_experiment_arms",
+      "namespace": "experiment_arm",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "operations": [
+          {
+            "operation_type": "create",
+            "experiment": "customers/7178239091/experiments/10055040522",
+            "name": "Harness Arm",
+            "control": false,
+            "traffic_split": 50,
+            "campaigns": [
+              "customers/7178239091/campaigns/1027287835"
+            ]
+          }
+        ]
+      },
+      "error_or_reason": "harness/other: InternalServerError: 500 Internal error encountered. [type_url: \"type.googleapis.com/google.ads.googleads.v23.errors.GoogleAdsFailure\" value: \"\\n%\\n\\002P\\002\\022\\037An internal error has occurred.\\022\\0267K1r7lMSGF1kgJ1fypfLJw\" ]"
+    },
+    {
+      "tool": "experiment_arm_remove_experiment_arm",
+      "namespace": "experiment_arm",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (experiment_arm)"
+    },
+    {
+      "tool": "experiment_arm_update_experiment_arm",
+      "namespace": "experiment_arm",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (experiment_arm)"
+    },
+    {
+      "tool": "experiment_create_experiment",
+      "namespace": "experiment",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "experiment_end_experiment",
+      "namespace": "experiment",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "experiment_id": "10055040522"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [experiment_error=CANNOT_MODIFY_PAST_END_DATE] The end date of an expired experiment cannot be modified. "
+    },
+    {
+      "tool": "experiment_promote_experiment",
+      "namespace": "experiment",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "experiment_id": "10055040522"
+      },
+      "error_or_reason": "account-state: the harvested experiment is not in a promotable status (API returned a newer error code): [request_error=UNKNOWN] The error code is not in this version."
+    },
+    {
+      "tool": "experiment_schedule_experiment",
+      "namespace": "experiment",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "experiment_id": "10055040522"
+      },
+      "error_or_reason": "account-state: the harvested experiment is not in a schedulable status: [experiment_error=INVALID_STATUS] The status is invalid. "
+    },
+    {
+      "tool": "identity_verification_start_identity_verification",
+      "namespace": "identity_verification",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "advertiser-identity-verification is an account-lifecycle action, not a dry-runnable mutate for this token"
+    },
+    {
+      "tool": "keyword_add_keywords",
+      "namespace": "keyword",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "56011821504",
+        "keywords": [
+          {
+            "text": "immigration lawyer",
+            "match_type": "BROAD"
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [context_error=OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE] The operation is not allowed for removed resources."
+    },
+    {
+      "tool": "keyword_plan_ad_group_create_keyword_plan_ad_group",
+      "namespace": "keyword_plan_ad_group",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (keyword_plan_campaign \u2014 no KP campaign exists)"
+    },
+    {
+      "tool": "keyword_plan_ad_group_keyword_create_keyword_plan_ad_group_keyword",
+      "namespace": "keyword_plan_ad_group_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (keyword_plan_ad_group \u2014 none exists)"
+    },
+    {
+      "tool": "keyword_plan_ad_group_keyword_mutate_keyword_plan_ad_group_keywords",
+      "namespace": "keyword_plan_ad_group_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "keyword_plan_ad_group_keyword_remove_keyword_plan_ad_group_keyword",
+      "namespace": "keyword_plan_ad_group_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "keyword_plan_ad_group_keyword_update_keyword_plan_ad_group_keyword",
+      "namespace": "keyword_plan_ad_group_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "keyword_plan_ad_group_mutate_keyword_plan_ad_groups",
+      "namespace": "keyword_plan_ad_group",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "keyword_plan_ad_group_remove_keyword_plan_ad_group",
+      "namespace": "keyword_plan_ad_group",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "keyword_plan_ad_group_update_keyword_plan_ad_group",
+      "namespace": "keyword_plan_ad_group",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "keyword_plan_add_keywords_to_plan",
+      "namespace": "keyword_plan",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (keyword_plan_ad_group \u2014 none exists to add keywords to)"
+    },
+    {
+      "tool": "keyword_plan_campaign_create_keyword_plan_campaign",
+      "namespace": "keyword_plan_campaign",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "keyword_plan": "customers/7178239091/keywordPlans/997511280",
+        "name": "Harness KP Campaign B",
+        "keyword_plan_network": "GOOGLE_SEARCH",
+        "cpc_bid_micros": 1000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "keyword_plan_campaign_keyword_create_keyword_plan_campaign_keyword",
+      "namespace": "keyword_plan_campaign_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (keyword_plan_campaign \u2014 none exists)"
+    },
+    {
+      "tool": "keyword_plan_campaign_keyword_mutate_keyword_plan_campaign_keywords",
+      "namespace": "keyword_plan_campaign_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "keyword_plan_campaign_keyword_remove_keyword_plan_campaign_keyword",
+      "namespace": "keyword_plan_campaign_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "keyword_plan_campaign_keyword_update_keyword_plan_campaign_keyword",
+      "namespace": "keyword_plan_campaign_keyword",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "keyword_plan_campaign_mutate_keyword_plan_campaigns",
+      "namespace": "keyword_plan_campaign",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "array-of-ids/resources 'operations' needs real values"
+    },
+    {
+      "tool": "keyword_plan_campaign_remove_keyword_plan_campaign",
+      "namespace": "keyword_plan_campaign",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "keyword_plan_campaign_update_keyword_plan_campaign",
+      "namespace": "keyword_plan_campaign",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "update tool has no required *changeable* field (only ids); a minimal request would send an empty field mask (FIELD_MASK_MISSING) \u2014 harness cannot construct a meaningful update"
+    },
+    {
+      "tool": "keyword_plan_create_keyword_plan",
+      "namespace": "keyword_plan",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "keyword_plan_create_keyword_plan_campaign",
+      "namespace": "keyword_plan",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "keyword_plan_id": "997511280",
+        "name": "Harness KP Campaign A",
+        "cpc_bid_micros": 1000000,
+        "location_ids": [
+          "21132"
+        ],
+        "language_id": "1000"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "keyword_remove_keyword",
+      "namespace": "keyword",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "192400794941",
+        "criterion_id": "326337106008"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "keyword_update_keyword_bid",
+      "namespace": "keyword",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "ad_group_id": "192400794941",
+        "criterion_id": "326337106008",
+        "cpc_bid_micros": 1000000
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "label_apply_label_to_ad_groups",
+      "namespace": "label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "label_id": "11985055182",
+        "ad_group_ids": [
+          "56011821504"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "label_apply_label_to_campaigns",
+      "namespace": "label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "label_id": "11985055182",
+        "campaign_ids": [
+          "1027287835"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "label_create_label",
+      "namespace": "label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "label_update_label",
+      "namespace": "label",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "label_id": "11985055182",
+        "description": "harness updated label"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "offline_user_data_job_add_user_data_operations",
+      "namespace": "offline_user_data_job",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'job_resource_name'"
+    },
+    {
+      "tool": "offline_user_data_job_create_customer_match_job",
+      "namespace": "offline_user_data_job",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091"
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [not_allowlisted_error=CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE] Customer Match uploads aren't supported in the Google Ads API for the developer token of the request. Use the Data Manager API for Customer Match workflows. See https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match for more information."
+    },
+    {
+      "tool": "offline_user_data_job_run_offline_user_data_job",
+      "namespace": "offline_user_data_job",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'job_resource_name'"
+    },
+    {
+      "tool": "pmax_create_pmax_campaign",
+      "namespace": "pmax",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness PMax",
+        "budget_micros": 1000000,
+        "final_urls": [
+          "https://goldenvisas.mercan.com"
+        ],
+        "business_name": "Mercan",
+        "headlines": [
+          "Immigration Help",
+          "Free Consultation",
+          "Apply Today"
+        ],
+        "long_headlines": [
+          "Expert immigration guidance for your visa journey"
+        ],
+        "descriptions": [
+          "Trusted immigration advisors ready to help you.",
+          "Start your residency application with confidence."
+        ],
+        "logos": [
+          "27261931"
+        ],
+        "landscape_images": [
+          "27261931"
+        ],
+        "square_images": [
+          "27261931"
+        ],
+        "video_youtube_ids": [
+          "TsSLg1W30Po"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "product_link_create_data_partner_link",
+      "namespace": "product_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'data_partner_id'"
+    },
+    {
+      "tool": "product_link_create_google_ads_link",
+      "namespace": "product_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'linked_customer_id'"
+    },
+    {
+      "tool": "product_link_create_merchant_center_link",
+      "namespace": "product_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'merchant_center_id'"
+    },
+    {
+      "tool": "product_link_remove_product_link",
+      "namespace": "product_link",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real matching resource-name for 'resource_name'"
+    },
+    {
+      "tool": "reach_plan_generate_basic_reach_forecast",
+      "namespace": "reach_plan",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "no real id available for 'plannable_location_id'"
+    },
+    {
+      "tool": "recommendation_apply_recommendation",
+      "namespace": "recommendation",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "recommendation_resource_name": "customers/7178239091/recommendations/MjQ3ODg5MTc2LTEwMi0xNzgzMTUyMDEyOTkxLSsyMzc1ODg3Nzc1Ng"
+      },
+      "error_or_reason": "account-state: the harvested recommendation type needs type-specific apply parameters the generic apply tool does not supply for this particular recommendation: [recommendation_error=INVALID_APPLY_REQUEST] Missing apply parameters in apply request."
+    },
+    {
+      "tool": "recommendation_dismiss_recommendation",
+      "namespace": "recommendation",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "recommendation_resource_names": [
+          "customers/7178239091/recommendations/MjQ3ODg5MTc2LTEwMi0xNzgzMTUyMDEyOTkxLSsyMzc1ODg3Nzc1Ng"
+        ]
+      },
+      "error_or_reason": "account-state: the harvested recommendation was already dismissed: [recommendation_error=RECOMMENDATION_ALREADY_DISMISSED] The recommendation requested to dismiss has already been dismissed"
+    },
+    {
+      "tool": "remarketing_action_create_remarketing_action",
+      "namespace": "remarketing_action",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "remarketing_action_update_remarketing_action",
+      "namespace": "remarketing_action",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "remarketing_action_id": "6949874601",
+        "name": "Harness Remarketing Renamed"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "search_execute_query",
+      "namespace": "search",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "cannot synthesize a valid GAQL query for 'query'"
+    },
+    {
+      "tool": "shared_criterion_add_keywords_to_shared_set",
+      "namespace": "shared_criterion",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "shared_set_id": "7017112368",
+        "keywords": [
+          {
+            "text": "free",
+            "match_type": "BROAD"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "shared_criterion_add_placements_to_shared_set",
+      "namespace": "shared_criterion",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "shared_set_id": "7017112368",
+        "placement_urls": [
+          "https://example.com"
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [shared_criterion_error=CRITERION_TYPE_NOT_ALLOWED_FOR_SHARED_SET_TYPE] The criterion is not appropriate for the shared set type."
+    },
+    {
+      "tool": "shared_criterion_remove_shared_criterion",
+      "namespace": "shared_criterion",
+      "verdict": "SKIP",
+      "args_used": null,
+      "error_or_reason": "resource absent in account 7178239091 \u2014 cannot build a valid request (shared_criterion)"
+    },
+    {
+      "tool": "shared_set_attach_shared_set_to_campaigns",
+      "namespace": "shared_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "shared_set_id": "7017112368",
+        "campaign_ids": [
+          "1027287835"
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "shared_set_create_shared_set",
+      "namespace": "shared_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "shared_set_update_shared_set",
+      "namespace": "shared_set",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "shared_set_id": "7017112368",
+        "name": "Harness Shared Set Renamed"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "user_data_upload_customer_match_data",
+      "namespace": "user_data",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "user_list_id": "592834018",
+        "user_data_list": [
+          {
+            "user_identifiers": [
+              {
+                "hashed_email": "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
+              }
+            ]
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [not_allowlisted_error=CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE] Customer Match uploads aren't supported in the Google Ads API for the developer token of the request. Use the Data Manager API for Customer Match workflows. See https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match for more information."
+    },
+    {
+      "tool": "user_data_upload_enhanced_conversions",
+      "namespace": "user_data",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversion_adjustments": [
+          {
+            "user_identifiers": [
+              {
+                "hashed_email": "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
+              }
+            ],
+            "transaction_attribute": {
+              "conversion_action": "customers/7178239091/conversionActions/848894779",
+              "currency_code": "USD",
+              "transaction_amount_micros": 1000000,
+              "transaction_date_time": "2026-01-01 12:00:00+00:00",
+              "order_id": "harness-order-1"
+            }
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [not_allowlisted_error=CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE] Customer Match uploads aren't supported in the Google Ads API for the developer token of the request. Use the Data Manager API for Customer Match workflows. See https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match for more information."
+    },
+    {
+      "tool": "user_data_upload_store_sales_data",
+      "namespace": "user_data",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "conversion_action": "customers/7178239091/conversionActions/848894779",
+        "store_sales_data": [
+          {
+            "user_identifiers": [
+              {
+                "hashed_email": "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
+              }
+            ],
+            "transaction_attribute": {
+              "conversion_action": "customers/7178239091/conversionActions/848894779",
+              "currency_code": "USD",
+              "transaction_amount_micros": 1000000,
+              "transaction_date_time": "2026-01-01 12:00:00+00:00"
+            }
+          }
+        ]
+      },
+      "error_or_reason": "account-constraint (not a tool bug): [not_allowlisted_error=CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE] Customer Match uploads aren't supported in the Google Ads API for the developer token of the request. Use the Data Manager API for Customer Match workflows. See https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match for more information."
+    },
+    {
+      "tool": "user_list_create_basic_user_list",
+      "namespace": "user_list",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": "tool not implemented (honest stub): Exception: Failed to create basic user list: create_basic_user_list is not implemented: a basic (rule-based) remarketing list requires membership rule definitions (UserListRuleInfo \u2014 URL/tag rules with rule item groups), which this tool does not model, so the API would reject an empty rule with FIELD_CANNOT_BE_CLEARED. No mutate was sent. Use create_crm_based_user_list (Customer Match) or create_logical_user_list (combine existing lists), or build the rule-based list in the Google Ads UI."
+    },
+    {
+      "tool": "user_list_create_crm_based_user_list",
+      "namespace": "user_list",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Test"
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "user_list_create_logical_user_list",
+      "namespace": "user_list",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Logical List",
+        "rules": [
+          {
+            "user_list_ids": [
+              "592834018"
+            ],
+            "operator": "ANY"
+          }
+        ]
+      },
+      "error_or_reason": null
+    },
+    {
+      "tool": "user_list_create_similar_user_list",
+      "namespace": "user_list",
+      "verdict": "SKIP",
+      "args_used": {
+        "customer_id": "7178239091",
+        "name": "Harness Similar List",
+        "seed_user_list_ids": [
+          "592834018"
+        ]
+      },
+      "error_or_reason": "tool not implemented (honest stub): Exception: Failed to create similar user list: create_similar_user_list is not implemented: Google removed Similar Audiences, so similar user lists can no longer be created (the API returns USER_LIST_MUTATE_NOT_SUPPORTED). No mutate was sent. Use Customer Match / rule-based lists plus optimized targeting or audience expansion instead."
+    },
+    {
+      "tool": "user_list_update_user_list",
+      "namespace": "user_list",
+      "verdict": "PASS",
+      "args_used": {
+        "customer_id": "7178239091",
+        "user_list_id": "592834018",
+        "description": "harness updated user list"
+      },
+      "error_or_reason": null
+    }
+  ]
+}

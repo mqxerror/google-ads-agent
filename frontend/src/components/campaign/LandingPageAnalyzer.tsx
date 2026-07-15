@@ -430,7 +430,7 @@ function HealthRadar({ sections, onAxisClick }: {
             <PolarGrid stroke="currentColor" strokeOpacity={0.15} />
             <PolarAngleAxis
               dataKey="category"
-              tick={(props: { x: number; y: number; payload: { value: string; index: number } }) => {
+              tick={((props: { x: number; y: number; payload: { value: string; index: number } }) => {
                 const { x, y, payload } = props;
                 const item = data[payload.index];
                 const color = item.score! >= 80 ? '#10b981' : item.score! >= 60 ? '#eab308' : '#ef4444';
@@ -444,7 +444,7 @@ function HealthRadar({ sections, onAxisClick }: {
                     </text>
                   </g>
                 );
-              }}
+              }) as never}
             />
             <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.4 }} />
             <Radar
@@ -640,7 +640,7 @@ Save the full analysis to campaign memory.`,
   };
 
   const askAgentToFix = (sectionOrItem: ParsedSection | ActionItem) => {
-    const title = 'title' in sectionOrItem ? sectionOrItem.title : sectionOrItem.title;
+    const title = sectionOrItem.title;
     const event = new CustomEvent('chat:send', {
       detail: {
         text: `As CRO Specialist, I need help fixing ONE specific issue on the "${campaign.name}" landing page: "${title}".

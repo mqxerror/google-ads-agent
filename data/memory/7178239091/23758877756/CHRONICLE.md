@@ -1,5 +1,5 @@
 # Campaign Chronicle: Greece Golden Visa - Turkey
-Last updated: 2026-06-08
+Last updated: 2026-07-14
 
 ## Timeline
 
@@ -41,6 +41,27 @@ Last updated: 2026-06-08
 - **Jun 02** — [CRO Specialist] 2026-06-02: CRO Specialist ran 12-point audit on Turkey Greece Golden Visa LP (mercan.com/tr/yunanistan-altin-vize) — CRO score 79/B-, conversion rate 0.7%; top blockers: 9-field form (vs 3 optimal), two dead-click bugs on CTA + project button, 29.67% avg scroll depth; FCP 780ms, load ~2.1s strong.
 - **Jun 02** — [Agency Director] Executed 3 of 4 action items on campaign 23758877756: added negatives (3 criteria created), verified Turkish LP tracking end-to-end (GTM-WZKDXFH8 loads, React form fires `gf_submit` cleanly, full conversion chain confirmed), and ran Clarity audit. Held action #4 (pause greece-golden-visa-en) pending double-check.
 - **Jun 02** — [Agency Director] Team session run for Turkey campaign (May 19–Jun 2, 14-day window): PPC confirmed Manual CPC fix held ($2.56–$6.08 band post-May 21), CPA at $620.69 on 1 conversion from 142 clicks; Search Term Hunter flagged negative keyword gaps and high-intent term validation needed; GTM Specialist tasked to re-verify real lead ping beyond test-mode confirmation.
+
+### July 2026
+- **Jul 14** — [Agency Director] Prune-in-place verdict issued for the Greece Golden Visa campaign: Director synthesized all three specialists (Manual CPC confirmed live 2026-07-14, so no smart-bidding learning phase to reset) — cloning would erase earned Quality Score history (golden vize yunanistan QS 5, altın vize yunanistan QS 6, greece golden visa program QS 8) and force 24-48h ad re-approval for zero structural gain; keep-core = yunanistan-golden-visa ad group holding all 3 lifetime conversions (yunanistan golden visa 253 clicks/2 conv, golden vize yunanistan 105/1), remove English terms entirely, cap budget at $50/day.
+- **Jul 14** — [Search Term Hunter] Greece GV keep/cut inventory locked from the Jul 14 audit: KEEP the 4-term Turkish `yunanistan-golden-visa` core (all 3 lifetime convs — `yunanistan golden visa` 253 clicks/2 conv, `golden vize yunanistan` 105/1) plus the citizenship-intent term in `yunanistan-oturum-gayrimenkul`; ADD `golden visa yunanistan` PHRASE ($31.63/4 clicks bleeding at NONE, 6 weeks overdue, $5 cap).
+CUT: pause ad group `greece-golden-visa-en` (198513892027) entirely and add campaign negatives `şartları`/`nedir`/`nasıl alınır` PHRASE + `ekşi` EXACT (~$127/week waste); rest of oturum cluster on 7-day probation at a $4 bid cap.
+- **Jul 14** — [PPC Strategist] PPC Strategist arbitrated the clone-vs-prune fork for the Turkish Greece GV campaign: verdict **B (prune in place)** — Manual CPC has no algorithmic state to reset, so cloning would erase earned Quality Scores (5/6/8 on `golden vize` / `altın vize` / `greece golden visa program`) and add 24–48hr ad re-approval risk for zero benefit; designed a 4-day one-change-per-day sequence (campaign negatives → pause EN group + $50/day cap → Czech→Turkish language fix → add `golden visa yunanistan` PHRASE at $5).
+
+Budget math showed the agreed cuts alone (~$18/day from şartları/nedir/nasıl alınır PHRASE + ekşi EXACT negatives, ~$6–9/day from pausing the EN group) drop spend from ~$70/day to ~$45/day, so the $50/day cap functions as a spike guard (against Jul-6-style $172.82 days), not the primary lever — flagged as >20% reduction requiring explicit confirm before execution.
+- **Jul 14** — [Creative Director] User asked: Answer the English-terms fork ONLY: remove the English terms entirely vs point them at an English LP
+- **Jul 14** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo
+- **Jul 14** — [Agency Director] User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voi. ** Lifetime, this campaign has burned ~$3,518 across its three ad groups for 3 leads (~$1,173/lead);
+- **Jul 14** — [PPC Strategist] User asked: Structural 'why it sucks' synthesis from context data only — no tool calls. Rank the causes of zero. ## Structural Breakdown — Why This Campaign Has Zero Leads ($1,057 / 15 Days)
+
+**Ranked by dollar im
+- **Jul 14** — [Search Term Hunter] User asked: Fresh 7-day search-term audit using ONLY the 2026-07-14 search-term table already in context — do NO
+- **Jul 14** — [Analytics Analyst] User asked: Arbitrate the core question: is 'no leads' a MEASUREMENT failure or a REAL zero? Facts already in co
+- **Jul 14** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo
+- **Jul 14** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo
+- **Jul 06** — [Agency Director] Proposed 3 new PHRASE-match keywords for Turkish ad group `yunanistan-oturum-gayrimenkul` (192400794941) — `ev almak vatandaşlık`, `ev alınca vatandaşlık`, `oturum için ev almak` — all backed by live search terms with $3–$6 spend each; flagged that "7 Yılda Vatandaşlığa Yol" is an RSA slogan, not a viable keyword.
+- **Jul 06** — [PPC Strategist] Identified that the May 19 "Turkish language fix" used constant 1021 (Czech) instead of 1037 (Turkish), leaving the campaign targeting English+Czech for a month — flagged by 3 specialists across Jun 2, Jun 8, Jul 4 but never corrected. Proposed 30-second fix: remove Czech (1021), add Turkish (1037).
+- **Jul 04** — [Analytics Analyst] Greece GV Turkey (23758877756) audit: impression collapse −28.5% (P1→P2) while clicks rose +20.5% (CTR 4.5%→7.6% denominator effect), zero conversions in P2 vs 1 in P1, 14-day conv drought confirmed. CPC improved $6.64→$5.72 but spend flat at ~$269/wk.
 
 ## Key Metrics Milestones
 

@@ -10,8 +10,8 @@ lastStep: 4
 **Author:** Wassim
 **Date:** 2026-04-03
 **Version:** 2.0
-**Status:** Draft
-**Scope:** Phase 1 (Foundation Upgrade)
+**Status:** Living — last Tier-2 reconcile 2026-07-14 (feature-log rows 2026-06-02 → 2026-07-14 folded back)
+**Scope:** Phase 1 (Foundation Upgrade) + Phase 1.5/1.6 epics + § "Shipped Unplanned" ledger
 
 ---
 
@@ -31,6 +31,10 @@ lastStep: 4
 ---
 
 ## Epic List
+
+> **Phase-1 status (reconciled 2026-07-14):** Epics 1–6 shipped with the V2
+> upgrade (complete by early April 2026, MCP wired 2026-04-04). Epic 7 (public
+> release preparation) remains open.
 
 ### Epic 1: Multi-Account Foundation & Smart Onboarding
 Upgrade the database, credentials, and account management to support multiple Google Ads accounts with encrypted credential storage, per-account data isolation, and smart onboarding that auto-generates guidelines. This is the foundation everything else builds on.
@@ -60,17 +64,24 @@ Enable full campaign creation from briefs, bulk operations, search term manageme
 Cross-platform testing, CI pipeline, contributing guide, README polish, install script hardening, and V1→V2 migration.
 **FRs covered:** NFR-M5, NFR-M6, NFR-M7, NFR-R7, NFR-S7
 
-### Epic 8: PMax Finalization
+### Epic 8: PMax Finalization — SHIPPED 2026-06-10→11
 Close the loop from the existing PMaxWizard (709 lines), `routers/pmax.py`, and `asset_groups` table (V12) to a live end-to-end Performance Max campaign create — budget, asset group, audience signals, review, enable. ~70% built; finish, harden, verify against a real account.
 **Source:** PRD §8 Phase 1.5 (2026-06-10) · `research/product-roadmap.md` coverage workstream
+**Status:** all 4 stories shipped + live-verified (campaign 23934110143 created PAUSED on 7178239091); hardened by three live-bug rounds — see the story status notes below.
 
-### Epic 9: MCP Plan Tools
+### Epic 9: MCP Plan Tools — SHIPPED 2026-06-10
 Expose Scheduled Plans on the HTTP MCP bridge (`app/mcp_server.py`): `create_plan`, `list_plans`, `approve_plan`, `skip_plan`, `run_plan_now`. Reuses the existing scheduler/REST logic and bearer-token auth so plans can be created and approved from any Claude Code session.
 **Source:** PRD §8 Phase 1.5 (2026-06-10) · roadmap Phase A0
 
-### Epic 10: Shopping Campaigns
-Greenfield: Merchant Center account linking, product feed awareness, listing group structure, and a Shopping campaign creation flow (builder stage + tools). Completes the sellable campaign-type coverage (Search ✓, PMax ✓ after Epic 8, Shopping).
+### Epic 10: Shopping Campaigns — NOT STARTED (as of 2026-07-14)
+Greenfield: Merchant Center account linking, product feed awareness, listing group structure, and a Shopping campaign creation flow (builder stage + tools). Completes the sellable campaign-type coverage (Search ✓, PMax ✓ after Epic 8, Shopping). The only open Phase-1.5 item.
 **Source:** PRD §8 Phase 1.5 (2026-06-10) · roadmap coverage workstream
+
+### Epic 13: Account Director Global Audit + Homepage v2 — SHIPPED 2026-07-04→05
+The homepage becomes the surface of ONE owned agent flow: the Account Director reads ALL active campaigns via an account-wide mode of the existing workflow orchestrator and produces ONE money-ranked, approvable fix list — persisted, staleness-labelled, refreshed by a weekly Scheduled Plans ritual. The home layout reforms to "clean" (one column, summoned chat, icon rail, progressive disclosure) using the existing OKLCH tokens — no re-skin.
+**Source:** PRD §8 Phase 1.6 (2026-07-04) · `research/homepage-redesign-brief.md` (THE ENGINE + DESIGN DIRECTION Wassim-locked)
+**Numbering note:** Epics 11 (video engine) and 12 (Studio redesign) are reserved by the Studio track — planned in `research/` briefs and tracked via feature-log rows, not in this file; both have since SHIPPED — see § "Shipped Unplanned" below. 13 is the next free number.
+**Status:** all 8 stories shipped (13.1–13.4 backend 2026-07-04; 13.5–13.8 homepage 2026-07-04→05) — see the story status notes below. Its data pipeline was rebuilt under Dashboard v2.1 (2026-07-12, § "Shipped Unplanned").
 
 ---
 
@@ -963,12 +974,26 @@ So that asset-group linking succeeds and the campaign actually materialises.
 **Technical notes:** orchestrator-side bridge (not in the generic upload endpoint);
 files read from the assets.py upload storage path; rollback pattern preserved.
 
+**Status note (2026-06-10→11):** implemented, then hardened through three
+live-bug rounds: (a) asset group now created ATOMICALLY with all
+AssetGroupAsset links in one mutate (Google validates PMax asset minimums at
+creation); rollback uses REMOVE operations for campaign AND budget; (b) every
+local image is center-cropped to the slot's EXACT Google aspect pre-flight
+(`_fit_image_for_slot` + IMAGE_SLOT_SPECS, below-min → clean 422); (c) upload
+dedupe re-keyed `(uuid, slot-aspect)` so one image in two different-aspect
+slots uploads per-aspect, and google-resource pass-throughs are GAQL-verified
+pre-flight. Regression tests in `backend/tests/test_pmax_resubmit.py`.
+
 ### Story 8.2: Audience Signals Attachment
 
 **Given** a bundle with non-empty `audience_signals`
 **When** asset linking has succeeded
 **Then** signals are attached via `AssetGroupSignalService.mutate_asset_group_signals()`
 **And** a bundle without signals skips the step silently.
+
+**Status note (2026-06-10):** implemented — signals attached post-link (search
+themes + audiences, best-effort warnings); the wizard collects and sends
+signal hints. Live-verified alongside 8.3.
 
 ### Story 8.3: PAUSED-safe create + step-level error surface
 
@@ -979,8 +1004,14 @@ files read from the assets.py upload storage path; rollback pattern preserved.
 **And** enabling remains a human action (UI or explicit agent command).
 
 **Status note (2026-06-10):** implemented same-day under Wassim's one-time
-autonomous-execution authorization; pending a human-run live wizard submit for
-final e2e verification (no live mutations were run autonomously).
+autonomous-execution authorization. Live-verified later the same day: campaign
+23934110143 created PAUSED on 7178239091 (attempt 1 failed only on
+DUPLICATE_CAMPAIGN_NAME from a pre-existing orphan and auto-removed its own
+budget — rollback proven live). Step-aware `PMaxStepError` + rollback report
+surface to the wizard as 502 detail. Wizard UX also gained "Draft with
+Creative Director" (`POST /pmax/draft-copy`, landing-page-grounded, server
+re-enforces ≤30/≤90 char limits), a campaign-brief field, and "why is Next
+disabled" hints.
 
 ### Story 8.4: PMax video generator + YouTube upload
 
@@ -1021,6 +1052,15 @@ Live-verified: draft (grounded scenes off goldenvisas.mercan.com) + render
 refresh token exists until Wassim runs the one-time connect; OAuth client may
 need http://localhost:8000/api/youtube/oauth-callback registered if it is a
 Web (not Desktop) client, and the YouTube Data API enabled on the project.
+
+**Extension (2026-06-11):** YouTube metadata generators — `POST
+/api/pmax/video/metadata` (3 grounded title options ≤95c + description,
+server-truncated) and `POST /api/pmax/video/frames` (ffmpeg stills →
+thumbnail candidates); `/api/youtube/upload` accepts description +
+thumbnail_asset_id (Pillow re-encode <2MB/1280px; unverified-channel 403
+degrades to a warning, never fails the upload). The video step later gained
+higgsfield AI scenes and a Soul talking intro via the video-engine track
+(§ "Shipped Unplanned" — Epic 11 P1/P2).
 
 ---
 
@@ -1090,6 +1130,374 @@ tools, matching the PMax pattern.
 
 ---
 
+## Epic 13: Account Director Global Audit + Homepage v2 (Phase 1.6)
+
+The homepage becomes the surface of ONE owned agent flow. Backend first: an
+account-wide mode of the existing Team Audit engine
+(`backend/app/services/workflow_orchestrator.py` — `campaign_id` is already
+`Optional` end-to-end, verified 2026-07-04) that fans out per-campaign
+specialist passes and synthesizes ONE ranked account report, persisted so the
+home renders instantly. Frontend second: the "clean" layout reform per the
+brief's DESIGN DIRECTION — one column, summoned chat, icon rail, progressive
+disclosure, zero-state discipline. Tokens stay Shopify-calm light OKLCH
+(`frontend/DESIGN.md`); this is layout reform, NOT a re-skin.
+
+**Source:** PRD §8 Phase 1.6 (2026-07-04) · `research/homepage-redesign-brief.md`
+**Depends on:** shipped foundations only — workflow orchestrator (V15), Scheduled Plans + scheduler (V17), campaigns table (V11), campaign_daily_metrics store, outcome tracker
+**Build order:** 13.1 → 13.4 (backend engine + contracts), then 13.5 → 13.8 (homepage surfaces)
+
+---
+
+### Story 13.1: Account-wide planning mode in the workflow orchestrator
+
+As an operator,
+I want the Team Audit to run across the whole account when no campaign is bound,
+So that the Director produces one ranked account-level report instead of per-campaign silos.
+
+**Acceptance Criteria:**
+
+**Given** `run_workflow()` is invoked with `campaign_id=None`
+**When** the Director plans (Phase 1)
+**Then** it plans ACROSS active campaigns: the roster is read from the `campaigns` table (`campaigns_repo.py`, V11 single source of truth), and the plan assigns per-campaign specialist passes
+**And** each specialist pass executes with the concrete `campaign_id` it audits (existing `_run_group`/`_run_agent` params), so role notes, campaign memory, and `CampaignScopeMiddleware` stay campaign-bound per pass
+
+**Given** all per-campaign passes complete
+**When** the rollup runs
+**Then** a cross-campaign debate phase surfaces conflicts (budget cannibalization, audience overlap, keyword collisions) and synthesis produces ONE ranked account report
+
+**Given** an account with many active campaigns
+**When** an account-wide run starts
+**Then** campaigns per run are capped (new setting, e.g. `WORKFLOW_MAX_CAMPAIGNS`, default ~5, selected by recent spend; skipped campaigns are named in the report)
+**And** the existing per-run cost cap (`WORKFLOW_MAX_COST_USD` → `_DEFAULT_BUDGET`) still degrades the run to synthesis-with-what-we-have rather than hard-failing; `_MAX_PARALLEL` unchanged
+**And** Phase 0 stays ONE batched `sync_account()` pre-fetch serving every pass (no per-campaign re-sync)
+
+**Files likely touched:** `backend/app/services/workflow_orchestrator.py`, `backend/app/routers/workflows.py`, `backend/app/services/campaigns_repo.py`, `backend/app/config.py`
+
+**Status note (2026-07-04):** SHIPPED. `WORKFLOW_MAX_CAMPAIGNS=5` cap with
+excluded campaigns NAMED (deterministic scope footer + `account_scope` SSE
+event — no silent truncation); account runs are analysis-only (tools FORCED
+`[]` on every pass); one UNBOUND cross-campaign debate pass per role;
+synthesis emits structured findings JSON normalized server-side ($-desc sort,
+total RECOMPUTED, never trusts LLM math); unparseable synthesis degrades to
+prose-only. Beyond spec: `WORKFLOW_MAX_COST_USD` was materialized in Settings
+— the documented env knob had never actually bound (pydantic ignored it).
+
+---
+
+### Story 13.2: Account report persistence + homepage read API
+
+As the homepage,
+I want the LATEST account audit persisted and instantly readable,
+So that no live agent run ever happens on page load.
+
+**Acceptance Criteria:**
+
+**Given** an account-mode synthesis completes
+**When** the run finishes
+**Then** the ranked report persists as account-level rows (new `account_reports` table or a `workflow_runs`-derived read model — DB migration V19; latest-wins read semantics), analogous to campaign reports
+
+**Given** the homepage loads
+**When** it calls the latest-report endpoint (e.g. `GET /api/workflows/account-report/latest?account_id=`)
+**Then** it returns the report + structured findings + `generated_at` + staleness metadata (age in minutes/hours for the "audited 2h ago · Run again" label)
+**And** the endpoint answers from local SQLite in <1s — zero Google Ads API calls, zero agent runs
+
+**Given** the fast-signals lane
+**When** the homepage fix list is assembled
+**Then** a deterministic aggregator merges always-fresh items with $-impact estimates: pending plan approvals (`plans` table), budget pacing alerts + search-term waste ($ with 0 conv, from `campaign_daily_metrics` / local search-term data), disapproved ads, tracking gaps — these render below/alongside the Account Director findings
+**And** no report + no signals → an explicit empty payload the UI collapses (zero-state discipline)
+
+**Files likely touched:** `backend/app/database.py` (V19), `backend/app/routers/workflows.py`, `backend/app/services/workflow_orchestrator.py`, `backend/app/services/metrics_store.py`, `backend/app/routers/plans.py` (read reuse)
+
+**Status note (2026-07-04):** SHIPPED — V19 `account_reports` (latest-wins
+UPSERT) + `GET /api/accounts/{id}/account-report` with staleness metadata +
+`services/fast_signals.py` deterministic lane (pending approvals, budget
+pacing, wasted spend, tracking gaps; ENABLED-only, $ only where honestly
+derivable). Shipped WITH a runner-reliability fix the story didn't plan:
+`services/workflow_runner.py` decouples execution from the SSE response
+(detached task + replay hub — a client disconnect no longer orphans the run as
+an eternal "running" zombie; startup + periodic zombie sweep added).
+
+---
+
+### Story 13.3: Findings → approvable actions contract
+
+As an operator,
+I want every finding to be a quantified, approvable ACTION,
+So that the home page is a fix list, not prose.
+
+**Acceptance Criteria:**
+
+**Given** the account-mode synthesis prompt
+**When** the Director produces the final report
+**Then** it must emit structured findings JSON per finding: title, evidence summary, `dollar_impact_wk`, affected campaign id(s), `action_category` (the scheduler taxonomy: budget | bids | status | geo | search_terms | audit | report | other), proposed action detail — findings sorted by $-impact, report total = "Total recoverable: $X/wk"
+**And** unparseable synthesis output degrades to a prose-only report (reuse the `_extract_json` fallback pattern — never fail the run)
+
+**Given** a finding row's actions
+**When** the user clicks [Approve]
+**Then** a Scheduled Plan is created via the existing lifecycle (`routers/plans.py` + `scheduler.infer_mode()`): money/structure categories arrive approval-gated and execute only through `approve_plan()`
+**And** [Approve once] creates a one-time plan (`run_at`=now) through the same gates; [Deny] marks the finding dismissed on the report row (excluded from the recoverable total, retained for audit)
+
+**Given** any approved action executes
+**When** the agent runs it
+**Then** execution is per-campaign via `stream_agent_response` with the finding's campaign binding — `CampaignScopeMiddleware` is never bypassed; nothing on the homepage writes directly
+
+**Files likely touched:** `backend/app/services/workflow_orchestrator.py`, `backend/app/routers/plans.py`, `backend/app/services/scheduler.py`, `backend/app/database.py` (finding dismissal state), `backend/app/services/agent.py` (reference only — scope guard path)
+
+**Status note (2026-07-04):** SHIPPED — `services/finding_actions.py` + V20
+`finding_actions` table. Actionable = scheduler taxonomy + ≥1 target campaign
+(gating via `scheduler.infer_mode`, never overridden); advisory-only findings
+surface info-only with `advisory_reason` (no mutation fabricated); Deny is a
+tombstone keyed on a STABLE `finding_key` (sha1 of source|category|campaigns|
+title — a deny sticks across re-audits until the finding's identity changes).
+Endpoints: `GET /api/accounts/{id}/actions`, `POST .../actions/{finding_key}/decide`.
+
+---
+
+### Story 13.4: "Weekly account audit" Scheduled Plans ritual (auto lane)
+
+As an operator,
+I want the account audit to run itself weekly,
+So that the fix list is fresh every week without me remembering to fire it.
+
+**Acceptance Criteria:**
+
+**Given** a plan with `action_category="audit"`, account scope (`campaign_id=None`), recurring recurrence (`weekly:mon:09:00` form)
+**When** the scheduler fires it
+**Then** it runs the account-wide workflow (Story 13.1) in the AUTO lane — analysis-only, no write tools, zero spend actions
+**And** completion persists a new latest account report (Story 13.2) and the plan re-arms per existing recurring logic
+
+**Given** the Plans UI or the homepage
+**When** the user clicks "Enable weekly account audit"
+**Then** the ritual plan is seeded one-click, with duplicate seeding prevented (max one active ritual per account)
+
+**Given** the server was down at fire time or the run fails
+**When** the next tick occurs
+**Then** existing scheduler semantics apply — overdue plans fire on the next tick, failed runs surface needs-attention-first in the plans list
+
+**Files likely touched:** `backend/app/services/scheduler.py`, `backend/app/routers/plans.py`, `backend/app/services/workflow_orchestrator.py`, `frontend/src/components/plans/PlansPanel.tsx`
+
+**Status note (2026-07-04):** SHIPPED — `_run_account_audit` routes account-
+scoped `audit` plans through the 13.2 workflow runner IN-PROCESS (not a
+self-HTTP call); auto lane inherent (`infer_mode('audit')` = auto); idempotent
+seeder `POST /api/plans/account-audit` (dup-guard returns the existing active
+ritual); weekly recurring re-arm via existing `_complete()` logic. No
+migration needed (V17 schema already supported account scope).
+
+---
+
+### Story 13.5: Homepage v2 shell — one column, summoned chat, icon rail
+
+As an operator,
+I want a clean single-focus home page,
+So that the first thing I see is what to fix, not chrome.
+
+**Acceptance Criteria:**
+
+**Given** the home page renders
+**When** an account is selected
+**Then** it is ONE column led by the fix-list strip — the current `AccountOverview` composition in `ContentArea.tsx` (lifetime-total KPI cards + OutcomeDashboard + ConversationGraph + campaign grid) is replaced by the v2 layout with no competing panels
+**And** the header shows: account · date-range picker (7d default, persisted) · Create Campaign
+
+**Given** the chat
+**When** on the HOME page
+**Then** no always-open right rail: a floating button and ⌘K (existing `CommandPalette.tsx` path) summon the existing `ChatPanel` as an overlay/drawer; campaign pages keep their rail unchanged
+
+**Given** the sidebar
+**When** on the HOME page
+**Then** it collapses to an icon rail by default and the campaign tree opens as a flyout (`Sidebar.tsx`), reclaiming width for the fix list
+
+**Given** any empty data state
+**When** the page composes
+**Then** zero-state discipline holds — nothing renders empty ("0% success rate" ban), empty sections are absent, and the trust line "Every write is reviewed. Every write is reversible." appears under write surfaces
+**And** all styling uses existing `frontend/DESIGN.md` OKLCH tokens — no new visual language, no dark
+
+**Files likely touched:** `frontend/src/components/layout/ContentArea.tsx`, `frontend/src/components/layout/Sidebar.tsx`, `frontend/src/components/layout/ChatPanel.tsx`, `frontend/src/components/layout/Header.tsx`, `frontend/src/components/CommandPalette.tsx`, `frontend/src/stores/appStore.ts`, `frontend/src/App.tsx`, `frontend/src/components/dashboard/HomeV2.tsx` (new)
+
+**Status note (2026-07-04, tightened 2026-07-05):** SHIPPED — HomeV2 one-column
+stack (FixListStrip / KpiCards / CampaignsRanked / AgentActivity),
+HomeChatDock floating button + ⌘K overlay (home only), icon-rail sidebar with
+campaign-tree flyout, Conversation Map moved to its own Conversations page.
+2026-07-05 tighten pass: AgentActivity 4 blocks → 2 (interleaved "Recent
+activity" cap 5 + slim Upcoming cap 3), CampaignsRanked top-6 disclosure +
+ENABLED-only default scope toggle, vertical rhythm compressed.
+
+---
+
+### Story 13.6: Fix-list strip (hero)
+
+As an operator,
+I want a money-ranked fix list with inline approvals at the top of the home page,
+So that I act on the account's biggest recoverable dollars in seconds.
+
+**Acceptance Criteria:**
+
+**Given** the latest account report + fast signals (Story 13.2)
+**When** the strip renders
+**Then** findings are money-ranked with header "Total recoverable: $X/wk" and a staleness label ("audited 2h ago · Run again") — Run again fires the account-wide workflow (reusing the `WorkflowPanel.tsx` / `/api/workflows/run` SSE path) and streams progress
+
+**Given** a finding row
+**When** displayed
+**Then** it is one line: icon · title · $-impact/wk · affected-campaign chips · actions; clicking expands the specialist's evidence/reasoning (progressive disclosure — nothing verbose by default)
+**And** inline [Approve] [Approve once] [Deny] call the Story 13.3 contract; [Review in chat] opens the summoned chat overlay pre-seeded with the finding
+
+**Given** multiple approvable rows are selected
+**When** the bulk bar appears
+**Then** ONE bulk-action bar handles them (NotFair table pattern: compact table, generous row height, subtle dividers, threshold chips — no border-boxes-inside-boxes)
+
+**Given** no findings exist
+**When** the page composes
+**Then** the strip is absent and the page collapses gracefully
+
+**Files likely touched:** `frontend/src/components/dashboard/FixListStrip.tsx` (new), `frontend/src/lib/api.ts`, `frontend/src/components/workflow/WorkflowPanel.tsx` (run-again reuse), `frontend/src/components/plans/planHelpers.ts`
+
+**Status note (2026-07-04):** SHIPPED — money-ranked rows w/ progressive
+disclosure, inline [Approve][Approve once][Deny] against the 13.3 contract,
+"needs sign-off" hint on gated rows, advisory rows button-less, [Review in
+chat] pre-seeds the summoned chat. Deviation: denied rows are hidden on
+refetch with NO fake Undo (the contract has no un-deny — spec's documented
+fallback). Decision-state field is `status`, not `decision` (followed real
+backend shapes, live-verified against :8000).
+
+---
+
+### Story 13.7: KPI cards with period deltas + sparklines
+
+As an operator,
+I want 4 context-rich KPI cards,
+So that I see performance direction at a glance instead of naked lifetime totals.
+
+**Acceptance Criteria:**
+
+**Given** the local metrics store
+**When** the homepage requests KPIs
+**Then** a new period-over-period endpoint rolls up `campaign_daily_metrics` account-wide: current window vs prior window totals + per-day series for sparklines, window driven by the header date-range picker (7d default) — local SQLite only, no live Google Ads calls
+
+**Given** the cards render
+**When** data exists for the window
+**Then** exactly 4 cards: Spend · Conversions · CPA · Conv rate — each value + Δ% vs prior period + sparkline, quiet labels, big type
+**And** CPA/cost delta colors are inverted (lower = green); every metric displays its time window
+
+**Given** a card has no data in the window
+**When** the page composes
+**Then** it does not render a zero-state (zero-state discipline)
+
+**Files likely touched:** `backend/app/routers/reports.py` or `backend/app/routers/campaigns.py` (endpoint home — decide at build), `backend/app/services/metrics_store.py`, `frontend/src/components/dashboard/KpiCards.tsx` (new), `frontend/src/components/charts/PerformanceChart.tsx` (sparkline reuse), `frontend/src/lib/api.ts`
+
+**Status note (2026-07-04):** SHIPPED — `GET
+/api/accounts/{id}/metrics/overview?days=` (endpoint landed on the existing
+account router in `workflows.py`; logic in `metrics_store.py`): 4 KPIs each
+{value, prev_value, delta_pct} + per-day series, ENABLED-only, local SQLite
+only. Zero-state honest throughout: nulls not zeros, delta null when the
+prior window is empty (no fabricated deltas). KpiCards rewired to it on
+2026-07-04 (replacing the interim two-fetch rollup).
+
+---
+
+### Story 13.8: Campaigns ranked section + Agent activity (Conversation Map to its own page)
+
+As an operator,
+I want ranked campaigns and an undo-able agent activity feed below the fix list,
+So that the home answers "what should I do" and "what did the agent do" — not "where did I talk".
+
+**Acceptance Criteria:**
+
+**Given** the CAMPAIGNS section
+**When** it renders
+**Then** rows are ranked (active first, sorted by spend — `campaigns` table joined with `campaign_daily_metrics`): name · status chip · spend · conv · CPA · trend spark · threshold flag (⚠ below target) · last agent action · [Chat] [Report]
+**And** when threshold flags exist, a bulk bar offers "Pause all N / Pick which" routed through the approval-gated plans path (Story 13.3 — never direct writes)
+
+**Given** the AGENT ACTIVITY section (replaces Agent Performance + Conversation Map on home)
+**When** it renders
+**Then** (a) a change log with before→after values from the `recommendations` baseline snapshots (`outcome_tracker.py`) and [Revert] where the underlying tool supports an inverse operation (approval-gated; rows without inverse support show no revert), with the trust copy beneath; (b) Upcoming: next Scheduled Plans + weekly-ritual due card; (c) Recent threads (last 5 only, "View all" → Conversations page)
+**And** "Agent Performance" (`OutcomeDashboard.tsx`) appears only after ≥1 measured action
+
+**Given** the Conversation Map
+**When** v2 ships
+**Then** `ConversationGraph.tsx` moves to its own routed page with a nav item and is removed from the home
+
+**Files likely touched:** `frontend/src/components/dashboard/CampaignsRanked.tsx` (new), `frontend/src/components/dashboard/AgentActivity.tsx` (new), `frontend/src/components/dashboard/{CampaignActivityFeed,OutcomeDashboard,ConversationGraph}.tsx`, `frontend/src/App.tsx`, `backend/app/routers/{outcomes,activity,plans}.py`, `backend/app/services/outcome_tracker.py` (revert executor — inverse-op coverage decided at build time)
+
+**Status note (2026-07-04):** SHIPPED with two honesty deviations from the AC:
+(a) the change log renders **read-only** — NO [Revert]: no inverse-op/undo
+endpoint exists in the backend, so no affordance that would 404 was built;
+(b) NO trend-spark column — the campaigns payload carries no per-day field,
+so nothing was faked. Threshold flags are payload-derived only ("No
+conversions"; "High CPA" relative to the account's blended CPA, only when a
+real converting baseline exists); bulk "Pause N" routes one approval-gated
+`status` plan per campaign through the 13.3 path. Before→after outcomes read
+`GET /api/accounts/{id}/outcomes` ("measuring…" until the post-window lands).
+
+---
+
+## Shipped Unplanned (reconciled 2026-07-14 — tracked via research plans + feature log)
+
+Work that shipped 2026-06-02 → 2026-07-14 without pre-written stories in this
+file. Each track's authoritative spec lives in its `research/` plan; entries
+below are the story-style reconcile record. Detailed per-session rows: `_bmad-output/feature-log.md` § Reconciled.
+
+### Epic 11: Video Engine (Higgsfield scenes → Soul segments → finished video)
+**Source:** `research/video-engine-plan.md` · reserved number per the Epic-13 numbering note
+
+- **11.P1 — Higgsfield storyboard scenes (2026-06-11):** `{type:"higgsfield"}` scenes in the storyboard renderer via `services/higgsfield_scene.py` — prompt-hash clip cache in `ad_assets` (**V18**, zero-credit re-renders), CLI submit + mezzanine normalize (1080p/30fps) + freeze-frame tail; `premium_reel` xfade splice; PMax engine prefs (allow_higgsfield default OFF, model forced server-side, scene cap 2) + degrade-to-broll.
+- **11.P2 — Soul talking segment + segment-timeline dispatcher (2026-07-04):** no lipsync model exists on the CLI → the plan's stated NON-LIPSYNC presenter fallback shipped: Soul still → veo3 image-to-video motion pass → script rides the per-scene VO bed. New `services/video_engine.py` (segments {storyboard|higgsfield|soul} COMPILED to one flat storyboard → existing normalize+xfade pipeline; caps 1 soul + 2 higgsfield) + `routers/video_engine.py` (`/estimate` + `/render` job+poll). Soul intro toggles in StudioPanel + PMaxWizard.
+- **11.FV — Finished-video planner 15/30/60s (2026-07-07):** `plan_scenes(target_seconds, model_id)` auto-plans N clips at each model's MAX legal clip length (Veo enum-snap vs Kling int-cap); `MAX_HIGGSFIELD_SCENES` 2→8; whole-script VO sizes to the stitched duration; StudioPanel "Single clip / Finished video" sub-mode with a debounced credit gate ("Generate finished video (≈ N cr)" — no silent burn).
+
+### Epic 12: Studio (panel, catalog, library, souls)
+**Source:** `research/studio-redesign-brief.md` (APPROVED 2026-06-11) · reserved number per the Epic-13 numbering note
+
+- **12.1 + 12.4 — Phase A (2026-06-11):** `GET /api/studio/models` server-side catalog (`services/model_catalog.py`, per-model duration/aspect constraints, liveness-cached, never 502s) + `StudioPanel.tsx` shared 480px slide-over (modes image|video|copy; `context` prop is the ONLY google-ads coupling — decoupling addendum honored) + PMax wiring (slots + YT thumbnail + copy drafting through the panel; post-crop preview at Google's exact ratio with "will be cropped" flag).
+- **12.2 + 12.3 — Phase B (2026-06-11):** `AssetLibrary.tsx` (filter rail, search, detail modal, 2-up compare, offset pagination) + `SoulCreator.tsx` (guided 3-step train flow on the existing soul backend; no invented credit numbers) + hub slim-down (Library/Souls/Presets tabs + ONE Create button); `HiggsfieldGenerator.tsx` + `SoulCharactersPanel.tsx` deleted; off-palette tints killed to DESIGN.md tokens.
+
+### Studio Redesign MVP: Two Studios, One Director
+**Source:** `research/studio-redesign-plan.md` (drafted 2026-07-13; supersedes the Epic-12 brief's *layout*, its invariants still bind)
+
+- **Epic A — the fork (2026-07-13):** `/studio` → StudioRouter → StudioHome (three door cards: AI Video "12 models · credits" / Kinetic "local · free" / Image) + 4 new routes; hub buttons removed.
+- **Backend core + Brand Avatar (2026-07-13):** **V23** `studio_video_projects` (source of truth for storyboards — survives refresh/tab-close by design) + `brand_avatars`; `video_director` role (model-aware storyboard contract, VO-pacing word budgets, RULE 0) + `services/video_director.py` turn (context → scoped campaign-Director consult, 90s DEGRADE-not-block → decompose → 3 concepts → model-aware storyboard with server-side clamp/8-scene cap) + `routers/video_director.py` CRUD; cost/render stay OUTSIDE the LLM turn.
+- **Epic B + C4 — AI Video workspace (2026-07-13):** 3-zone workspace (SETUP rail / STORYBOARD canvas / Director dock), model gallery sheet, per-scene cards + cost-gate footer (Render button always carries the credit total), dock rides the v2 turn transport (cursor-replay reconnect).
+- **Epic D — Kinetic recomposition (2026-07-13):** 3 lanes (Brand Reel / Premium Reel incl. Brand Story / Presenter with ScriptGenerator folded in); render payloads verified byte-identical to legacy. Deviation: `VideoCreator.tsx` KEPT (plan §9.3 said delete — `ChatInput.tsx` still mounts it for the chat video flow; Kinetic no longer imports it).
+- **Follow-ups (2026-07-14):** draft-stage timeout 45s→150s with a structured retryable error + "Retry draft" button; campaign dropdown `<optgroup>` Active/Paused; brief sources (Brief / From campaign / From landing page — **V24** `brief_source`); honest render failures (`error_class` taxonomy, auth pre-flight `GET /api/studio/auth-status`, logged-out disables Render); honest cost estimate (failed estimate can never render at a literal 0); URL-as-source-of-truth after project create (refresh-proof).
+
+### Chat Orchestration v2 (MVP + accuracy hard-gate)
+**Source:** `research/chat-orchestration-v2-plan.md` (2026-07-12) — born from the Panama QIP post-mortem
+
+- **Epic 0 — stop/bleed P0 hotfix (2026-07-12):** frontend identity guards on every async chat writer (kills three cross-campaign bleed vectors by construction); backend `start_new_session` + process-group SIGTERM→SIGKILL + `_stop_requested` flag (closes the between-segments relaunch race); per-conversation proc registry retyped to sets (stop reaches every parallel child); stop no longer auto-resurrects via the queue drain.
+- **Epic 1 — turn runner + event protocol (2026-07-12):** `chat_runner.py` detached turn tasks + replay hubs; **V22** `chat_turns`/`chat_turn_events` + `messages.turn_id` + `workflow_reports.origin`; `POST /message` → `{turn_id}` with `?stream=1` legacy passthrough; `GET /turns/{id}/stream?cursor`.
+- **Epics 2+3 — orchestrated mode MVP (2026-07-12):** `chat_orchestrator.py` state machine (TRIAGE double-gate → RECALL → VERIFY → PLAN ≤3 specialists → DISPATCH → RESOLVE → SYNTHESIZE Director-only voice → GATE → WRITEBACK) + `task_ledger.py` recall over the 4 prior-output stores with the §8.2 staleness matrix; $5/6-min budget DEGRADE; frontend `OrchestrationLedger` live-activity UI + per-specialist stop; per-conversation toggle, default OFF (direct mode byte-identical).
+- **Epic 4 — claim gate + provenance (2026-07-14):** `provenance.py` manifest (LIVE_API/PAGE_FETCH/LOCAL_STORE/MEMORY; `verified_ids()` excludes bare memory) + `claim_gate.py` deterministic post-pass — unverified ID tokens REWRITTEN in place, material numbers flagged (derived-math guard avoids false positives), page-state assertions traced to a real fetch; **the persisted message is the gated text**. Replaced the S7 stub.
+- **Deferred (still open in the plan):** 1.4 token-level previews; 3.3 conflict/decision rows (render seams present); Epic 5 writeback polish; Epic 6 persona overhaul; Epic 7 migration/eval (incl. the Panama replay eval); Epic 8 Director of Directors.
+
+### Dashboard v2.1: Always-Fresh Data + Clarity + Effortless Home
+**Source:** `research/dashboard-freshness-clarity-plan.md` (2026-07-12) — root cause: the scheduled metrics sync had written ZERO rows since April (ghost-column INSERT swallowed by a bare except) while burning ~3,300 API ops/run
+
+- **Epic A — the data is real again (2026-07-12, A1–A5):** sync rewrite to ONE read-only GAQL `search_stream` per account (~3,300 ops → 2); **V21** `sync_state` ledger keyed on `data_through_date` NEVER `synced_at`; watchdog + heartbeat + timeout fence + backoff + boot-sync; freshness envelopes on the home endpoints + `<FreshnessChip>` + `useSyncNow`; self-heal `maybe_kick_sync` (single-flight, stampede-guarded, reads never block on Google); cache honesty (stale-serve marked, no laundering re-stamps, upsert stops NULLing roster fields).
+- **Epic B — every number explains itself (2026-07-12, B1–B5):** KpiCards three-state honesty (pipeline-stale renders VISIBLY amber instead of vanishing); `InfoHover` explainers with real window dates; CampaignsRanked neutral "no data yet" chip; FixListStrip dual staleness ("audited Xh ago · on data through …"); B4 live-truth campaign header (`LiveHeadChip` — live control-plane read preferred over roster cache) + scheduler live pre-read before approval analysis AND apply; B5 context bar (CID only — currency/tz not exposed client-side, nothing fabricated).
+- **Epic C — push + effortless home (2026-07-12, C1–C5):** `useAccountEvents` SSE invalidation (`sync_completed`/`external_change`); C2 home-as-default-route (killed the last-campaign restore hijack; `/campaign/:id` deep links; `lastCampaignId` powers "Continue where you left off"); C3 keyboard chords (`g h`/`g c`/`g p`/Esc) + palette Navigate group + rail Home; C4 skeletons + parallel prefetch; C5 "Changed outside the app" block + absolute-time hovers. Also killed the B2 bidding-strategy fallback LIE (`bidding_strategy || campaign_type` → honest '—').
+- **Deferred:** B2 `new` chip (created_at false-positive risk on rebuilt DBs); C5 change_event GAQL attribution; currency/tz in the context bar; small-window table scroll.
+
+### Agent Quality Hardening (WS1–WS5)
+**Source:** `research/agent-quality-hardening-plan.md` — Panama QIP post-mortem P0s
+
+- **WS1 (2026-07-08):** `ad_update_ad_final_urls` MCP tool + `POST /api/operations/ad/final-urls` — in-place landing-page switch preserving pins/history/ad-id (was: destructive delete+recreate).
+- **WS2–WS5 (2026-07-08):** verify-before-diagnose (`fetch_ad_landing_pages` injected into BOTH campaign-context paths + global guardrail); role-notes freshness (⚠️ STALE >7d, labeled never dropped); ID integrity (no conversion/GTM/AW- ID unless live-pulled this session); Team Audit premise gate + ~200-word cap + forced "What would change my conclusion:" line. Additive only — no persona prompt rewritten.
+
+### MCP Tool-Surface Hardening (2026-07-05)
+**Source:** unplanned P0 audit gap-fixes + harness (feature-log rows)
+
+- **Keyword status tool:** `update_ad_group_criterion_status` (pause/enable a keyword — the agent previously could not).
+- **Ad-extension creators:** `create_sitelink_asset` / `create_callout_asset` / `create_structured_snippet_asset` / `create_call_asset` — mcp_main advertised these; the tools didn't exist.
+- **Audit Phase 2:** un-stubbed `attach_shared_set_to_campaigns` (working code sat under a stray `NotImplementedError`); fake-success stubs (value-rule/data-link/batch add-ops) converted to honest `NotImplementedError`s — the agent can no longer believe a mutation happened when nothing did; capability blurbs corrected.
+- **Fail-closed dry-run harness:** `dry_run.py` + `validate_all_tools.py` force `validate_only` at the SDK layer on every mutate (unforceable → quarantined, never sent); widened with real-resource harvest to 314 tools / 237 mutates → after fixing the 9 real bugs it surfaced: **90 PASS / 0 FAIL / 147 SKIP**, zero unflagged mutates ever executed.
+
+### Platform / misc (unplanned)
+
+- **2026-06-02:** app-wide re-skin to Shopify-calm light (OKLCH token layer; `frontend/DESIGN.md` + `PRODUCT.md` born).
+- **2026-06-10:** default model Opus 4.8 → **Fable 5** (`claude-fable-5[1m]`; plain fallback; aliases kept).
+- **2026-06-11:** CLI discovery prefers the native Claude binary over stale npm cli.js in every subprocess spawn.
+- **2026-07-06:** Panama QIP + Greece GV Oman/Jordan keyword research client deliverables (read-only live Keyword Planner pulls; zero fabricated numbers).
+- **2026-07-14:** legacy chat `?stream=1` restore (P0 "thinks forever" fix) + ChatPanel scope-bug fix unblocking `vite build`.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -1111,22 +1519,26 @@ Epic 1: Multi-Account Foundation ──────┐
 
 ## Implementation Order
 
-| Order | Epic | Est. Stories | Rationale |
-|-------|------|-------------|-----------|
-| 1st | Epic 1: Multi-Account Foundation | 7 stories | Foundation — everything depends on this |
-| 2nd | Epic 2: Marketing Intelligence | 5 stories | Enriches agent and dashboard |
-| 3rd | Epic 5: Guidelines Enhancement | 3 stories | Quick, builds on Epic 1+2 |
-| 4th | Epic 4: Conversation Upgrade | 3 stories | Independent, enhances daily workflow |
-| 5th | Epic 3: Dashboards & Charts | 5 stories | Visual impact, needs Epic 1+2 data |
-| 6th | Epic 6: Advanced Editing | 5 stories | Power features, needs intelligence layer |
-| 7th | Epic 7: Public Release | 5 stories | Final polish before launch |
-| 8th | Epic 8: PMax Finalization | 3 stories | ~70% built — fastest coverage win (Phase 1.5) |
-| 9th | Epic 9: MCP Plan Tools | 1 story | Small, unlocks scheduling from any Claude Code |
-| 10th | Epic 10: Shopping Campaigns | 5 stories | Greenfield — largest Phase 1.5 lift |
+| Order | Epic | Est. Stories | Rationale | Status (2026-07-14) |
+|-------|------|-------------|-----------|---------------------|
+| 1st | Epic 1: Multi-Account Foundation | 7 stories | Foundation — everything depends on this | Done |
+| 2nd | Epic 2: Marketing Intelligence | 5 stories | Enriches agent and dashboard | Done |
+| 3rd | Epic 5: Guidelines Enhancement | 3 stories | Quick, builds on Epic 1+2 | Done |
+| 4th | Epic 4: Conversation Upgrade | 3 stories | Independent, enhances daily workflow | Done |
+| 5th | Epic 3: Dashboards & Charts | 5 stories | Visual impact, needs Epic 1+2 data | Done |
+| 6th | Epic 6: Advanced Editing | 5 stories | Power features, needs intelligence layer | Done |
+| 7th | Epic 7: Public Release | 5 stories | Final polish before launch | **Open** |
+| 8th | Epic 8: PMax Finalization | 4 stories | ~70% built — fastest coverage win (Phase 1.5) | Shipped 2026-06-10→11 |
+| 9th | Epic 9: MCP Plan Tools | 1 story | Small, unlocks scheduling from any Claude Code | Shipped 2026-06-10 |
+| 10th | Epic 10: Shopping Campaigns | 5 stories | Greenfield — largest Phase 1.5 lift | **Open** |
+| 11th | Epic 13: Account Director + Homepage v2 | 8 stories | Homepage becomes the audit's surface (Phase 1.6); backend engine 13.1–13.4 before UI 13.5–13.8 | Shipped 2026-07-04→05 |
 
-**Total: 7 epics, 33 stories for Phase 1 · +3 epics / 9 stories (Phase 1.5, stories added 2026-06-10; Epics 8–9 implemented same day, Epic 10 pending)**
+**Total: 7 epics, 33 stories for Phase 1 · +3 epics / 10 stories (Phase 1.5, stories added 2026-06-10; Epics 8–9 shipped same day, Epic 10 pending)**
+
+**Phase 1.6 (2026-07-04): +1 epic (Epic 13) / 8 stories — Account Director global audit + Homepage v2. SHIPPED 2026-07-04→05.**
+
+**Phase 1.7 (reconciled 2026-07-14): the § "Shipped Unplanned" ledger above — Epics 11/12 + Studio Redesign MVP, Chat Orchestration v2 (E0/E1/E2-3/E4), Dashboard v2.1 (A/B/C), WS1–WS5 hardening, MCP tool-surface hardening. Specs live in their `research/` plans; PRD §8 Phase 1.7 is the summary.**
 
 ---
 
-*Next step: Begin implementation starting with Epic 1, Story 1.1.*
-*Phase 1.5 next step: expand Epics 8–10 into full stories via `/bmad-create-epics-and-stories`, then implement in order 8 → 9 → 10.*
+*Open items (2026-07-14): Epic 7 (public release), Epic 10 (Shopping), and the deferred remainders listed per-track in § "Shipped Unplanned" (Chat-orch Epics 5–8, Dashboard deferred chips/attribution, Studio Virality/Clipper + lipsync presenter).*

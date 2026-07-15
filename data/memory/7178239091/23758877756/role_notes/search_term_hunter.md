@@ -1,6 +1,6 @@
 # Search Term Hunter Notes
 
-**Last updated:** 2026-06-02 15:37
+**Last updated:** 2026-07-14 16:57
 
 **Task:** Search-term + match-type audit for Greece Golden Visa - Turkey (23758877756) from the 7-day search-term report in context. 1) Waste analysis: quantify spend on low-intent/informational terms (nedir, ş
 ## Search Term Hunter — 7-Day Audit | Greece Golden Visa - Turkey (23758877756)
@@ -84,3 +84,124 @@ FOCUS: Reconcile the central conflict: is the 1-conv-in-14-days / 0.34% CVR a TR
 |-----|--------|------|-------------|
 **Why this order:** Language verification first (no-cost, removes a QS suppressor), negatives second (lowest-impact, doesn't conflict with any pending ad change), EN group pause third (frees budget on Jun 4 when Jun 4 is already the wait-window release date — clean timing), headlines fourth (immediately after the 7-day window closes), keywords fifth (never add keywords before the matching ad copy 
 — *Search Term Hunter*
+
+### 2026-07-14 15:44 — Fresh 7-day search-term audit using ONLY the 2026-07-14 search-term table alread
+
+**Task:** Fresh 7-day search-term audit using ONLY the 2026-07-14 search-term table already in context — do NOT re-pull the report. The user asks why this campaign gets zero leads; you own the traffic-quality h
+**Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-14**
+**1. Waste: 43.5% — 5× worse than Jun 2**
+Visible search-term cost this week: **$292.10**
+| Cluster | Terms | Cost |
+|---------|-------|------|
+Jun 2 baseline: 8.8% (~$20/week). **Waste is now 5× worse and ~$107/week higher.** Primary driver: the şartları cluster had near-zero spend on Jun 2; it has since surged to the campaign's single biggest waste line.
+**2. Jun 2 negatives that were never applied**
+Chronicle confirms "3 criteria created" Jun 2, but nedir ($28.35), nasıl alınır ($11.83), and ekşi ($1.14) are all still matching and spending this week — clear evidence none were applied (or the wrong 3 were). The şartları PHRASE negative (flagged again Jul 4 by Analytics Analyst as ~$62/week) is also unexecuted. No chronicle entry confirms any of these four were actioned after Jun 2.
+**3. "golden visa yunanistan" — NONE status, 6 weeks overdue**
+$31.63 / 4 clicks this week, status NONE. Flagged Jun 2 for immediate PHRASE addition to yunanistan-golden-visa. Still unactioned.
+**Execute — negatives:**
+| Term | Match | Level |
+|------|-------|-------|
+| şartları | PHRASE | Campaign |
+| nedir | PHRASE | Campaign |
+| nasıl alınır | PHRASE | Campaign |
+| ekşi | EXACT | Campaign |
+| şirket kurulumu | PHRASE | Ad-group: yunanistan-golden-visa |
+**Execute — keyword adds:**
+| Term | Match | Ad Group |
+|------|-------|---------|
+| golden visa yunanistan | PHRASE | yunanistan-golden-visa |
+— *Search Term Hunter*
+
+### 2026-07-14 15:47 — Orchestrated finding
+
+{
+  "summary": "Waste tripled to 43.5% ($127/week) because Jun 2 negatives were never applied \u2014 add \u015fartlar\u0131 PHRASE + nedir PHRASE + nas\u0131l al\u0131n\u0131r PHRASE + ek\u015fi EXACT at campaign level, and finally add 'golden visa yunanistan' PHRASE as a keyword.",
+  "findings": [
+    {
+      "claim": "Informational waste has grown from 8.8% to 43.5% of visible search-term spend (~$127/week) because Jun 2 negatives for \u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r/ek\u015fi were never applied",
+      "severity": "high",
+      "confidence": 0.93,
+      "sources": [
+        "2026-07-14 search-term table (context)",
+        "Jun 2 chronicle: '3 criteria created' with no follow-up entries",
+        "Jun 2 Search Term Hunter audit"
+      ],
+      "disconfirmed_by": "Evidence that nedir/nas\u0131l al\u0131n\u0131r/ek\u015fi were among the 3 negatives added Jun 2 but are re-matching due to match type gaps",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "\u015fartlar\u0131 PHRASE at campaign level is the single highest-impact unexecuted negative \u2014 alone worth ~$80/week",
+      "severity": "high",
+      "confidence": 0.97,
+      "sources": [
+        "2026-07-14 search-term table: 5 \u015fartlar\u0131 variants sum to $79.88",
+        "Jul 4 Analytics Analyst recommendation (unexecuted per chronicle)"
+      ],
+      "disconfirmed_by": "\u015eartlar\u0131 negative was applied between Jul 4 and Jul 14 but the benefit not yet visible in this data snapshot",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "'golden visa yunanistan' should be added as PHRASE keyword to yunanistan-golden-visa \u2014 4 clicks/$31.63 this week at NONE status, flagged Jun 2 and still unexecuted",
+      "severity": "medium",
+      "confidence": 0.99,
+      "sources": [
+        "2026-07-14 search-term table (status: NONE, $31.63)",
+        "Jun 2 Search Term Hunter recommendation"
+      ],
+      "disconfirmed_by": "A PHRASE or EXACT keyword already capturing this term exist
+
+### 2026-07-14 16:56 — Produce the concrete 'keep what's working' inventory that either scenario (clone
+
+**Task:** Produce the concrete 'keep what's working' inventory that either scenario (clone or prune-in-place) would be built from — context data only, cite your Jul 14 audit (reuse), do NOT redo the waste math.
+**KEEP** (proven Turkish investor terms — all 3 lifetime convs live here):
+- `yunanistan golden visa` PHRASE | **yunanistan-golden-visa** | QS 2 | 253 clicks, **2 conv** — primary signal, protect budget
+- `golden vize yunanistan` PHRASE | **yunanistan-golden-visa** | QS 5 | 105 clicks, **1 conv** — best QS/conv combo
+- `altın vize yunanistan` PHRASE | **yunanistan-golden-visa** | QS 6 | 24 clicks — anchor for QS score
+- `yunanistan golden vize` PHRASE | **yunanistan-golden-visa** | QS 5 | 18 clicks — variant coverage
+- `yunanistan ev alana vatandaşlık` PHRASE | **yunanistan-oturum-gayrimenkul** | QS 4 | 34 clicks — QS recovered, citizenship intent is on-thesis
+- Remaining oturum-izni cluster (QS 3 band, yunanistan-oturum-gayrimenkul) — keep but let the EN pause + negatives free their budget share
+**ADD**:
+- `golden visa yunanistan` PHRASE → **yunanistan-golden-visa** | $31.63 / 4 clicks this week at NONE — 6 weeks overdue, add with $5 bid cap
+**CUT/NEGATE**:
+- Pause ad group `greece-golden-visa-en` (198513892027) entirely — kills `greece golden visa` (46 clicks/0 conv), `greece golden visa citizenship` (18 clicks/0 conv), `greece golden visa program` QS:8 — high QS but wrong-language group, Creative Director closed this Jul 14
+- Campaign-level negatives: `şartları` PHRASE, `nedir` PHRASE, `nasıl alınır` PHRASE, `ekşi` EXACT — $127/week of identified waste per Jul 14 Hunter audit
+- PROBATION (yunanistan-oturum-gayrimenkul, bid-cap $4 max, review in 7 days): `ev almak vatandaşlık`, `ev alınca vatandaşlık`, `oturum için ev almak` — all added Jul 6, coincide with the impression/CPC spike (439 impr, $172.82, band breach to $6.40+), on-thesis but suspects; cap before deciding
+At $50/day: EN pause frees ~$8/day, negatives cut ~$18/day — together absorb the cap without touching the converting Turkish core.
+— *Search Term Hunter*
+
+### 2026-07-14 16:57 — Orchestrated finding
+
+{
+  "summary": "All 3 conversions are in yunanistan-golden-visa; keep its Turkish PHRASE core, add golden visa yunanistan PHRASE, pause EN group, deploy 4 campaign negatives, and bid-cap the Jul 6 citizenship additions \u2014 that gets you to $50/day without cutting converting traffic.",
+  "findings": [
+    {
+      "claim": "All 3 lifetime conversions sit in yunanistan-golden-visa group; this group's top Turkish PHRASE keywords should receive the majority of the $50/day budget post-restructure",
+      "severity": "high",
+      "confidence": 0.92,
+      "sources": [
+        "Keyword table: yunanistan golden visa 253 clicks 2 conv, golden vize yunanistan 105 clicks 1 conv, golden vize yunanistan 105/1",
+        "Ad group data: yunanistan-golden-visa $2,495 / 3 conv lifetime"
+      ],
+      "disconfirmed_by": "API pull showing conversions attributed to yunanistan-oturum-gayrimenkul or EN group keywords",
+      "id": "c3-f0"
+    },
+    {
+      "claim": "Jul 6 citizenship keyword additions (ev almak/al\u0131nca vatanda\u015fl\u0131k, oturum i\u00e7in ev almak) are the most likely trigger for the CPC band breach \u2014 bid-cap at $4, do not remove",
+      "severity": "medium",
+      "confidence": 0.72,
+      "sources": [
+        "15-day daily table: Jul 6 impression spike 439 / $172.82 / CPC $6.40",
+        "Chronicle Jul 6: 3 PHRASE keywords added to oturum-gayrimenkul group"
+      ],
+      "disconfirmed_by": "Confirmed via API that no keywords were added or bids changed around Jul 5\u20136",
+      "id": "c3-f1"
+    },
+    {
+      "claim": "EN group pause is required before the $50/day cap is achievable \u2014 group currently contributes ~$8/day of structural waste with 0 lifetime conversions",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "Ad group data: 198513892027 $361.22 lifetime / 0 conv / 67 clicks",
+        "Creative Director Jul 14: EN group removal confirmed \u2014 conversion action contamination + audience mismatch"
+      ],
+  

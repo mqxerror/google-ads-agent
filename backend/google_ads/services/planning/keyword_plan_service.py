@@ -208,6 +208,7 @@ class KeywordPlanService:
         cpc_bid_micros: int,
         location_ids: Optional[List[str]] = None,
         language_id: Optional[str] = None,
+        keyword_plan_network: str = "GOOGLE_SEARCH",
     ) -> Dict[str, Any]:
         """Create a campaign within a keyword plan.
 
@@ -219,6 +220,8 @@ class KeywordPlanService:
             cpc_bid_micros: CPC bid in micros
             location_ids: Geo target location IDs
             language_id: Language ID
+            keyword_plan_network: Targeting network — GOOGLE_SEARCH (default) or
+                GOOGLE_SEARCH_AND_PARTNERS (required by the API)
 
         Returns:
             Created campaign details
@@ -232,6 +235,9 @@ class KeywordPlanService:
                 sdk_client.client.get_service("KeywordPlanCampaignService")
             )
 
+            from google.ads.googleads.v23.enums.types.keyword_plan_network import (
+                KeywordPlanNetworkEnum,
+            )
             from google.ads.googleads.v23.resources.types.keyword_plan_campaign import (
                 KeywordPlanCampaign,
                 KeywordPlanGeoTarget,
@@ -248,6 +254,11 @@ class KeywordPlanService:
                 f"customers/{customer_id}/keywordPlans/{keyword_plan_id}"
             )
             campaign.cpc_bid_micros = cpc_bid_micros
+            # keyword_plan_network is REQUIRED — the API rejects the create with
+            # a [REQUIRED] field-not-present error when it is omitted.
+            campaign.keyword_plan_network = getattr(
+                KeywordPlanNetworkEnum.KeywordPlanNetwork, keyword_plan_network
+            )
 
             # Set language
             campaign.language_constants.append(
@@ -463,6 +474,7 @@ def create_keyword_plan_tools(
         cpc_bid_micros: int,
         location_ids: Optional[List[str]] = None,
         language_id: Optional[str] = None,
+        keyword_plan_network: str = "GOOGLE_SEARCH",
     ) -> Dict[str, Any]:
         """Create a campaign within a keyword plan.
 
@@ -473,6 +485,8 @@ def create_keyword_plan_tools(
             cpc_bid_micros: Default CPC bid in micros (e.g., 1000000 for $1.00)
             location_ids: Geo target location IDs (default: US)
             language_id: Language ID (default: English)
+            keyword_plan_network: Targeting network — GOOGLE_SEARCH (default) or
+                GOOGLE_SEARCH_AND_PARTNERS
 
         Returns:
             Created campaign details with resource_name and campaign_id
@@ -485,6 +499,7 @@ def create_keyword_plan_tools(
             cpc_bid_micros=cpc_bid_micros,
             location_ids=location_ids,
             language_id=language_id,
+            keyword_plan_network=keyword_plan_network,
         )
 
     async def add_keywords_to_plan(

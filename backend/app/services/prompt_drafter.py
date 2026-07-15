@@ -123,8 +123,15 @@ _STAGE1_SYSTEM = (
 )
 
 
-async def _stage1_decompose(*, page: dict[str, Any], target: str) -> dict[str, Any]:
-    """Stage 1: structured-brief extraction from raw page signals."""
+async def _stage1_decompose(
+    *, page: dict[str, Any], target: str, timeout_s: float = _STAGE_TIMEOUT_S
+) -> dict[str, Any]:
+    """Stage 1: structured-brief extraction from raw page signals.
+
+    `timeout_s` defaults to the tight per-stage budget so the image-drafting
+    flow is UNCHANGED. The video-director flow folds the whole campaign-context
+    block into this call, so it passes a longer budget (see video_director
+    `_DRAFT_STAGE_TIMEOUT_S`)."""
     user = (
         f"Target creative format: {target}\n\n"
         f"Page URL: {page.get('url')}\n"
@@ -135,7 +142,7 @@ async def _stage1_decompose(*, page: dict[str, Any], target: str) -> dict[str, A
         f"Body excerpt (first 2k chars):\n{(page.get('body_excerpt') or '')[:2000]}\n\n"
         f"Return the JSON brief now."
     )
-    raw = await _claude_one_shot(system=_STAGE1_SYSTEM, user=user)
+    raw = await _claude_one_shot(system=_STAGE1_SYSTEM, user=user, timeout_s=timeout_s)
     parsed = _parse_json_envelope(raw)
     # Don't crash on partial output — fill missing keys with safe
     # defaults so Stage 2 always has a workable brief.
@@ -227,12 +234,16 @@ async def _stage2_draft(
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
-async def _claude_one_shot(*, system: str, user: str, model: str = "sonnet") -> str:
+async def _claude_one_shot(
+    *, system: str, user: str, model: str = "sonnet",
+    timeout_s: float = _STAGE_TIMEOUT_S,
+) -> str:
     """Single-shot Claude call via the `claude --print` CLI. Same
     subprocess pattern agent.py uses for the streaming agent path —
     just non-streaming here because we want one structured response.
-    Times out at _STAGE_TIMEOUT_S; raises with a structured message
-    on failure."""
+    Times out at `timeout_s` (default _STAGE_TIMEOUT_S — image drafting
+    keeps its tight budget; video drafting passes a longer one); raises
+    with a structured message on failure."""
     proc = await asyncio.create_subprocess_exec(
         "claude", "--print", "--model", model,
         "--system-prompt", system,
@@ -243,13 +254,13 @@ async def _claude_one_shot(*, system: str, user: str, model: str = "sonnet") -> 
     try:
         out_b, err_b = await asyncio.wait_for(
             proc.communicate(input=user.encode("utf-8")),
-            timeout=_STAGE_TIMEOUT_S,
+            timeout=timeout_s,
         )
     except asyncio.TimeoutError as e:
         proc.kill()
         await proc.wait()
         raise PromptDrafterError(
-            f"claude timed out after {_STAGE_TIMEOUT_S}s",
+            f"claude timed out after {timeout_s}s",
         ) from e
     if proc.returncode != 0:
         err = err_b.decode("utf-8", errors="replace").strip()

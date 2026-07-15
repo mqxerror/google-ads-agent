@@ -915,7 +915,252 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V18 migration complete (ad_assets.prompt_hash for clip reuse).")
 
-        if version >= 18:
-            logger.info("Database schema is V18 (up to date).")
+        # V19: account-mode audit report read model + runner reliability.
+        #
+        # `account_reports` = latest-wins persistence of the normalized
+        # `account_report` the orchestrator emits for an account-mode run
+        # (Story 13.2). One row per (account_id) is the "latest" — we UPSERT
+        # on account_id so the homepage read is O(1): SELECT ... WHERE
+        # account_id = ?. History is retained via source run_id + generated_at
+        # (older reports are overwritten in the latest slot but the underlying
+        # workflow_runs / workflow_reports rows remain the audit trail).
+        #
+        # `workflow_runs` also gains a `stop_reason` (already present from V15)
+        # and now needs nothing new for stop — status already has a 'stopped'
+        # value in the CHECK-comment. The zombie sweeper flips stale 'running'
+        # rows to 'failed' with stop_reason='stale' using existing columns.
+        if version < 19:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS account_reports (
+                    account_id TEXT PRIMARY KEY,          -- latest-wins: one row per account
+                    run_id TEXT NOT NULL,                 -- source workflow_runs.id
+                    findings_json TEXT NOT NULL,          -- JSON: full normalized account_report
+                    total_recoverable_wk REAL NOT NULL DEFAULT 0,
+                    campaigns_audited INTEGER NOT NULL DEFAULT 0,
+                    campaigns_excluded INTEGER NOT NULL DEFAULT 0,
+                    parse_ok INTEGER NOT NULL DEFAULT 0,
+                    generated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_account_reports_generated
+                    ON account_reports(account_id, generated_at DESC);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (19)")
+            await db.commit()
+            logger.info("V19 migration complete (account_reports latest-wins read model).")
+
+        # V20: finding→action decision state (Story 13.3).
+        #
+        # The homepage fix list turns each persisted account-report finding
+        # (and each fast-signal) into a concrete approvable ACTION. This table
+        # records the OPERATOR'S DECISION on each one — approved / approved_once
+        # / denied — plus the resulting Scheduled Plan id when the action was
+        # routed into the plan/approval lifecycle.
+        #
+        # Keyed by (account_id, finding_key): finding_key is a stable content
+        # hash of the source finding/signal (category + campaigns + title), so
+        # the SAME finding across re-audits maps to the SAME row — a DENY
+        # persists and keeps the finding suppressed until the finding's content
+        # actually changes (i.e. it's genuinely re-surfaced by a new audit).
+        # No Google Ads mutation ever lives here; execution is always the plan
+        # path (scheduler.py), which is scope-guarded.
+        if version < 20:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS finding_actions (
+                    account_id TEXT NOT NULL,
+                    finding_key TEXT NOT NULL,          -- stable content hash of the finding/signal
+                    source TEXT NOT NULL DEFAULT 'finding', -- finding | signal
+                    title TEXT,                         -- snapshot for audit/debug
+                    action_category TEXT,               -- scheduler taxonomy at decision time
+                    status TEXT NOT NULL DEFAULT 'proposed', -- proposed|approved|approved_once|denied
+                    plan_id TEXT,                       -- resulting scheduled_plans.id (nullable)
+                    dollar_impact_wk REAL,              -- snapshot of the $ estimate (nullable)
+                    decided_by TEXT DEFAULT 'user',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (account_id, finding_key)
+                );
+                CREATE INDEX IF NOT EXISTS idx_finding_actions_account
+                    ON finding_actions(account_id, status);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (20)")
+            await db.commit()
+            logger.info("V20 migration complete (finding_actions decision state).")
+
+        # V21: sync_state ledger (Dashboard v2.1 — Epic A, P0 freshness).
+        #
+        # The canonical per-account, per-domain freshness ledger. Every sync
+        # ATTEMPT writes here (in_progress flag + last_attempt_at at start;
+        # last_success_at / data_through_date / consecutive_failures / last_error
+        # at the end). This is the single source of truth the dashboard reads to
+        # answer "is this account's data fresh, syncing, stale, or erroring?" —
+        # replacing the ambiguous sync_status (which conflated "checked, no data"
+        # with "never checked"). `data_through_date` is the MAX(date) actually
+        # written for the account so freshness compares against real coverage,
+        # not a wall-clock guess. Keyed by (account_id, domain) so future domains
+        # (search_terms, assets, …) get their own row without schema churn.
+        if version < 21:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS sync_state (
+                    account_id TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    last_attempt_at TEXT,
+                    last_success_at TEXT,
+                    last_error TEXT,
+                    consecutive_failures INTEGER DEFAULT 0,
+                    in_progress INTEGER DEFAULT 0,
+                    data_through_date TEXT,
+                    PRIMARY KEY (account_id, domain)
+                );
+                CREATE INDEX IF NOT EXISTS idx_sync_state_account
+                    ON sync_state(account_id, domain);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (21)")
+            await db.commit()
+            logger.info("V21 migration complete (sync_state freshness ledger).")
+
+        # V22: Chat Orchestration v2 — turn runner persistence (Epic 1.1).
+        #
+        # `chat_turns` = one row per agent turn (a single POST /message run).
+        # It is the durable lifecycle record the chat_runner's detached task
+        # owns: the runner mints turn_id up front, inserts the row before
+        # launching, and flips `status` (running→done|failed|stopped|stale)
+        # from the driver — so a restart shows honest terminal states via the
+        # same zombie-sweep idea as workflow_runs (workflow_runner.py:222-248).
+        # `parent_turn_id` is nullable and baked in now for Epic 8 sub-turns
+        # (NULL for every top-level turn) — one column now saves a migration
+        # later. `mode` = direct|orchestrated|delegated; direct is today's
+        # single-persona passthrough.
+        #
+        # `chat_turn_events` = the append-only, batched-flush event log per
+        # turn (seq is the monotonic hub cursor). History replay reads this
+        # table, so a reconnect after a restart still catches up — fixing the
+        # process-local `_agent_buffers` loss (chat.py:35-38).
+        #
+        # `messages.turn_id` links a persisted assistant/user message to its
+        # originating turn (nullable — legacy rows keep rendering exactly as
+        # today). `workflow_reports.origin` distinguishes chat-dispatched
+        # specialist reports ('chat') from Team-Audit workflow reports
+        # ('workflow', the default) so Epic 2's recall can scope its reads.
+        if version < 22:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS chat_turns (
+                    turn_id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    campaign_id TEXT,
+                    parent_turn_id TEXT,                    -- nullable; Epic-8 sub-turns only, NULL for top-level
+                    mode TEXT NOT NULL DEFAULT 'direct',    -- direct|orchestrated|delegated
+                    status TEXT NOT NULL DEFAULT 'running', -- running|done|failed|stopped|stale
+                    cost REAL NOT NULL DEFAULT 0,
+                    agents_used INTEGER DEFAULT 0,
+                    conflicts INTEGER DEFAULT 0,
+                    started_at TEXT DEFAULT (datetime('now')),
+                    finished_at TEXT,
+                    final_message_id TEXT,
+                    stop_reason TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_chat_turns_conversation
+                    ON chat_turns(conversation_id, started_at DESC);
+
+                CREATE TABLE IF NOT EXISTS chat_turn_events (
+                    turn_id TEXT NOT NULL,
+                    seq INTEGER NOT NULL,
+                    type TEXT NOT NULL,
+                    payload TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    PRIMARY KEY (turn_id, seq)
+                );
+                CREATE INDEX IF NOT EXISTS idx_chat_turn_events_turn
+                    ON chat_turn_events(turn_id, seq);
+            """)
+            # Additive columns — guard each with PRAGMA table_info so re-running
+            # init_db on an already-migrated DB never raises (V16/V18 idiom).
+            cursor = await db.execute("PRAGMA table_info(messages)")
+            msg_cols = [row[1] for row in await cursor.fetchall()]
+            if "turn_id" not in msg_cols:
+                await db.execute("ALTER TABLE messages ADD COLUMN turn_id TEXT")
+            cursor = await db.execute("PRAGMA table_info(workflow_reports)")
+            wr_cols = [row[1] for row in await cursor.fetchall()]
+            if "origin" not in wr_cols:
+                await db.execute(
+                    "ALTER TABLE workflow_reports ADD COLUMN origin TEXT DEFAULT 'workflow'"
+                )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (22)")
+            await db.commit()
+            logger.info("V22 migration complete (chat_turns + chat_turn_events + turn linkage).")
+
+        # V23: Studio video-director foundation (studio redesign §6.5, §10.2).
+        #
+        # `studio_video_projects` = one row per AI-Video-Studio project — the
+        # durable source of truth for a Video-Director-led video (brief →
+        # model → storyboard → render). It is deliberately a table, not
+        # browser state: after the builder-state failure (memory
+        # `feedback_builder_frustration.md`) and the PMax localStorage lesson,
+        # in-progress work must survive a refresh, a tab close, or a second
+        # machine. `conversation_id` binds to the Director's chat thread;
+        # `storyboard_json` holds the latest full storyboard (DB = truth);
+        # `status` walks drafting→storyboard→rendering→done|abandoned;
+        # `consult_director` defaults ON when campaign-linked (§13).
+        #
+        # `brand_avatars` = a persistent, reusable AI avatar per account —
+        # it references an already-trained Higgsfield Soul (`soul_id`, the
+        # reference_id returned by the existing SoulCreator flow) plus a TTS
+        # `voice_id`, so a brand's face + voice can be reused across projects
+        # without re-training. Both tables ALTER nothing existing (additive).
+        if version < 23:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS studio_video_projects (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT,
+                    conversation_id TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    brief TEXT DEFAULT '',
+                    model_id TEXT NOT NULL,
+                    target_seconds INTEGER NOT NULL,
+                    aspect TEXT NOT NULL DEFAULT '16:9',
+                    consult_director INTEGER NOT NULL DEFAULT 1,   -- §13 default: consult ON when campaign-linked
+                    storyboard_json TEXT,
+                    status TEXT NOT NULL DEFAULT 'drafting',        -- drafting|storyboard|rendering|done|abandoned
+                    asset_id TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_studio_video_projects_account
+                    ON studio_video_projects(account_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS brand_avatars (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    soul_id TEXT,          -- trained Higgsfield Soul reference_id (reuses existing SoulCreator output)
+                    voice_id TEXT,         -- TTS voice
+                    style_notes TEXT DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_brand_avatars_account
+                    ON brand_avatars(account_id, created_at DESC);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (23)")
+            await db.commit()
+            logger.info("V23 migration complete (studio_video_projects + brand_avatars).")
+
+        # V24: persist the draft brief source on a video project. Additive —
+        # a JSON string of {type, url} recording how the operator seeded the
+        # draft (text | campaign | landing_page). NULL for pre-V24 rows and
+        # for plain-text drafts (default "text" behavior unchanged).
+        if version < 24:
+            cursor = await db.execute("PRAGMA table_info(studio_video_projects)")
+            svp_cols = [row[1] for row in await cursor.fetchall()]
+            if "brief_source" not in svp_cols:
+                await db.execute(
+                    "ALTER TABLE studio_video_projects ADD COLUMN brief_source TEXT"
+                )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (24)")
+            await db.commit()
+            logger.info("V24 migration complete (studio_video_projects.brief_source).")
+
+        if version >= 24:
+            logger.info("Database schema is V24 (up to date).")
     finally:
         await db.close()

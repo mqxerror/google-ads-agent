@@ -46,3 +46,6 @@
 
 1. How did yesterday compare to the 7-day average? Flag any anomalies.
 2. Are we on pace for monthly  | pending | ppc_strategist |
+| 2026-07-13 17:40 | **2. ALLOWED CLAIMS** *(LP-verified only — do not fabricate)* | User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign and needs your guidance FIRST. In a tight brief (no  | pending | director |
+| 2026-07-13 17:40 | - $300,000 minimum investment threshold (confirmed from CRO LP audit, stale but consistent with program facts) | User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign and needs your guidance FIRST. In a tight brief (no  | pending | director |
+| 2026-07-13 17:40 | - **No invented social proof** — no "thousands of clients," no approval rate stats, no ROI figures. None are verified for this campaign. | User asked: You are the campaign Director. A Video Director is about to draft a short video for this campaign and needs your guidance FIRST. In a tight brief (no  | pending | director |

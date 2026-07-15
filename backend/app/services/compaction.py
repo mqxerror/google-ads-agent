@@ -218,7 +218,7 @@ async def _generate_summary(messages: list[dict]) -> str | None:
             *_find_cli(),
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
-            "--model", "claude-sonnet-4-6",
+            "--model", "claude-opus-4-8",
             "--permission-mode", "bypassPermissions",
         ]
 

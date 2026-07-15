@@ -175,7 +175,7 @@ async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMa
         active_role="creative_director",
         tool_allowlist=[],  # no Google Ads tools; built-in web fetch still works
     ):
-        if ev.get("type") == "text":
+        if ev.get("type") in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
             parts.append(ev.get("content", ""))
     raw = "".join(parts)
 

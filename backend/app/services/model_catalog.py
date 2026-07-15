@@ -20,6 +20,7 @@ in from callers; nothing Ads-specific lives here.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import Any, Optional
 
@@ -101,6 +102,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "veo3_1", "label": "Veo 3.1 (Google)", "kind": "video",
         "tier": TIER_BEST, "cost_text": "premium; tens of credits per clip",
+        "origin": "Google (US)",
+        "strengths": "Motion & physics realism; enum clips 4/6/8s — write self-contained shots",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16"],
             "duration_type": "enum", "durations": [4, 6, 8], "max_duration": 8,
@@ -112,6 +115,8 @@ _CATALOG: list[dict[str, Any]] = [
         "id": "veo3_1_lite", "label": "Veo 3.1 Lite", "kind": "video",
         "tier": TIER_BUDGET, "cost_text": "about 8 credits per 5s clip",
         "default": True,
+        "origin": "Google (US)",
+        "strengths": "Motion & physics realism; enum clips 4/6/8s — write self-contained shots",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16"],
             "duration_type": "enum", "durations": [4, 6, 8], "max_duration": 8,
@@ -120,6 +125,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "veo3", "label": "Veo 3 (older)", "kind": "video",
         "tier": TIER_FAST, "cost_text": "image-to-video only (needs an input image)",
+        "origin": "Google (US)",
+        "strengths": "Image-to-video only (needs a start image)",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16"],
             "duration_type": None, "requires_input_image": True,
@@ -128,6 +135,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "kling3_0", "label": "Kling 3.0", "kind": "video",
         "tier": TIER_BEST, "cost_text": "about 10 credits per 5s in std mode; 4k costs multiples more",
+        "origin": "Kuaishou (CN)",
+        "strengths": "Continuity king — single takes up to 15s/10s; std mode = cheap",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16", "1:1"],
             "duration_type": "int", "max_duration": 15,
@@ -137,6 +146,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "kling2_6", "label": "Kling 2.6", "kind": "video",
         "tier": TIER_BUDGET, "cost_text": "cheaper Kling; std mode keeps cost down",
+        "origin": "Kuaishou (CN)",
+        "strengths": "Continuity king — single takes up to 15s/10s; std mode = cheap",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16", "1:1"],
             "duration_type": "int", "max_duration": 10,
@@ -146,21 +157,29 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "seedance_2_0", "label": "Seedance 2.0", "kind": "video",
         "tier": TIER_BEST, "cost_text": "tens of credits per clip",
+        "origin": "ByteDance (CN)",
+        "strengths": "Dynamic action & camera movement",
         "constraints": {"aspect_ratios": ["16:9", "9:16", "1:1"], "duration_type": "int", "max_duration": 10},
     },
     {
         "id": "seedance1_5", "label": "Seedance 1.5 Pro", "kind": "video",
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
+        "origin": "ByteDance (CN)",
+        "strengths": "Dynamic action & camera movement",
         "constraints": {"aspect_ratios": ["16:9", "9:16", "1:1"], "duration_type": "int", "max_duration": 10},
     },
     {
         "id": "minimax_hailuo", "label": "Minimax Hailuo", "kind": "video",
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
+        "origin": "MiniMax (CN)",
+        "strengths": "Expressive human performance",
         "constraints": {"aspect_ratios": ["16:9", "9:16"], "duration_type": "int", "max_duration": 10},
     },
     {
         "id": "wan2_6", "label": "Wan 2.6", "kind": "video",
         "tier": TIER_BUDGET, "cost_text": "about 13 credits per clip",
+        "origin": "Alibaba (CN)",
+        "strengths": "Budget b-roll; enum 5/10/15s",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16", "1:1"],
             "duration_type": "enum", "durations": [5, 10, 15], "max_duration": 15,
@@ -169,6 +188,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "wan2_7", "label": "Wan 2.7", "kind": "video",
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
+        "origin": "Alibaba (CN)",
+        "strengths": "Budget b-roll; enum 5/10/15s",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16", "1:1"],
             "duration_type": "enum", "durations": [5, 10, 15], "max_duration": 15,
@@ -177,6 +198,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "soul_cast", "label": "Soul Cast (face-consistent)", "kind": "video",
         "tier": TIER_BEST, "cost_text": "premium; needs a trained Soul",
+        "origin": "Higgsfield",
+        "strengths": "Face-consistent presenter (needs a trained Soul)",
         "constraints": {
             "aspect_ratios": ["16:9", "9:16"], "duration_type": "int",
             "max_duration": 10, "supports_soul": True,
@@ -185,6 +208,8 @@ _CATALOG: list[dict[str, Any]] = [
     {
         "id": "grok_video", "label": "Grok Video", "kind": "video",
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
+        "origin": "xAI (US)",
+        "strengths": "Fast turnaround, mid quality",
         "constraints": {"aspect_ratios": ["16:9", "9:16"], "duration_type": "int", "max_duration": 10},
     },
 ]
@@ -226,6 +251,54 @@ def clamp_duration(model_id: str, requested: Optional[int]) -> Optional[int]:
         return min(durations, key=lambda d: abs(int(d) - int(requested)))
     max_d = int(c.get("max_duration") or 60)
     return max(1, min(int(requested), max_d))
+
+
+def plan_scenes(target_seconds: int, model_id: str) -> list[dict[str, Any]]:
+    """Plan N generative clips to fill `target_seconds` on `model_id`.
+
+    "Finished video" mode: instead of hand-authoring segments, the user
+    asks for a 15/30/60s video and we auto-plan the fewest clips at the
+    chosen model's MAX legal clip length (fewest seams / crossfades).
+    Returns a list of `{"duration": <int|None>}` dicts — the caller adds
+    the prompt/model. All planned clips are the SAME length (we never
+    shorten the last clip; equal-length clips minimise seams).
+
+    Graceful fallbacks (all return in a way the dispatcher tolerates):
+      * unknown id / non-video model  -> `[]` (caller falls back to its
+        normal flow — the "no renderable scenes" path).
+      * model with no --duration control (duration_type is None, e.g.
+        veo3) -> exactly ONE clip at native length `[{"duration": None}]`;
+        you cannot plan multi-clip on a model you can't length-control.
+      * unusable max clip length      -> `[]`.
+
+    Clip count is `ceil(target / max_clip)` (minimises count), then
+    clamped to `[1, MAX_HIGGSFIELD_SCENES]`. On non-divisible targets the
+    plan OVER-shoots the target rather than under-filling it — e.g. veo3_1
+    (enum 4/6/8, max 8) at 15s -> ceil(15/8)=2 clips of 8s = 16s. That
+    slight over-shoot is expected/correct: you cannot hit 15s exactly with
+    8s clips, and a full final clip beats a starved one.
+    """
+    m = get_model(model_id)
+    if m is None or m.get("kind") != "video":
+        # Unknown id or a non-video model — no plan; caller falls back.
+        return []
+    c = m.get("constraints") or {}
+    if c.get("duration_type") is None:
+        # No --duration control (e.g. veo3): can't plan multi-clip, so
+        # emit ONE clip at the model's native length (duration omitted).
+        return [{"duration": None}]
+    # clamp_duration snaps max_duration correctly for BOTH enum (-> top
+    # enum value) and int (-> the int cap).
+    max_clip = clamp_duration(model_id, c.get("max_duration"))
+    if not max_clip:
+        return []
+    n = math.ceil(target_seconds / max_clip)  # fewest clips / seams
+    # Import locally to avoid any circular-import risk (higgsfield_scene
+    # imports model_catalog lazily inside its functions).
+    from app.services.higgsfield_scene import MAX_HIGGSFIELD_SCENES
+
+    n = max(1, min(n, MAX_HIGGSFIELD_SCENES))
+    return [{"duration": max_clip} for _ in range(n)]
 
 
 async def _live_model_ids() -> Optional[set[str]]:

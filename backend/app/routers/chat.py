@@ -20,6 +20,7 @@ from app.models.schemas import (
     ToolConfirmRequest,
 )
 from app.services.agent import stream_agent_response, stop_agent
+from app.services import chat_runner
 from app.services.guidelines import GuidelinesService
 from app.services.roles import list_roles, classify_intent, get_role_detail, save_role_override, delete_role_override
 from app.config import settings
@@ -149,8 +150,18 @@ async def list_messages(conversation_id: str) -> list[ChatMessageResponse]:
 async def send_message(
     conversation_id: str,
     body: ChatMessageRequest,
-) -> StreamingResponse:
-    """Send a user message and stream back the AI agent response via SSE."""
+    stream: int = Query(0),
+):
+    """Send a user message.
+
+    Default (v2): starts a DIRECT-mode turn via chat_runner in a detached
+    background task and returns JSON `{turn_id}` immediately. The client then
+    opens `GET .../turns/{turn_id}/stream?cursor=N` to view events.
+
+    Legacy (`?stream=1`): the exact pre-v2 StreamingResponse behavior — the run
+    is driven inside `_agent_buffers` and events stream straight from the POST
+    response. Kept for one release so old clients don't break.
+    """
     # Persist user message
     user_msg_id = str(uuid.uuid4())
     db = await get_db()
@@ -299,6 +310,114 @@ async def send_message(
     except Exception:
         pass
 
+    # ── v2 default path: detached turn via chat_runner → {turn_id} ──────
+    # A DIRECT-mode turn wraps today's stream_agent_response in v2 envelopes.
+    # run_fn yields BARE {type, payload}; the runner stamps the envelope + seq
+    # and persists to chat_turn_events. proc_key=(turn_id, "director") routes a
+    # per-turn stop to this single child. Direct-mode payloads stay byte-
+    # equivalent to today (the v1 event dict, minus its own "type", becomes the
+    # payload). We also persist the assistant message + link it to the turn.
+    if not stream:
+        _model = body.model or "fable"
+        _active_role = getattr(body, "active_role", None)
+        _attachments = [a.model_dump() for a in (body.attachments or [])]
+
+        # ── Epic 2: orchestrated turn (opt-in via body.orchestrate) ──────
+        # An orchestrated turn runs the §5 state machine (triage → recall →
+        # verify → plan → dispatch → resolve → synthesize). run_turn yields
+        # BARE {type, payload}; the runner stamps the envelope + persists. The
+        # DIRECT path below is UNCHANGED (default when orchestrate is False).
+        if body.orchestrate:
+            async def _orchestrated_run_fn(*, turn_id: str):
+                from app.services import chat_orchestrator  # lazy import
+                async for ev in chat_orchestrator.run_turn(
+                    turn_id=turn_id,
+                    user_message=body.content,
+                    account_id=account_id,
+                    campaign_id=campaign_id,
+                    campaign_name=campaign_name,
+                    conversation_id=conversation_id,
+                    base_guidelines=base_guidelines,
+                    campaign_guidelines=campaign_guidelines_text,
+                    model=body.model or "fable",
+                    force_mode="orchestrate",
+                ):
+                    yield ev
+
+            turn_id = await chat_runner.start(
+                _orchestrated_run_fn,
+                conversation_id=conversation_id,
+                campaign_id=campaign_id,
+                mode="orchestrated",
+            )
+            return {"turn_id": turn_id}
+
+        async def _direct_run_fn(*, turn_id: str):
+            assistant_msg_id = str(uuid.uuid4())
+            full_text_parts: list[str] = []
+            tool_calls_json: list[dict] = []
+            agent_role_id: str | None = None
+            agent_role_name: str | None = None
+            try:
+                async for event in stream_agent_response(
+                    user_message=body.content,
+                    account_id=account_id,
+                    campaign_id=campaign_id,
+                    campaign_name=campaign_name,
+                    conversation_id=conversation_id,
+                    base_guidelines=base_guidelines,
+                    campaign_guidelines=campaign_guidelines_text,
+                    model=_model,
+                    active_role=_active_role,
+                    attachments=_attachments,
+                    proc_key=(turn_id, "director"),
+                ):
+                    etype = event.get("type", "event")
+                    payload = {k: v for k, v in event.items() if k != "type"}
+                    if etype in ("text", "text_delta"):
+                        full_text_parts.append(event.get("content", ""))
+                        # RAW direct-mode client SSE path: relabel token-level
+                        # `text_delta` → `text` so existing v1 frontend rendering
+                        # is unaffected (story 1.4). text_delta stays distinct
+                        # only inside the orchestrator translation.
+                        etype = "text"
+                    elif etype == "tool_call":
+                        tool_calls_json.append(event)
+                    elif etype == "routing":
+                        agent_role_id = event.get("role_id")
+                        agent_role_name = event.get("role_name")
+                    # Yield the bare event for the runner to wrap. v1 types flow
+                    # untouched inside the envelope (§4.3).
+                    yield {"type": etype, "payload": payload}
+            finally:
+                # Persist the assistant message even if the viewer disconnected —
+                # runs inside the detached task, so it survives a closed client.
+                full_text = "".join(full_text_parts)
+                if full_text:
+                    db2 = await get_db()
+                    try:
+                        await db2.execute(
+                            "INSERT INTO messages (id, conversation_id, role, content, tool_input, agent_role, agent_role_name, campaign_id, turn_id) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                assistant_msg_id, conversation_id, "assistant", full_text,
+                                json.dumps(tool_calls_json) if tool_calls_json else None,
+                                agent_role_id, agent_role_name, campaign_id, turn_id,
+                            ),
+                        )
+                        await db2.commit()
+                    finally:
+                        await db2.close()
+
+        turn_id = await chat_runner.start(
+            _direct_run_fn,
+            conversation_id=conversation_id,
+            campaign_id=campaign_id,
+            mode="direct",
+        )
+        return {"turn_id": turn_id}
+
+    # ── Legacy ?stream=1 path (unchanged) ───────────────────────────────
     # Run agent in background task — survives page refresh
     async def _run_agent_background(conv_id: str):
         """Run agent and buffer events. Persists response even if frontend disconnects."""
@@ -321,6 +440,11 @@ async def send_message(
                 active_role=getattr(body, 'active_role', None),
                 attachments=[a.model_dump() for a in (body.attachments or [])],
             ):
+                # RAW v1 client SSE path: relabel token-level `text_delta` →
+                # `text` before buffering so existing v1 frontend rendering is
+                # unaffected (story 1.4).
+                if event.get("type") == "text_delta":
+                    event = {**event, "type": "text"}
                 _agent_buffers[conv_id].append(event)
 
                 if event.get("type") == "text":
@@ -390,14 +514,117 @@ async def send_message(
     )
 
 
+# ── v2 turn viewer + lifecycle endpoints (Epic 1.2/1.5/1.6) ─────────
+
+
+async def _get_turn_row(turn_id: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM chat_turns WHERE turn_id = ?", (turn_id,)
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+@router.get("/conversations/{conversation_id}/turns/active")
+async def list_active_turns(conversation_id: str) -> dict:
+    """Active turn(s) for this conversation, for reconnect after a refresh."""
+    turns = await chat_runner.active_turns(conversation_id)
+    return {"conversation_id": conversation_id, "turns": turns}
+
+
+@router.get("/conversations/{conversation_id}/turns/{turn_id}/events")
+async def list_turn_events(conversation_id: str, turn_id: str) -> dict:
+    """Full persisted event list for a turn (history replay). 404 if the turn
+    doesn't belong to this conversation (the story-1.6 isolation guarantee)."""
+    turn = await _get_turn_row(turn_id)
+    if not turn:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    if turn["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=404, detail="Turn does not belong to this conversation")
+    events = await chat_runner.get_events(turn_id)
+    return {"turn_id": turn_id, "status": turn["status"], "events": events}
+
+
+@router.get("/conversations/{conversation_id}/turns/{turn_id}/stream")
+async def stream_turn(conversation_id: str, turn_id: str, cursor: int = Query(0)):
+    """SSE viewer over a turn's hub (replay from cursor, then tail). Closing the
+    stream never kills the run. 404 if the turn doesn't belong to `{conversation_id}`
+    — cross-conversation subscription is impossible by URL shape (story 1.6)."""
+    turn = await _get_turn_row(turn_id)
+    if not turn:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    if turn["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=404, detail="Turn does not belong to this conversation")
+
+    async def _stream():
+        async for env in chat_runner.subscribe(turn_id, cursor):
+            yield f"data: {json.dumps(env)}\n\n"
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/conversations/{conversation_id}/turns/{turn_id}/stop")
+async def stop_turn_endpoint(conversation_id: str, turn_id: str) -> dict:
+    """Per-turn stop (story 1.5). Idempotent: a terminal turn returns
+    {status:"already_done"}. 404 if the turn isn't this conversation's."""
+    turn = await _get_turn_row(turn_id)
+    if not turn:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    if turn["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=404, detail="Turn does not belong to this conversation")
+    if turn["status"] != "running":
+        return {"turn_id": turn_id, "status": "already_done"}
+    return await chat_runner.stop_turn(turn_id)
+
+
+@router.post("/conversations/{conversation_id}/turns/{turn_id}/calls/{call_id}/stop")
+async def stop_call_endpoint(conversation_id: str, turn_id: str, call_id: str) -> dict:
+    """Per-specialist stop (story 2.6). Kills one call; the turn continues.
+    Idempotent. 404 if the turn isn't this conversation's."""
+    turn = await _get_turn_row(turn_id)
+    if not turn:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    if turn["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=404, detail="Turn does not belong to this conversation")
+    return await chat_runner.stop_call(turn_id, call_id)
+
+
 # ── Tool confirmation ───────────────────────────────────────────────
 
 
 @router.post("/conversations/{conversation_id}/stop")
 async def stop_agent_task(conversation_id: str) -> dict:
-    """Abort a running agent subprocess for this conversation."""
-    stopped = stop_agent(conversation_id)
-    return {"stopped": stopped}
+    """Abort a running agent for this conversation.
+
+    Legacy alias: prefers stopping the conversation's active v2 turn(s); falls
+    back to the Epic-0 conversation-keyed stop_agent for any legacy in-flight
+    run driven through _agent_buffers.
+    """
+    active = await chat_runner.active_turns(conversation_id)
+    stopped_turns = []
+    for t in active:
+        res = await chat_runner.stop_turn(t["turn_id"])
+        stopped_turns.append(res.get("turn_id"))
+    # Also fire the legacy conversation-keyed stop so an in-flight ?stream=1 run
+    # (or any pre-v2 code path) is covered.
+    legacy_stopped = stop_agent(conversation_id)
+    return {
+        "stopped": bool(stopped_turns) or legacy_stopped,
+        "turns_stopped": stopped_turns,
+        "legacy_stopped": legacy_stopped,
+    }
 
 
 # ── Claude Code handoff ─────────────────────────────────────────────

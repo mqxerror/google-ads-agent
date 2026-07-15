@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { useAppStore } from '@/stores/appStore';
 import {
   Brain, Pin, FileText, MessageSquare, Users, Target, BookOpen,
   ChevronDown, ChevronRight, Save, BarChart3, Clock,

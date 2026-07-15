@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { Brain, Zap, TrendingUp, RotateCcw, Play, ChevronRight, ChevronDown, ArrowLeft, Save, GitCompareArrows as GitCompare } from 'lucide-react';
+import { Brain, Zap, TrendingUp, RotateCcw, ChevronRight, ArrowLeft, Save, GitCompareArrows as GitCompare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

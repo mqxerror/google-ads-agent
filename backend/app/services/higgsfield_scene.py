@@ -19,9 +19,10 @@ stitch. This module owns the two pieces premium_reel delegates to:
    longer than the fixed-length clip" case — generative models can't
    stretch to audio the way HTML scenes can.
 
-Scenes per render are capped at MAX_HIGGSFIELD_SCENES (2) — enforced
+Scenes per render are capped at MAX_HIGGSFIELD_SCENES (8) — enforced
 here AND in pmax_video's `_clean_scenes` (defense in depth; the
-renderer cap also covers hand-edited storyboards).
+renderer cap also covers hand-edited storyboards). 60s worst case =
+8× 8s Veo clips.
 
 DECOUPLING: studio service layer — no google_ads imports.
 """
@@ -39,7 +40,8 @@ logger = logging.getLogger(__name__)
 
 # Hard cap on generative scenes per render — the credit-burn guard from
 # the video-engine plan. Anything beyond this is skipped with a warning.
-MAX_HIGGSFIELD_SCENES = 2
+# 60s worst case = 8× 8s Veo clips.
+MAX_HIGGSFIELD_SCENES = 8
 
 DEFAULT_SCENE_MODEL = "veo3_1_lite"   # 8 credits / 5s — cheapest verified
 

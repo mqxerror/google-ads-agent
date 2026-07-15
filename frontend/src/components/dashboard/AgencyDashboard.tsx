@@ -102,9 +102,10 @@ function SpendSparkline() {
             <XAxis dataKey="date" tick={{ fontSize: 9 }} className="text-muted-foreground" />
             <Tooltip
               contentStyle={{ fontSize: '11px', borderRadius: '8px' }}
-              formatter={(value: number, name: string) => {
-                if (name === 'cost') return [`$${value.toFixed(2)}`, 'Cost'];
-                if (name === 'conversions') return [value.toFixed(1), 'Conv'];
+              formatter={(value, name) => {
+                const num = Number(value);
+                if (name === 'cost') return [`$${num.toFixed(2)}`, 'Cost'];
+                if (name === 'conversions') return [num.toFixed(1), 'Conv'];
                 return [value, name];
               }}
             />
@@ -117,7 +118,7 @@ function SpendSparkline() {
 }
 
 export default function AgencyDashboard() {
-  const { switchAccount, connectedAccounts } = useAppStore();
+  const { switchAccount } = useAppStore();
 
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['dashboard'],

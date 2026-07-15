@@ -52,7 +52,7 @@ _render_jobs: Dict[str, Dict[str, Any]] = {}
 _COMPOSITIONS = ["letterbox", "split", "lowerthird", "fullbleed"]
 _MOTIONS = ["kenburns-zoom-in", "pan-right", "kenburns-zoom-out", "parallax-tilt", "pan-left", "dolly-in"]
 _TREATMENTS = ["blur-stagger", "slide-up", "mask-reveal", "scale-bounce", "typewriter"]
-_VALID_TYPES = {"logo", "hero", "broll", "stat", "cta", "higgsfield"}
+_VALID_TYPES = {"logo", "hero", "broll", "stat", "cta", "higgsfield", "soul"}
 _MAX_SCENES = 8
 
 _LOGO_RX = re.compile(r"(^|[^a-z])logo([^a-z]|$)", re.IGNORECASE)
@@ -73,6 +73,10 @@ class PMaxVideoDraftRequest(BaseModel):
     allow_higgsfield: bool = False
     video_model: str = "veo3_1_lite"                     # cheapest verified clip model
     max_higgsfield_scenes: int = Field(default=2, ge=0, le=2)
+    # Epic 11 P2 engine prefs — a trained Soul (our soul_characters row
+    # id) unlocks ONE opening `type:"soul"` presenter scene. Default OFF
+    # (None); the scene is stripped unless the row is ready.
+    soul_character_id: Optional[str] = None
 
 
 async def _resolve_images(image_ids: List[str]) -> tuple[list[dict], dict[str, str]]:
@@ -125,7 +129,9 @@ async def _resolve_images(image_ids: List[str]) -> tuple[list[dict], dict[str, s
     return library, lookup
 
 
-def _draft_prompt(body: PMaxVideoDraftRequest, library: list[dict]) -> str:
+def _draft_prompt(
+    body: PMaxVideoDraftRequest, library: list[dict], *, allow_soul: bool = False,
+) -> str:
     img_lines = []
     for img in library:
         dims = f"{img.get('width','?')}×{img.get('height','?')}"
@@ -150,6 +156,17 @@ def _draft_prompt(body: PMaxVideoDraftRequest, library: list[dict]) -> str:
                 "credits. Keep prompts to a single continuous shot."
             )
             if body.allow_higgsfield and body.max_higgsfield_scenes > 0 else ""
+        )
+        + (
+            (
+                "\n\nTALKING INTRO (optional): the operator provided a trained Soul presenter. "
+                'You MAY open the video with ONE {"type": "soul", "script": "<8-20 spoken words '
+                'welcoming the viewer>", "look_prompt": "<presenter setting, e.g. bright modern '
+                "office>\", \"speak\": \"<same as script>\"} scene BEFORE the logo/hero scene. "
+                "The presenter appears on camera with motion and voiceover (no lip-sync), so keep "
+                "the script short and standalone."
+            )
+            if allow_soul else ""
         )
         + "\n\nSTRUCTURE — 6 to 8 scenes total:\n"
         "1. Open with a `logo` scene IF an image is tagged [LOGO] (set logo_filename to its storage id, "
@@ -190,6 +207,7 @@ def _clean_scenes(
     allow_higgsfield: bool = False,
     video_model: str = "veo3_1_lite",
     max_higgsfield: int = 2,
+    soul_id: Optional[str] = None,
 ) -> list[dict]:
     """Validate + normalise the model's storyboard into scenes that
     generate_storyboard_reel accepts. Round-robins unassigned/unknown broll
@@ -199,7 +217,12 @@ def _clean_scenes(
     capped at `max_higgsfield` (credit-burn guard), model FORCED to the
     operator's pick (never trust the LLM with a spend decision), and
     duration snapped to the model's legal values (Veo enum 4/6/8 vs
-    Kling int) via the server-side catalog."""
+    Kling int) via the server-side catalog.
+
+    Soul scenes (Epic 11 P2): kept only when the caller resolved a READY
+    higgsfield `soul_id` (never trust the LLM with an id), capped at ONE,
+    forced to open the video. Non-lipsync presenter — see
+    services/video_engine.py §1a."""
     from app.services.higgsfield_scene import MAX_HIGGSFIELD_SCENES
     from app.services.model_catalog import clamp_duration
 
@@ -209,6 +232,7 @@ def _clean_scenes(
     logo_fns = [img["filename"] for img in library if img["is_logo"]]
     rr = 0  # round-robin pointer for image recovery
     n_hf = 0
+    soul_scene: Optional[dict] = None
 
     cleaned: list[dict] = []
     used_images: set[str] = set()
@@ -219,6 +243,21 @@ def _clean_scenes(
         if t not in _VALID_TYPES:
             continue
         speak = (s.get("speak") or s.get("_speak_text") or "").strip()
+        if t == "soul":
+            script = (s.get("script") or speak or "").strip()
+            if not soul_id or soul_scene is not None or not script:
+                # No ready character / already have one / nothing to say —
+                # drop the beat (no image fallback: it only exists because
+                # a presenter was offered).
+                continue
+            soul_scene = {
+                "type": "soul",
+                "soul_id": soul_id,              # server-resolved, always
+                "script": script[:400],
+                "look_prompt": (s.get("look_prompt") or "").strip()[:500],
+                "_speak_text": script[:400],
+            }
+            continue
         if t == "higgsfield":
             prompt = (s.get("prompt") or "").strip()
             if not allow_higgsfield or not prompt or n_hf >= max_hf:
@@ -330,6 +369,9 @@ def _clean_scenes(
         **({"logo_filename": logo_fns[0]} if logo_fns else {}),
     }
     cleaned.append(cta)
+    # At most one soul presenter, always the opening scene (plan §4).
+    if soul_scene is not None:
+        cleaned.insert(0, soul_scene)
     return cleaned
 
 
@@ -343,16 +385,32 @@ async def _run_draft_job(job_id: str, body: PMaxVideoDraftRequest) -> None:
             }
             return
 
+        # Epic 11 P2 — resolve the operator's Soul BEFORE prompting so the
+        # script agent only ever sees the intro option when a character is
+        # actually ready (plan §4: strip soul scenes when none is).
+        soul_hf_id: Optional[str] = None
+        if body.soul_character_id:
+            from app.services.video_engine import _fetch_soul_row
+
+            row = await _fetch_soul_row(body.soul_character_id)
+            if row and row.get("status") == "ready" and (row.get("soul_id") or "").strip():
+                soul_hf_id = str(row["soul_id"]).strip()
+            else:
+                logger.info(
+                    "pmax video draft: soul %s not ready (%s) — intro disabled",
+                    body.soul_character_id, (row or {}).get("status") or "not found",
+                )
+
         from app.services.agent import stream_agent_response
 
         parts: list[str] = []
         async for ev in stream_agent_response(
-            user_message=_draft_prompt(body, library),
+            user_message=_draft_prompt(body, library, allow_soul=soul_hf_id is not None),
             account_id=body.account_id,
             active_role="script_generator",
             tool_allowlist=[],  # no Google Ads tools; built-in web fetch still grounds the landing page
         ):
-            if ev.get("type") == "text":
+            if ev.get("type") in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
                 parts.append(ev.get("content", ""))
         raw = "".join(parts)
 
@@ -375,6 +433,7 @@ async def _run_draft_job(job_id: str, body: PMaxVideoDraftRequest) -> None:
             allow_higgsfield=body.allow_higgsfield,
             video_model=body.video_model,
             max_higgsfield=body.max_higgsfield_scenes,
+            soul_id=soul_hf_id,
         )
         if len(scenes) < 3:
             _draft_jobs[job_id] = {"status": "error", "message": f"Draft produced only {len(scenes)} usable scenes — try again."}
@@ -430,19 +489,42 @@ async def _run_render_job(job_id: str, body: PMaxVideoRenderRequest) -> None:
 
     try:
         music_path = await _resolve_music_path(body.music_filename)
-        req = StoryboardReelRequest(
-            scenes=body.scenes,
-            voice_id=body.voice_id,
-            music_path=music_path,
-            quality=body.quality,
-            parallel_workers=2,
-            sync_audio_to_scenes=body.sync_audio_to_scenes,
-            # Epic 11 P1 — lets `type:"higgsfield"` scenes tag their
-            # cached clip rows (prompt-hash reuse + library visibility).
-            account_id=body.account_id,
-            campaign_id=body.campaign_id,
+        # Epic 11 P2 — a `type:"soul"` scene routes the render through
+        # the video-engine dispatcher (soul resolution + segment caps).
+        # Default OFF: storyboards without soul scenes take the exact
+        # P1 path below, untouched.
+        has_soul = any(
+            (s.get("type") or "").strip().lower() == "soul"
+            for s in body.scenes if isinstance(s, dict)
         )
-        async for event in generate_storyboard_reel(req):
+        if has_soul:
+            from app.services.video_engine import VideoEngineRequest, generate_engine_video
+
+            engine_req = VideoEngineRequest(
+                account_id=body.account_id,
+                segments=[{"engine": "storyboard", "scenes": body.scenes}],
+                voice_id=body.voice_id,
+                music_path=music_path,
+                quality=body.quality,
+                campaign_id=body.campaign_id,
+                sync_audio_to_scenes=body.sync_audio_to_scenes,
+            )
+            event_gen = generate_engine_video(engine_req)
+        else:
+            req = StoryboardReelRequest(
+                scenes=body.scenes,
+                voice_id=body.voice_id,
+                music_path=music_path,
+                quality=body.quality,
+                parallel_workers=2,
+                sync_audio_to_scenes=body.sync_audio_to_scenes,
+                # Epic 11 P1 — lets `type:"higgsfield"` scenes tag their
+                # cached clip rows (prompt-hash reuse + library visibility).
+                account_id=body.account_id,
+                campaign_id=body.campaign_id,
+            )
+            event_gen = generate_storyboard_reel(req)
+        async for event in event_gen:
             et = event.get("type")
             if et == "status":
                 _render_jobs[job_id] = {
@@ -559,7 +641,7 @@ async def _run_metadata_job(job_id: str, body: PMaxVideoMetadataRequest) -> None
             active_role="creative_director",
             tool_allowlist=[],  # no Google Ads tools; built-in web fetch still grounds the landing page
         ):
-            if ev.get("type") == "text":
+            if ev.get("type") in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
                 parts.append(ev.get("content", ""))
         raw = "".join(parts)
 

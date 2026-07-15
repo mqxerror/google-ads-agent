@@ -36,7 +36,13 @@ import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
 } from '@/components/studio/StudioPanel';
-import type { StudioJobStatus } from '@/lib/api';
+import {
+  studioListSouls,
+  videoEngineEstimate,
+  type SoulCharacter,
+  type StudioJobStatus,
+  type VideoEngineEstimate,
+} from '@/lib/api';
 
 // Map a wizard slot to the higgsfield aspect that fits best.
 // Google's "landscape" PMax image is 1.91:1 — higgsfield's closest
@@ -51,8 +57,6 @@ const STEPS = [
   { id: 'signals',  label: 'Audience signals'  },
   { id: 'review',   label: 'Review & submit'   },
 ] as const;
-
-type StepId = typeof STEPS[number]['id'];
 
 // Google's PMax hard minimums — server validates these too; this is the
 // client-side mirror so Next/Submit can stay disabled until satisfied.
@@ -631,7 +635,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
 // ── Step 4: Videos — agent-made slideshow ad + YouTube upload ───────
 
 interface StoryScene {
-  type: 'logo' | 'hero' | 'broll' | 'stat' | 'cta' | 'higgsfield';
+  type: 'logo' | 'hero' | 'broll' | 'stat' | 'cta' | 'higgsfield' | 'soul';
   headline?: string;
   caption?: string;
   scene_label?: string;
@@ -651,6 +655,11 @@ interface StoryScene {
   prompt?: string;
   model?: string;
   duration?: number;
+  // soul scenes (Epic 11 P2): opening Soul-presenter clip — motion +
+  // voiceover, no lip-sync. soul_id is server-resolved, never edited.
+  soul_id?: string;
+  script?: string;
+  look_prompt?: string;
 }
 
 interface VideoPanelState {
@@ -705,9 +714,41 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   // Epic 11 P1 — opt-in for AI-generated clips inside the slideshow.
   // Off by default: pure hyperframes is free; each clip costs credits.
   const [allowHiggsfield, setAllowHiggsfield] = useState(false);
+  // Epic 11 P2 — optional Soul-presenter talking intro (default OFF).
+  // Presenter-style: motion + voiceover, no lip-sync. The draft only
+  // offers the scene when the picked character is ready server-side.
+  const [soulCharacterId, setSoulCharacterId] = useState('');
+  const [souls, setSouls] = useState<SoulCharacter[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    studioListSouls(accountId)
+      .then(s => { if (!cancelled) setSouls(s.filter(x => x.status === 'ready' && x.soul_id)); })
+      .catch(() => { if (!cancelled) setSouls([]); });
+    return () => { cancelled = true; };
+  }, [accountId]);
   const [rendering, setRendering] = useState(false);
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  // Cost guardrail: summed credit estimate for AI scenes (higgsfield +
+  // soul), fetched before the operator clicks Render. Cached clips
+  // show as free re-renders.
+  const [aiEstimate, setAiEstimate] = useState<VideoEngineEstimate | null>(null);
+  const aiSceneCount = useMemo(
+    () => (panel.scenes || []).filter(s => s.type === 'higgsfield' || s.type === 'soul').length,
+    [panel.scenes],
+  );
+  const scenesKey = useMemo(() => JSON.stringify(panel.scenes), [panel.scenes]);
+  useEffect(() => {
+    if (!panel.scenes?.length || aiSceneCount === 0) { setAiEstimate(null); return; }
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      videoEngineEstimate({ scenes: panel.scenes as object[], aspect: '16:9' })
+        .then(r => { if (!cancelled) setAiEstimate(r); })
+        .catch(() => { if (!cancelled) setAiEstimate(null); });
+    }, 600);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenesKey, aiSceneCount]);
 
   // YouTube connect + upload
   const [ytConnected, setYtConnected] = useState<boolean | null>(null);
@@ -798,6 +839,9 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
           allow_higgsfield: allowHiggsfield,
           video_model: 'veo3_1_lite',
           max_higgsfield_scenes: 2,
+          // Epic 11 P2 — Soul talking intro (server verifies readiness
+          // and resolves the higgsfield soul_id itself).
+          soul_character_id: soulCharacterId || undefined,
         }),
       });
       const data = await res.json();
@@ -1122,6 +1166,23 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
                 />
                 Allow up to 2 AI clips (costs credits)
               </label>
+              <label
+                className="flex items-center gap-1.5 select-none text-[10px] text-muted-foreground"
+                title={souls.length
+                  ? 'Opens the video with a short presenter clip of your trained Soul — motion + voiceover, no lip-sync. Costs credits; cached on re-render.'
+                  : 'Train a Soul character in Studio → Souls first (5-15 min), then it appears here.'}
+              >
+                Talking intro
+                <select
+                  value={soulCharacterId}
+                  onChange={e => setSoulCharacterId(e.target.value)}
+                  disabled={drafting || rendering || !souls.length}
+                  className="h-6 rounded border border-border bg-background px-1.5 text-[10px] disabled:opacity-50"
+                >
+                  <option value="">Off</option>
+                  {souls.map(s => <option key={s.id} value={s.id}>{s.name} (Soul)</option>)}
+                </select>
+              </label>
             </div>
             {draftError && (
               <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
@@ -1148,6 +1209,15 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
                 {rendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
                 {rendering ? 'Rendering…' : panel.renderedAsset ? 'Re-render video' : 'Render video'}
               </Button>
+              {aiSceneCount > 0 && (
+                <p className="mt-1.5 text-[10px] text-warning">
+                  {aiEstimate
+                    ? <>AI scenes ≈ {aiEstimate.total_credits}{aiEstimate.unknown_count > 0 ? '+' : ''} credits
+                        {aiEstimate.cached_hits > 0 ? ` · ${aiEstimate.cached_hits} cached (free)` : ''}
+                        {aiEstimate.unknown_count > 0 ? ' · some stages could not be priced' : ''}</>
+                    : `${aiSceneCount} AI scene${aiSceneCount > 1 ? 's' : ''} will cost credits at render — estimate unavailable right now`}
+                </p>
+              )}
               {rendering && renderMsg && (
                 <p className="mt-1.5 text-[11px] text-muted-foreground">{renderMsg}</p>
               )}
@@ -1435,7 +1505,7 @@ function SceneRow({ index, scene, imageLookup, onChange }: {
         <img src={thumb} alt="" className="h-14 w-14 rounded object-cover shrink-0 border border-border" loading="lazy" />
       ) : (
         <div className="h-14 w-14 rounded bg-secondary/50 shrink-0 flex items-center justify-center text-[9px] uppercase text-muted-foreground border border-border">
-          {scene.type === 'higgsfield' ? 'AI clip' : scene.type}
+          {scene.type === 'higgsfield' ? 'AI clip' : scene.type === 'soul' ? 'Soul' : scene.type}
         </div>
       )}
       <div className="flex-1 min-w-0 space-y-1">
@@ -1465,6 +1535,19 @@ function SceneRow({ index, scene, imageLookup, onChange }: {
             <Input value={scene.brand_name || ''} onChange={e => onChange({ brand_name: e.target.value })} placeholder="Brand name" className="h-7 text-xs flex-1" />
             <Input value={scene.tagline || ''} onChange={e => onChange({ tagline: e.target.value })} placeholder="Tagline" className="h-7 text-xs flex-1" />
           </div>
+        )}
+        {scene.type === 'soul' && (
+          <>
+            <Input
+              value={scene.look_prompt || ''}
+              onChange={e => onChange({ look_prompt: e.target.value })}
+              placeholder="Presenter look & setting (optional — e.g. navy suit, bright modern office)"
+              className="h-7 text-xs"
+            />
+            <p className="text-[9px] text-warning">
+              Soul presenter clip — speaks the line below (motion + voiceover, no lip-sync) · costs credits at render (cached on re-render)
+            </p>
+          </>
         )}
         {scene.type === 'higgsfield' && (
           <>

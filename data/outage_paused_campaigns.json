@@ -1,0 +1,34 @@
+{
+  "paused_at": "2026-07-13",
+  "reason": "server outage \u2014 mercan.com down",
+  "account": "7178239091",
+  "restore_ids": [
+    "23758877756",
+    "23847913167",
+    "23871240619",
+    "24002195025",
+    "24002377362"
+  ],
+  "campaigns": [
+    {
+      "id": "23758877756",
+      "name": "Greece Golden Visa - Turkey"
+    },
+    {
+      "id": "23847913167",
+      "name": "MapleRoots \u2014 Citizenship by Descent (US)"
+    },
+    {
+      "id": "23871240619",
+      "name": "Panama QIP \u2014 Qualified Investor Program"
+    },
+    {
+      "id": "24002195025",
+      "name": "Panama QIP \u2014 Oman + Jordan \u2014 Search \u2014 EN"
+    },
+    {
+      "id": "24002377362",
+      "name": "Greece Golden Visa \u2014 Oman + Jordan \u2014 Search \u2014 EN"
+    }
+  ]
+}

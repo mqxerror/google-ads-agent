@@ -11,7 +11,7 @@ projectType: 'web_app'
 **Author:** Wassim
 **Date:** 2026-04-03
 **Version:** 2.0
-**Status:** Draft
+**Status:** Living — §1–§10 are the April 2026 V2 design (kept as written); §11 is the as-built delta ledger, last reconciled 2026-07-14
 **Previous Version:** docs/architecture.md (V1)
 
 ---
@@ -28,6 +28,7 @@ projectType: 'web_app'
 8. [Frontend Architecture](#8-frontend-architecture)
 9. [AI Agent Architecture](#9-ai-agent-architecture)
 10. [Cross-Cutting Concerns](#10-cross-cutting-concerns)
+11. [Shipped Delta Ledger (V2.1+, reconciled 2026-07-14)](#11-shipped-delta-ledger-v21-reconciled-2026-07-14)
 
 ---
 
@@ -65,7 +66,7 @@ projectType: 'web_app'
 | Constraint | Detail |
 |------------|--------|
 | **No Anthropic API** | Agent runs through Claude Code CLI only. Users pay via CLI subscription, NOT API keys. No `anthropic` SDK import for chat. |
-| **No cloud backend** | 100% local. No SaaS, no hosted service, no remote database. |
+| **No cloud backend** | 100% local. No SaaS, no hosted service, no remote database. *(Superseded 2026-06-10 for the hosted-MCP track only — see PRD §8 Phase 1.5 note: the app stays local-first, but the MCP bridge becomes hostable, token-secured.)* |
 | **No Docker requirement** | Direct install via `bash install.sh`. No containers. |
 | **CLI-first AI** | The Claude Code CLI subprocess model stays. Future Gemini CLI support follows the same pattern (CLI binary, not API). |
 
@@ -1562,4 +1563,76 @@ jobs:
 
 ---
 
-*Next step: Epic breakdown with implementation stories for Phase 1.*
+## 11. Shipped Delta Ledger (V2.1+, reconciled 2026-07-14)
+
+§1–§10 above are the April 2026 V2 design and are kept as written. This
+section is the as-built record of what landed on top of it (feature-log rows
+2026-06-02 → 2026-07-14, Tier-2 reconcile). Sources of truth for the specs:
+`research/chat-orchestration-v2-plan.md`, `research/dashboard-freshness-clarity-plan.md`,
+`research/studio-redesign-plan.md`, `research/video-engine-plan.md`,
+`research/agent-quality-hardening-plan.md`, PRD §8 Phases 1.5–1.7.
+
+### 11.1 Migration ledger (schema now at V24)
+
+The §5 schema shows the V2 baseline; migrations V3–V17 landed between April
+and early July (notably: `campaigns` roster V11, `asset_groups` V12,
+`workflow_reports` V15, `scheduled_plans` V17). The June–July delta
+(verified against `backend/app/database.py`, `SCHEMA_VERSION = 24`):
+
+| Version | Date | What |
+|---------|------|------|
+| V18 | 2026-06-11 | `ad_assets.prompt_hash` — Higgsfield clip cache key (zero-credit re-renders) |
+| V19 | 2026-07-04 | `account_reports` — latest-wins UPSERT per account (Story 13.2 persistence; homepage reads local, never runs an audit on load) |
+| V20 | 2026-07-04 | `finding_actions` — PK (account_id, finding_key); approve/deny decision state incl. deny tombstones that survive re-audits (Story 13.3) |
+| V21 | 2026-07-12 | `sync_state` — per (account_id, domain) freshness ledger; UI truth keyed on `data_through_date`, NEVER `synced_at` (Dashboard v2.1 A2) |
+| V22 | 2026-07-12 | `chat_turns` + `chat_turn_events` (append-only event log, `seq` = hub cursor) + `messages.turn_id` + `workflow_reports.origin` ('chat' vs 'workflow') — Chat Orchestration v2 turn runner |
+| V23 | 2026-07-13 | `studio_video_projects` (storyboard source of truth — survives refresh/tab-close by design) + `brand_avatars` (Studio Redesign backend core) |
+| V24 | 2026-07-14 | `studio_video_projects.brief_source` — Brief / From-campaign / From-landing-page draft sources |
+
+### 11.2 New/changed services (beyond the §6 graph)
+
+| Area | Service (backend/app/services/) | Role |
+|------|--------------------------------|------|
+| Chat v2 | `chat_runner.py` | Detached per-turn task + replay hub (`workflow_runner` pattern); turns survive client disconnects; cursor reconnect |
+| Chat v2 | `chat_orchestrator.py` | Orchestrated-mode state machine: TRIAGE → RECALL → VERIFY → PLAN ≤3 specialists → DISPATCH → RESOLVE → SYNTHESIZE (Director-only voice) → GATE → WRITEBACK; $5/6-min budget with DEGRADE-to-synthesize |
+| Chat v2 | `task_ledger.py` | Read-only recall over workflow_reports / scheduled_plan_runs / session_summaries / role_notes with the staleness matrix — recall-before-run |
+| Chat v2 | `provenance.py` + `claim_gate.py` | Machine-readable source manifest (LIVE_API / PAGE_FETCH / LOCAL_STORE / MEMORY) + deterministic post-pass on Director finals: unverified IDs rewritten in place, material numbers flagged (derived-math guard), page claims traced to a real fetch. **The persisted message is the gated text.** |
+| Chat v2 | `agent.py` (hardened) | `start_new_session` + process-group SIGTERM→SIGKILL stop; `_stop_requested` flag closes the continuation relaunch race; per-conversation proc registry holds SETS (stop reaches every parallel child); WS2–WS5 guardrails (live landing-page fetch, role-note staleness labels, ID integrity) |
+| Account audit | `workflow_runner.py` | Detached workflow execution + `_RunHub` replay; SSE endpoint is a viewer, not the driver; zombie sweep on boot + periodic |
+| Account audit | `account_report_store.py` · `fast_signals.py` · `finding_actions.py` | Report persistence (V19) · deterministic always-fresh signals (local rows only, no LLM, $-impact only where honest) · findings→approvable-actions mapping through the existing plans/scope-guard path (never a direct write) |
+| Freshness | `sync_engine.py` (rewritten) · `freshness.py` · `external_change.py` · `account_events.py` | ONE read-only GAQL `search_stream` per account per sync (was ~3,300 ops); freshness envelope math; roster-diff external-change detection; SSE hub for `/accounts/{id}/events` push invalidation |
+| Metrics | `metrics_store.py` (extended) | `GET /metrics/overview` period-over-period rollup (ENABLED-only, nulls-not-zeros honesty); as-of header for the agent |
+| Studio | `model_catalog.py` · `higgsfield_scene.py` · `video_engine.py` | Server-side model catalog with per-model param contracts (Veo enum vs Kling int) + `plan_scenes` finished-video planner · prompt-hash clip cache + mezzanine normalize · segment timeline {storyboard\|higgsfield\|soul} compiled onto the premium_reel pipeline |
+| Studio | `video_director.py` (+ `roles.py` entry, `prompt_drafter.py` staged drafting) | Model-aware Video Director turn: context → scoped campaign-Director consult (90s, DEGRADE-not-block) → decompose → 3 concepts → storyboard with server-side clamp/cap; cost/render OUTSIDE the LLM turn |
+| PMax | `youtube_uploader.py` (+ `routers/pmax_video.py`, `routers/youtube.py`) | Storyboard-reel video step; one-time OAuth (token chmod 600, gitignored); resumable unlisted upload + metadata/thumbnails |
+
+**Studio decoupling invariant (2026-06-11, standing):** studio services never
+import `google_ads` code — campaign context flows in through props/params
+only; Studio is a potential standalone product.
+
+### 11.3 Transport & API additions
+
+| Surface | Contract |
+|---------|----------|
+| Chat turn transport | `POST /conversations/{id}/message` → `{turn_id}` (legacy `?stream=1` = pre-v2 StreamingResponse passthrough); `GET /turns/{id}/stream?cursor=` SSE with replay; `GET /turns/{id}/events` history; per-turn and per-specialist stop endpoints. Orchestrated mode is per-conversation opt-in, default OFF — direct mode stays byte-identical |
+| Account push | `GET /api/accounts/{id}/events` SSE (`sync_completed`, `external_change`) → frontend TanStack-Query invalidation hook |
+| Homepage reads | `GET /api/accounts/{id}/account-report` (+freshness, +signals) · `/actions` + `/actions/{finding_key}/decide` · `/metrics/overview?days=` · `/outcomes` · `/external-changes` · campaign `/live-head` (60s TTL live control-plane read) |
+| Studio/video | `/api/studio/models` · `/api/studio/auth-status` · `/api/video-engine/{estimate,render}` · `/api/studio/video-projects` CRUD + `/draft` · brand-avatars CRUD · `/api/pmax/video/{draft,render,metadata,frames}` · `/api/youtube/*` |
+| MCP (stdio) | `google_ads/mcp_main.py` — 314 discovered tools after the 2026-07-05 hardening (keyword status flip, 4 ad-extension asset creators, fake-success stubs → honest errors); every mutate validated by the fail-closed dry-run harness (`dry_run.py` + `validate_all_tools.py`, `validate_only` forced at the SDK layer; 90 PASS / 0 FAIL / 147 SKIP) |
+| MCP (HTTP bridge) | `app/mcp_server.py` — bearer-auth; 10 tools incl. the Epic-9 plan tools (create/list/approve/skip/run_now; money categories arrive approval-gated) |
+
+### 11.4 Operational model (differs from the April assumptions)
+
+| Concern | As-built |
+|---------|----------|
+| Backend process | macOS **launchd LaunchAgent** (KeepAlive auto-restart) — manage via `launchctl`, not nohup. `.py` changes and `.env` changes require a manual restart (no hot reload) |
+| Frontend serving | `vite build` → the FastAPI backend serves the `dist/` bundle at `/`; a code fix isn't live until the bundle is rebuilt AND the browser hard-refreshes (a recurring gotcha — "serving-stale" verdicts are checked before debugging) |
+| Default model | Claude CLI subprocess, default `claude-fable-5[1m]` since 2026-06-10 (plain `claude-fable-5` fallback; opus/sonnet/haiku aliases kept); native CLI binary preferred over npm cli.js at every spawn site (2026-06-11) |
+| Design system | Shopify-calm light OKLCH token layer (`frontend/DESIGN.md`, 2026-06-02) — tokens only, never dark, no em-dashes in UI copy |
+| Write safety | All homepage/agent writes route through Scheduled Plans (`scheduler.infer_mode` gating: budget/bids/status/geo approval-gated) + `CampaignScopeMiddleware`; account-wide audit runs force `tools=[]` (analysis-only by construction) |
+| Test discipline | stdlib unittest, real temp SQLite via `init_db`, zero live LLM/Google calls; suite ~256 green as of 2026-07-14; frontend gates: `tsc --noEmit` 0 + `vite build` exit 0 |
+
+---
+
+*§1–§10 next step (historical): Epic breakdown with implementation stories for Phase 1.*
+*§11 maintenance: extend this ledger at each Tier-2 reconcile (`_bmad-output/feature-log.md` discipline).*

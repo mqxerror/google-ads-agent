@@ -56,19 +56,12 @@ class ConversionValueRuleService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            # Note: Value rule types not available in v20 - simplified implementation
-            await ctx.log(
-                level="info",
-                message=f"Conversion value rule creation requested for rule set {conversion_value_rule_set_id}",
+            raise NotImplementedError(
+                "create_basic_conversion_value_rule is not implemented: building a "
+                "ConversionValueRule requires geo/device/audience value-rule condition "
+                "types that are not wired up, so no mutate is sent. Create value rules "
+                "in the Google Ads UI. Listing/reading value rules IS supported."
             )
-
-            return {
-                "customer_id": customer_id,
-                "conversion_value_rule_set_id": conversion_value_rule_set_id,
-                "status": status,
-                "result": "Request processed - conversion value rule creation requires additional v20 type support",
-                "note": "This is a simplified implementation due to v20 API limitations",
-            }
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"
@@ -100,17 +93,12 @@ class ConversionValueRuleService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            await ctx.log(
-                level="info",
-                message=f"Conversion value rule update requested for {rule_resource_name}",
+            raise NotImplementedError(
+                "update_basic_conversion_value_rule is not implemented: the "
+                "ConversionValueRuleOperation + update field_mask are not built, so no "
+                "mutate is sent. Edit value rules in the Google Ads UI. "
+                "Listing/reading value rules IS supported."
             )
-
-            return {
-                "resource_name": rule_resource_name,
-                "status": status,
-                "result": "Request processed - conversion value rule updates require additional v20 type support",
-                "note": "This is a simplified implementation due to v20 API limitations",
-            }
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"

@@ -7,6 +7,11 @@ fires them:
 - **auto** mode (safe / read actions: search-term cleanup, audits, reports) —
   runs the agent with its normal (campaign-scoped) tools and streams the
   result straight into the originating chat thread. Done.
+  - Special case — the "Weekly account audit" ritual (Story 13.4): an `audit`
+    plan with NO campaign binding (account scope) fires the account-wide Team
+    Audit (Story 13.1, campaign_id=None) via the 13.2 runner in-process instead
+    of a per-campaign chat turn. Still AUTO / analysis-only (account mode forces
+    tools=[]); completion persists the latest account report (Story 13.2).
 - **approval** mode (spend / structural: budget, bids, status, geo) — runs
   ANALYSIS-ONLY first (no write tools, zero spend), captures the proposed
   change, and parks the plan in `awaiting_approval`. The user approves from
@@ -37,6 +42,35 @@ _task: asyncio.Task | None = None
 
 # Categories that move money or change campaign structure → gate behind approval.
 _APPROVAL_CATEGORIES = {"budget", "bids", "status", "geo"}
+
+# ── "Weekly account audit" ritual (Story 13.4) ────────────────────────────
+# An account-scoped `audit` plan (campaign_id=None) is NOT a normal per-campaign
+# chat turn: firing it launches the account-wide Team Audit (Story 13.1,
+# campaign_id=None) via the 13.2 runner IN-PROCESS. It runs in the AUTO lane and
+# is inherently analysis-only — account mode forces tools=[] in the orchestrator,
+# so there is nothing to approve (it only produces a report). Completion persists
+# the latest account report (Story 13.2, already wired in the orchestrator) and
+# the plan re-arms per the existing recurring logic. `infer_mode("audit")` already
+# classifies this AUTO, so it is never approval-gated.
+AUDIT_CATEGORY = "audit"
+# Weekly-ritual default: Monday 09:00 UTC. One active ritual per account (guarded
+# in routers/plans.py). Matches `compute_next_run`'s 'weekly:dow:HH:MM' form.
+WEEKLY_AUDIT_RECURRENCE = "weekly:mon:09:00"
+_ACCOUNT_AUDIT_GOAL = (
+    "Full weekly account audit: read all active campaigns, run each specialist "
+    "pass, then team-reconcile into ONE ranked account-level action plan with "
+    "$-impact per finding, resolving cross-campaign conflicts."
+)
+_ACCOUNT_AUDIT_TIMEFRAME = "weekly"
+
+
+def is_account_audit(plan: dict) -> bool:
+    """True when a plan is the account-wide audit ritual: `audit` category with
+    no campaign binding (account scope). Such a plan fires the account-wide
+    workflow via the runner, NOT a per-campaign chat turn."""
+    return (plan.get("action_category") == AUDIT_CATEGORY
+            and not plan.get("campaign_id")
+            and not plan.get("campaign_name"))
 # Which specialist runs each category.
 _CATEGORY_ROLE = {
     "search_terms": "search_term_hunter",
@@ -159,7 +193,58 @@ async def _post_message(conv_id: str, role: str, content: str, campaign_id: str 
         await db.close()
 
 
-async def _run_agent(plan: dict, *, instruction: str, analysis_only: bool, model: str = "sonnet") -> tuple[str, float]:
+async def _live_preread_suffix(plan: dict) -> str:
+    """Pre-flight LIVE control-plane read for an approval-gated plan (B4 / PART 2).
+
+    Before an agent PROPOSES a change (approval-mode analysis) or APPLIES an
+    approved one, we fetch the campaign's current live status / bidding / budget
+    straight from Google so the diff the agent quotes is against LIVE truth, not
+    the (possibly stale) roster cache — the plan's whole point (fixes the "app
+    shows Maximize Conversions when the account says Maximize Clicks" mystery).
+
+    READ-ONLY toward Google (one tiny GAQL SELECT, no mutation). Fully
+    defensive: any failure (no campaign binding, quota, circuit, API error)
+    returns a note that the live pre-read was unavailable — it NEVER blocks the
+    plan. Returns a string to append to the agent instruction.
+    """
+    campaign_id = plan.get("campaign_id")
+    if not campaign_id:
+        # Account-scoped plans have no single campaign control-plane to pre-read.
+        return ""
+    try:
+        # The scheduler reaches Google exactly the way metrics_store does:
+        # instantiate the service directly (its config/credentials are process
+        # globals). This is a READ; the write still flows through gated tools.
+        from app.services.google_ads import GoogleAdsService
+
+        head = await GoogleAdsService().get_campaign_live_head(
+            plan["account_id"], str(campaign_id)
+        )
+    except Exception as e:  # noqa: BLE001 — degrade honestly, never block
+        logger.warning("live pre-read unavailable for plan %s: %s", plan.get("id"), e)
+        head = None
+
+    if not head:
+        return (
+            "\n\n(Live pre-read unavailable — could not verify the campaign's "
+            "current control-plane state against Google just now. Inspect the "
+            "campaign state from your available context before proposing.)"
+        )
+
+    budget = head.get("budget_micros")
+    budget_str = (
+        f"${budget / 1_000_000:.2f}/day" if isinstance(budget, (int, float)) else "unknown"
+    )
+    return (
+        "\n\nCurrent LIVE state (verified against Google just now): "
+        f"status={head.get('status') or 'unknown'}, "
+        f"bidding={head.get('bidding_strategy') or 'unknown'}, "
+        f"budget={budget_str}. "
+        "Diff your proposed change against THESE live values, not cached data."
+    )
+
+
+async def _run_agent(plan: dict, *, instruction: str, analysis_only: bool, model: str = "opus") -> tuple[str, float]:
     """Run one agent turn for a plan, persisting it into the origin chat thread."""
     conv_id = await _ensure_conversation(plan)
     campaign_id = plan.get("campaign_id")
@@ -182,7 +267,7 @@ async def _run_agent(plan: dict, *, instruction: str, analysis_only: bool, model
         tool_allowlist=[] if analysis_only else None,
     ):
         t = ev.get("type")
-        if t == "text":
+        if t in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
             parts.append(ev.get("content", ""))
         elif t == "routing":
             role_name = ev.get("role_name")
@@ -192,6 +277,29 @@ async def _run_agent(plan: dict, *, instruction: str, analysis_only: bool, model
     if text:
         await _post_message(conv_id, "assistant", text, campaign_id, role, role_name)
     return text, cost
+
+
+async def _run_account_audit(plan: dict) -> tuple[str, float]:
+    """Fire the account-wide Team Audit (Story 13.1) via the 13.2 runner,
+    IN-PROCESS — no self-HTTP call. Launches `run_workflow(campaign_id=None)`
+    detached for the plan's account; the orchestrator persists the latest
+    account report on completion (Story 13.2, already wired). This scheduler
+    only kicks it off + records the run_id — it does not re-persist the report.
+    Analysis-only is guaranteed by account mode itself (the orchestrator forces
+    tools=[] when campaign_id is None)."""
+    # Imported lazily so tests can stub `scheduler.workflow_runner.start`
+    # without dragging the orchestrator import graph into every test module.
+    from app.services import workflow_runner
+    run_id = await workflow_runner.start(
+        goal=_ACCOUNT_AUDIT_GOAL,
+        account_id=plan["account_id"],
+        campaign_id=None,          # account-wide: plan across active campaigns
+        campaign_name=None,
+        budget=None,
+        timeframe=_ACCOUNT_AUDIT_TIMEFRAME,
+    )
+    msg = f"Weekly account audit launched (run {run_id}). Report persists on completion."
+    return msg, 0.0
 
 
 async def _fire(plan: dict) -> None:
@@ -209,14 +317,23 @@ async def _fire(plan: dict) -> None:
         await db.close()
 
     try:
-        if plan["mode"] == "approval":
+        if is_account_audit(plan):
+            # AUTO lane, account-wide. Kick off the workflow via the runner and
+            # re-arm; the run's own persistence stores the report asynchronously.
+            text, cost = await _run_account_audit(plan)
+            await _complete(plan, text, cost)
+            await _finish_run(run_id, "done", text, cost)
+        elif plan["mode"] == "approval":
             # Analysis-only: propose the change, do NOT execute. Park for sign-off.
+            # B4 pre-flight: read the LIVE control-plane state first so the diff we
+            # quote to the user is against account-truth, not the roster cache.
             instruction = (
                 f"A scheduled plan is due: \"{plan['action_detail']}\". DO NOT make any "
                 f"changes yet. Inspect the current campaign state and produce the exact "
                 f"proposed change as a one-line diff (e.g. 'daily budget $100 -> $150') "
                 f"plus a 2-3 sentence rationale. This will be shown to the user for approval."
             )
+            instruction += await _live_preread_suffix(plan)
             text, cost = await _run_agent(plan, instruction=instruction, analysis_only=True)
             await _set(pid, status="awaiting_approval", proposed_change=text,
                        last_run_at=_now().isoformat(sep=" ", timespec="seconds"),
@@ -281,10 +398,14 @@ async def approve_plan(plan_id: str) -> dict:
     finally:
         await db.close()
     try:
+        # B4 pre-flight: re-read the LIVE control-plane state right before applying
+        # so the write acts on account-truth (the campaign may have changed since
+        # the proposal was parked) — never on a stale roster snapshot.
         instruction = (
             f"The user APPROVED this scheduled change: \"{plan['action_detail']}\". "
             f"Apply it now on this campaign and confirm exactly what you changed."
         )
+        instruction += await _live_preread_suffix(plan)
         text, cost = await _run_agent(plan, instruction=instruction, analysis_only=False)
         await _complete(plan, text, cost)
         await _finish_run(run_id, "done", text, cost)

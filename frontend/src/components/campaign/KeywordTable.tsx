@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { fetchKeywords } from '@/lib/api';
 import { formatNumber, formatMicros } from '@/lib/formatters';
-import type { Keyword } from '@/types';
 
 type SortKey = 'text' | 'matchType' | 'adGroupName' | 'status' | 'qualityScore' | 'impressions' | 'clicks' | 'conversions' | 'cpa';
 

@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-06-07 20:26
+**Last updated:** 2026-07-14 15:47
 
 **Task:** Conversion-tracking + attribution audit for Greece Golden Visa - Turkey (23758877756). Context: GTM-WZKDXFH8 V12 fixed the trigger May 20 (regex greece-golden-visa|yunanistan-altin-vize), conversion l
 
@@ -90,3 +90,80 @@ So either:
 2. A previous response garbled something — in which case, paste the exact line that says "Plan B campaign" / "metros" and I'll trace where it came from.
 Which report are you looking at? If you can paste the sentence that mentions metros, I'll tell you exactly where it originated and whether it's even about this campaign.
 — *Analytics Analyst*
+
+### 2026-07-04 23:18 — Audit campaign "Greece Golden Visa - Turkey" (id 23758877756) — compare the most
+
+**Task:** Audit campaign "Greece Golden Visa - Turkey" (id 23758877756) — compare the most recent period vs the period before it.
+1. Performance vs the comparison window: spend, clicks, conversions, CPA. Flag a
+## Period-over-Period Audit — Greece GV Turkey (23758877756)
+**Analytics Analyst | 2026-07-04 | 14-day window split into two 7-day periods**
+### 1. Performance Comparison
+Splitting the 14-day window at the midpoint:
+|--------|--------------|-----------------|--------|
+**Anomalies:**
+- **Impression collapse (-28.5%) while clicks rose.** The CTR jump from 4.5% → 7.6% is not organic — it's a denominator effect. Fewer auctions entered, so the CTR ratio inflates mechanically. This could be QS-driven auction exclusion or competition retreating. It is not a sign of improved ad relevance. Watch this: if impressions don't recover in the next 7 days, it's a signal the campaign is losin
+- **Zero conversions in P2, 14 days since the last one (Jun 24).** The Jun 24 conversion is now outside the attribution window (10 days old), so this is a confirmed 0-conv streak. Not a lag issue.
+- **Jun 26–27: 25 and 19 impressions** (vs. 100–190 on surrounding days). Weekend compression pattern, consistent with the May 30–31 dip flagged in June. This is structural — expect it every week.
+- **Jun 30: 3 clicks / $13.02** — the anomaly runs the other direction on a Monday. Likely a budget exhaustion or serve-rate blip, not a structural signal.
+### 2. Budget Pacing & Waste
+Daily burn is steady at **~$37–48/day**, no hard budget cap visible (no two identical days).
+**Biggest waste line in the 7-day search terms:**
+|---------|-------|-----------|------|---------------|
+`şartları` alone is burning $62/week on pure informational "what are the requirements" queries. These have zero consultation intent by definition — someone looking up program requirements is researching, not ready to invest.
+**Structural waste — EN group still ENABLED:**
+`greece-golden-visa-en` (198513892027) shows 54 lifetime clicks, **$298.67, 0 conversions**. This group was recommended for pause on Jun 2 (held "pending double-check") and is still running 32 days later. At its lifetime average of ~$6.49/day, that's ~**$45/week** with zero conversion return. The language mismatch is unchanged: English ad → Turkish LP.
+### 3. Single Biggest Fix
+**Add `şartları` as a PHRASE-level campaign negative.**
+Estimated weekly $ impact: **~$62 saved** (based on the exact 7-day search term cost above — this is a hard number, not an estimate).
+This is the only fix with a defensible weekly dollar figure directly from the data. The EN group pause is the structural second (~$45/week) and was supposed to happen Jun 2 — at this point the combined ask is: **pause EN + add `şartları` PHRASE negative in one session** (these are different change types — targeting vs. group status — so they don't conflict under the one-change-per-day rule).
+The LP form fix (9→3 fields + dead-click bugs) remains the dominant conversion lever but the weekly dollar impact is **unquantified** — there is no conversion volume to base a projection on, and the CRM hasn't confirmed the Jun 24 conversion as a real lead.
+**Czech language targeting is still `English, Czech`** — flagged on Jun 2, still live on Jul 4, 32 days unresolved. This costs nothing to fix and suppresses QS across the entire campaign. It should be verified and corrected before any keyword changes.
+— *Analytics Analyst*
+
+### 2026-07-14 15:43 — Arbitrate the core question: is 'no leads' a MEASUREMENT failure or a REAL zero?
+
+**Task:** Arbitrate the core question: is 'no leads' a MEASUREMENT failure or a REAL zero? Facts already in context: 0 conversions across Jun 30–Jul 14 (176 clicks, ~$1,057 spend); last recorded conversion Jun 
+
+**Critical Details:** GTM-WZKDXFH8
+## Analytics Analyst — Measurement vs. Real Zero Arbitration
+**Probability-weighted verdict:**
+- **P ≈ 0.65 — Static-fetch blind spot.** Both URLs are Next.js/React apps. A static HTTP fetch returns the pre-hydration shell; GTM-WZKDXFH8 and the form both render client-side. "None detected" is the *expected* result of a static fetch on this stack. The Jun 2 browser-rendered live test (gf_submit → fxvWCM-vu6scELCTg4oD → 200 OK) remains the last verified ground truth. No chronicle entry docume
+- **P ≈ 0.25 — Real zero from traffic quality.** The şartları cluster alone burned ~$80 this 7-day window on informational "requirements/conditions" queries. These are researchers, not investors. Even with perfect tracking, this traffic converts near zero by definition.
+- **P ≈ 0.10 — Form or tag actually removed.** Possible but requires an undocumented break post-Jun 2.
+**Three decisive verifications (browser-only, no tools from my seat):**
+1. **JS-rendered check:** Chrome → mercan.com/tr/yunanistan-altin-vize → `list_network_requests()` — confirm GTM-WZKDXFH8 loads + form is present in DOM.
+2. **Test gf_submit:** Console → `dataLayer.push({event:'gf_submit'})` → verify ping to googleadservices.com with label `fxvWCM-vu6scELCTg4oD`.
+3. **GAQL PRIMARY check (open since Jun 2):** Pull `conversion_action.primary_for_goal` for this label — if FALSE, the bidding algo has no primary signal even when conversions record.
+**Implication per outcome:** If form/GTM intact → 0-conv streak is a real traffic-quality + demand problem; execute şartları negatives + Czech fix + EN pause immediately. If broken → all other analysis is noise; restore tracking before any bid/keyword decisions. If non-PRIMARY → Manual CPC isn't signal-deprived, but automated bidding would be.
+— *Analytics Analyst*
+
+### 2026-07-14 15:47 — Orchestrated finding
+
+{
+  "summary": "Most likely a static-fetch blind spot (P=0.65) masking intact-but-untested tracking, concurrent with genuine traffic-quality waste (~$80/week on \u015fartlar\u0131 informational queries) \u2014 JS-rendered browser check + test gf_submit + PRIMARY GAQL pull are the three decisive verifications before any structural conclusions.",
+  "findings": [
+    {
+      "claim": "The 'form signal: none detected' result is a static-fetch artifact, not evidence the form or GTM-WZKDXFH8 was removed \u2014 JS-rendered browser check is required to confirm",
+      "severity": "high",
+      "confidence": 0.65,
+      "sources": [
+        "Live fetch caveat: headless React app, form/GTM load post-JS",
+        "Jun 2 browser-verified end-to-end: gf_submit \u2192 fxvWCM-vu6scELCTg4oD \u2192 200 OK",
+        "No chronicle entry documenting a GTM break post-Jun 2"
+      ],
+      "disconfirmed_by": "Browser JS-render check shows no GTM-WZKDXFH8 network request OR no form element in DOM",
+      "id": "c2-f0"
+    },
+    {
+      "claim": "The 20-day conversion drought is at least partially a real traffic-quality problem \u2014 the \u015fartlar\u0131 informational cluster burned ~$80 this week on zero-intent queries with zero plausible conversion path",
+      "severity": "high",
+      "confidence": 0.85,
+      "sources": [
+        "Search terms: yunanistan golden visa \u015fartlar\u0131 $44.28, yunanistan golden vize \u015fartlar\u0131 $21.70, yunanistan golden visa \u015fartlar\u0131 2026 $12.50 \u2014 all NONE status, 0 conv",
+        "Informational intent: 'requirements/conditions' searchers are researching programs, not booking consultations"
+      ],
+      "disconfirmed_by": "A confirmed organic conversion ping from a non-\u015fartlar\u0131 search term in the same 20-day window",
+      "id": "c2-f1"
+    },
+    {
+      "claim": "Whether label fxvWCM-vu6scELCTg4oD is set PRIMARY at campaign goal level remains unverified \u2014 open since Jun 2; if non-PRIMARY, the bidding algori

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain, Film, ScrollText, BookOpen } from 'lucide-react';
+import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain, Film, ScrollText, BookOpen, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import { fetchAccountsV2, removeAccount } from '@/lib/api';
@@ -35,6 +35,8 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
     setShowChangelog,
     showGuidelines,
     setShowGuidelines,
+    showConversations,
+    setShowConversations,
     darkMode,
     toggleDarkMode,
   } = useAppStore();
@@ -138,6 +140,19 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
 
       {/* Right */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'text-xs gap-1',
+            showConversations ? 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent' : 'text-muted-foreground'
+          )}
+          onClick={() => setShowConversations(!showConversations)}
+          title="Conversations — the full conversation map"
+        >
+          <GitBranch className="h-3 w-3" />
+          Conversations
+        </Button>
         <Button
           variant="ghost"
           size="sm"

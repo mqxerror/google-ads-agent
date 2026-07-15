@@ -924,7 +924,7 @@ def _find_claude_cli() -> list[str] | None:
     return _CLI_PATH_CACHE
 
 
-async def _call_claude_json(prompt: str, model: str = "claude-sonnet-4-6", timeout_s: int = 120) -> str | None:
+async def _call_claude_json(prompt: str, model: str = "claude-opus-4-8", timeout_s: int = 120) -> str | None:
     """Call Claude CLI in one-shot mode, return concatenated text output. Async-safe."""
     cli_cmd = _find_claude_cli()
     if not cli_cmd:

@@ -277,6 +277,103 @@ class GoogleAdsService:
             })
         return result
 
+    async def get_campaign_daily_metrics(
+        self,
+        customer_id: str,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict]:
+        """Per-campaign × per-day metrics for the whole account in ONE stream.
+
+        Unlike get_account_daily_metrics this does NOT aggregate away
+        campaign.id — it returns one dict per (campaign, date) so the sync
+        engine can upsert campaign_daily_metrics directly. READ-ONLY GAQL
+        SELECT; a single search_stream call covers every campaign (RC-7: new
+        campaigns are picked up automatically). Returns raw micros — the
+        writer computes ctr / avg_cpc_micros.
+        """
+        d_from, d_to = _default_dates(date_from, date_to)
+        query = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              campaign.status,
+              campaign.bidding_strategy_type,
+              campaign_budget.amount_micros,
+              segments.date,
+              metrics.impressions,
+              metrics.clicks,
+              metrics.cost_micros,
+              metrics.conversions
+            FROM campaign
+            WHERE segments.date BETWEEN '{d_from}' AND '{d_to}'
+              AND campaign.status != 'REMOVED'
+            ORDER BY segments.date
+        """
+        rows = await asyncio.to_thread(
+            _run_query, _clean_id(customer_id), query
+        )
+        out: list[dict] = []
+        for r in rows:
+            out.append({
+                "campaign_id": str(r.campaign.id),
+                "campaign_name": r.campaign.name,
+                "campaign_status": r.campaign.status.name,
+                "bidding_strategy": r.campaign.bidding_strategy_type.name,
+                "budget_micros": r.campaign_budget.amount_micros,
+                "date": str(r.segments.date),
+                "impressions": r.metrics.impressions,
+                "clicks": r.metrics.clicks,
+                "cost_micros": r.metrics.cost_micros,
+                "conversions": r.metrics.conversions,
+            })
+        return out
+
+    # ── live-truth campaign header (control plane) ───────────────
+
+    async def get_campaign_live_head(
+        self, customer_id: str, campaign_id: str
+    ) -> dict | None:
+        """ONE tiny live GAQL read of a single campaign's control-plane state.
+
+        Dashboard v2.1 B4 (LIVE-TRUTH RULE, PART 2). No metrics, no
+        segments.date — just the fields the campaign header must reflect
+        NOW: status, bidding strategy, daily budget, channel type, name.
+        READ-ONLY (SELECT); this method NEVER mutates the account.
+
+        Returns a dict::
+
+            {"status", "bidding_strategy", "budget_micros",
+             "campaign_type", "name"}
+
+        or ``None`` if the campaign id matched no row.
+        """
+        query = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              campaign.status,
+              campaign.bidding_strategy_type,
+              campaign.advertising_channel_type,
+              campaign_budget.amount_micros
+            FROM campaign
+            WHERE campaign.id = {campaign_id}
+            LIMIT 1
+        """
+        rows = await asyncio.to_thread(
+            _run_query, _clean_id(customer_id), query
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        return {
+            "status": r.campaign.status.name,
+            "bidding_strategy": r.campaign.bidding_strategy_type.name,
+            "budget_micros": r.campaign_budget.amount_micros,
+            "campaign_type": r.campaign.advertising_channel_type.name,
+            "name": r.campaign.name,
+        }
+
     # ── ad groups ────────────────────────────────────────────────
 
     async def get_adgroups(

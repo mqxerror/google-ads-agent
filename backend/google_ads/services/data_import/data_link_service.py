@@ -56,20 +56,12 @@ class DataLinkService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            # Note: Complex data link types not available in v20 - simplified implementation
-            await ctx.log(
-                level="info",
-                message=f"Data link creation requested: {data_link_name} ({data_link_type}) for {external_id}",
+            raise NotImplementedError(
+                "create_basic_data_link is not implemented: constructing a DataLink "
+                "requires the per-type payload (e.g. YouTube/advertiser link details) "
+                "which is not built, so no CreateDataLinkRequest is sent. Set up data "
+                "links in the Google Ads UI."
             )
-
-            return {
-                "customer_id": customer_id,
-                "data_link_name": data_link_name,
-                "type": data_link_type,
-                "external_id": external_id,
-                "status": "Request processed - full data link creation requires additional v20 type support",
-                "note": "This is a simplified implementation due to v20 API limitations",
-            }
 
         except GoogleAdsException as e:
             error_msg = f"Google Ads API error: {e.failure}"
@@ -97,19 +89,12 @@ class DataLinkService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            # Note: Complex data link queries not fully supported in v20
-            await ctx.log(
-                level="info",
-                message=f"Data link list requested for customer {customer_id}",
+            raise NotImplementedError(
+                "list_data_links is not implemented: the data_link GAQL query is not "
+                "built, so no data is fetched (the previous version returned a fake "
+                "placeholder row). Query data links via execute_gaql_query against the "
+                "data_link resource, or view them in the Google Ads UI."
             )
-
-            return [
-                {
-                    "customer_id": customer_id,
-                    "status": "Request processed - data link listing requires additional v20 type support",
-                    "note": "This is a simplified implementation due to v20 API limitations",
-                }
-            ]
 
         except Exception as e:
             error_msg = f"Failed to list data links: {str(e)}"

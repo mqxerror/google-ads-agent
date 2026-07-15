@@ -1,10 +1,8 @@
 import { useRef, useState, useCallback, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
-import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Image as ImageIcon, Loader2, Film } from 'lucide-react';
+import { SendHorizonal, Zap, Brain, Sparkles, LayoutTemplate, X, Square, Users, ChevronDown, Paperclip, FileText, Loader2, Film } from 'lucide-react';
 import VideoCreator from './VideoCreator';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/stores/appStore';
 import templates, { TEMPLATE_CATEGORIES, type ChatTemplate } from '@/lib/chatTemplates';
-import type { Campaign } from '@/types';
 
 export interface Attachment {
   filename: string;
@@ -44,7 +42,7 @@ interface ConversationRef {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, model: ModelId, roleId?: string, attachments?: Attachment[]) => void;
+  onSend: (text: string, model: ModelId, roleId?: string, attachments?: Attachment[], orchestrate?: boolean) => void;
   disabled: boolean;
   campaignName?: string | null;
   onStop?: () => void;
@@ -62,6 +60,34 @@ export default function ChatInput({ onSend, disabled, campaignName, onStop, conv
   const [showTeam, setShowTeam] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [teamRoles, setTeamRoles] = useState<Set<string>>(new Set());
+  // "Ask the team" — v2 orchestration toggle. DEFAULT OFF: the send stays the
+  // byte-identical direct path until the user explicitly opts in. When ON, the
+  // POST body carries `orchestrate:true` (force-orchestrate). Persisted
+  // PER-CONVERSATION in localStorage (same convention as selectedCampaignId in
+  // appStore) so the choice survives a refresh but stays scoped to the thread.
+  const orchestrateKey = conversationId ? `orchestrate:${conversationId}` : null;
+  const [orchestrate, setOrchestrateRaw] = useState<boolean>(() =>
+    orchestrateKey ? localStorage.getItem(orchestrateKey) === 'true' : false,
+  );
+  // Re-hydrate from storage on a conversation switch (default OFF for a thread
+  // that never opted in). Without this, switching conversations would carry the
+  // previous thread's toggle over.
+  useEffect(() => {
+    setOrchestrateRaw(orchestrateKey ? localStorage.getItem(orchestrateKey) === 'true' : false);
+  }, [orchestrateKey]);
+  const setOrchestrate = useCallback(
+    (next: boolean | ((v: boolean) => boolean)) => {
+      setOrchestrateRaw((prev) => {
+        const value = typeof next === 'function' ? next(prev) : next;
+        if (orchestrateKey) {
+          if (value) localStorage.setItem(orchestrateKey, 'true');
+          else localStorage.removeItem(orchestrateKey);
+        }
+        return value;
+      });
+    },
+    [orchestrateKey],
+  );
   const [templateCategory, setTemplateCategory] = useState<string>('analyze');
   const [roles, setRoles] = useState<AgencyRole[]>([]);
   const [activeRole, setActiveRole] = useState<string | null>(null);
@@ -204,9 +230,9 @@ Each specialist should:
 After ALL specialists respond, as the Agency Director, provide a CONSENSUS summary with the recommended action plan.
 
 The question/topic: ${messageText}`;
-      onSend(teamPrompt, model, 'director', attachments);
+      onSend(teamPrompt, model, 'director', attachments, orchestrate);
     } else {
-      onSend(messageText, model, messageRole, attachments);
+      onSend(messageText, model, messageRole, attachments, orchestrate);
     }
 
     setValue('');
@@ -215,7 +241,7 @@ The question/topic: ${messageText}`;
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, onSend, model, activeRole, roles, attachments, showTeam, teamRoles]);
+  }, [value, onSend, model, activeRole, roles, attachments, showTeam, teamRoles, orchestrate]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -537,6 +563,24 @@ The question/topic: ${messageText}`;
             </button>
           );
         })}
+        {/* "Ask the team" — v2 orchestration toggle. Quiet ghost, DEFAULT OFF.
+            ON = the Director convenes specialists for this turn (orchestrate:true). */}
+        <button
+          onClick={() => setOrchestrate((v) => !v)}
+          className={cn(
+            'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
+            orchestrate
+              ? 'bg-accent-soft text-accent font-medium'
+              : 'text-muted-foreground hover:text-text hover:bg-surface-3'
+          )}
+          title={orchestrate
+            ? 'Ask the team is ON — the Director convenes specialists for this turn'
+            : 'Ask the team — convene specialists (default off; direct chat otherwise)'}
+          aria-pressed={orchestrate}
+        >
+          <Sparkles className="h-3 w-3" />
+          Ask the team
+        </button>
         <span className="ml-auto flex items-center gap-2">
           {/* Role selector */}
           <div className="relative">
