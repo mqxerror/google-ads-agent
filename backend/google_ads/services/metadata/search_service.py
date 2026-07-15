@@ -267,7 +267,7 @@ class SearchService:
         ctx: Context,
         customer_id: str,
         query: str,
-        page_size: int = 1000,
+        page_size: int = 0,
     ) -> List[Dict[str, Any]]:
         """Execute a custom GAQL query.
 
@@ -275,7 +275,11 @@ class SearchService:
             ctx: FastMCP context
             customer_id: The customer ID
             query: The GAQL (Google Ads Query Language) query
-            page_size: Number of results per page
+            page_size: DEPRECATED / ignored. The Google Ads API no longer supports
+                a client-set page size on Search and rejects any non-zero value with
+                PAGE_SIZE_NOT_SUPPORTED (fixed server-side page size of 10000). The
+                param is retained for backward compatibility but is never applied;
+                the SDK response iterator auto-paginates across all rows.
 
         Returns:
             List of query results as dictionaries
@@ -283,11 +287,12 @@ class SearchService:
         try:
             customer_id = format_customer_id(customer_id)
 
-            # Create request
+            # Create request. NOTE: request.page_size is intentionally NOT set —
+            # the Google Ads API raises PAGE_SIZE_NOT_SUPPORTED for any client-set
+            # value; the search() iterator paginates automatically.
             request = SearchGoogleAdsRequest()
             request.customer_id = customer_id
             request.query = query
-            request.page_size = page_size
 
             # Execute search
             response = self.client.search(request=request)
@@ -354,6 +359,46 @@ class SearchService:
             raise Exception(error_msg) from e
         except Exception as e:
             error_msg = f"Failed to execute query: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
+    async def list_accessible_customers(
+        self,
+        ctx: Context,
+    ) -> Dict[str, Any]:
+        """List accounts accessible to the authenticated OAuth identity.
+
+        Read-only. Calls CustomerService.ListAccessibleCustomers, which uses only
+        the developer token + OAuth refresh token (no customer_id / login_customer_id
+        required) — the credential-free account-discovery bootstrap.
+
+        Returns:
+            {"resource_names": [...], "customer_ids": [...]}
+        """
+        try:
+            sdk_client = get_sdk_client()
+            customer_service = sdk_client.client.get_service("CustomerService")
+            response = customer_service.list_accessible_customers()
+
+            resource_names: List[str] = list(response.resource_names)
+            customer_ids = [rn.split("/")[-1] for rn in resource_names]
+
+            await ctx.log(
+                level="info",
+                message=f"Found {len(resource_names)} accessible customer(s)",
+            )
+
+            return {
+                "resource_names": resource_names,
+                "customer_ids": customer_ids,
+            }
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to list accessible customers: {str(e)}"
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
@@ -445,14 +490,15 @@ def create_search_tools(service: SearchService) -> List[Callable[..., Awaitable[
         ctx: Context,
         customer_id: str,
         query: str,
-        page_size: int = 1000,
+        page_size: int = 0,
     ) -> List[Dict[str, Any]]:
         """Execute a custom GAQL (Google Ads Query Language) query.
 
         Args:
             customer_id: The customer ID
             query: The GAQL query to execute
-            page_size: Number of results per page
+            page_size: DEPRECATED / ignored (the Google Ads API fixes page size at
+                10000 and rejects any client-set value; the SDK auto-paginates).
 
         Returns:
             List of query results as dictionaries
@@ -468,7 +514,33 @@ def create_search_tools(service: SearchService) -> List[Callable[..., Awaitable[
             page_size=page_size,
         )
 
-    tools.extend([search_campaigns, search_ad_groups, search_keywords, execute_query])
+    async def list_accessible_customers(
+        ctx: Context,
+    ) -> Dict[str, Any]:
+        """List the Google Ads accounts the authenticated OAuth identity can access.
+
+        Read-only account-discovery bootstrap that needs NO customer_id: it calls
+        CustomerService.ListAccessibleCustomers using only the developer token +
+        OAuth refresh token. Returns the accessible customer resource names and
+        their bare 10-digit ids (typically the manager/MCC), which callers then
+        expand into the full account tree via
+        `execute_query(customer_id=<mcc>, query="... FROM customer_client")`.
+
+        Returns:
+            {"resource_names": ["customers/1234567890", ...],
+             "customer_ids": ["1234567890", ...]}
+        """
+        return await service.list_accessible_customers(ctx=ctx)
+
+    tools.extend(
+        [
+            search_campaigns,
+            search_ad_groups,
+            search_keywords,
+            execute_query,
+            list_accessible_customers,
+        ]
+    )
     return tools
 
 
