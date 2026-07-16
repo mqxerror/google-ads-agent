@@ -294,6 +294,17 @@ class SearchService:
             List of query results as dictionaries
         """
         try:
+            # Read-only guard: GAQL is a SELECT-only query language (it has no
+            # mutation syntax), and this tool is exposed to chat-dispatched
+            # specialists on the read surface — so reject anything that is not a
+            # SELECT. Defense-in-depth; the Google Ads API would reject it too.
+            if not (query or "").lstrip().upper().startswith("SELECT"):
+                raise ValueError(
+                    "execute_query is read-only: only SELECT (GAQL) queries are "
+                    "allowed. To change the account, use the appropriate mutate "
+                    "tool (subject to the approval flow)."
+                )
+
             customer_id = format_customer_id(customer_id)
 
             # Create request. NOTE: request.page_size is intentionally NOT set —

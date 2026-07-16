@@ -422,5 +422,238 @@ class WriteIntentDetection(unittest.TestCase):
             {"task": "review it", "tools": ["search__execute_query"]}))
 
 
+# ── Fix 1: turn-budget wrap-up (never ends mid-synthesis) ─────────────
+class BudgetWrapup(_Base):
+    """When the turn budget is hit, the turn emits a VISIBLE budget_notice ledger
+    event AND a COMPLETE final answer composed from state — never a mid-sentence
+    cut, and never a wasted LLM synthesis that could burn past the cap."""
+
+    async def test_blown_budget_emits_notice_and_complete_wrapup(self):
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze bids"}]}\n```')
+        # This specialist alone blows the $5 cap (cost 6.0) → S6 must take the
+        # deterministic wrap-up path. NO synth entry is scripted: if the code
+        # wrongly called the LLM, the fake would return the bland "ok".
+        spec = [
+            {"type": "text", "content":
+                "Bids look high.\n```json\n{\"findings\":[{\"claim\":\"cut AG4 bids\","
+                "\"severity\":\"high\",\"confidence\":0.8,\"sources\":[\"ctx\"],"
+                "\"disconfirmed_by\":\"a volume drop\"}],"
+                "\"summary\":\"AG4 bids are too high\"}\n```"},
+            {"type": "done", "cost": 6.0},
+        ]
+        _SCRIPT.extend([plan, spec])  # deliberately NO synth entry
+        events = await self._run(
+            force_mode="orchestrate",
+            user_message="audit my bidding across the whole campaign in depth")
+        types = self.types(events)
+
+        notices = [e for e in events if e["type"] == "budget_notice"]
+        self.assertTrue(notices, "a visible budget_notice must be emitted")
+        for k in ("reason", "cost", "cap_usd", "elapsed_s", "cap_s",
+                  "specialists_done", "specialists_total"):
+            self.assertIn(k, notices[0]["payload"])
+        self.assertEqual(notices[0]["payload"]["reason"], "cost")
+
+        final_text = "".join(
+            e["payload"].get("content", "")
+            for e in events if e["type"] == "final_chunk")
+        self.assertIn("Turn budget reached", final_text)      # complete wrap-up header
+        self.assertIn("AG4 bids are too high", final_text)     # summary FROM STATE
+        self.assertNotIn("ok", final_text)                     # no LLM synth ran
+        # A clean terminal — the turn ends on a whole thought, not mid-sentence.
+        self.assertSubsequence(["final_start", "final_done", "turn_done"], types)
+
+    async def test_within_budget_runs_llm_synthesis_no_notice(self):
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+        spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```', cost=0.1)
+        synth = _text_call("Reconciled: keep bids steady.", cost=0.1)
+        _SCRIPT.extend([plan, spec, synth])
+        events = await self._run(
+            force_mode="orchestrate",
+            user_message="audit my bidding across the whole campaign in depth")
+        self.assertFalse([e for e in events if e["type"] == "budget_notice"])
+        final_text = "".join(
+            e["payload"].get("content", "")
+            for e in events if e["type"] == "final_chunk")
+        self.assertIn("Reconciled: keep bids steady.", final_text)
+
+
+# ── Fix 2: meta-question triage + degrade renders a real answer ───────
+class MetaQuestionRouting(_Base):
+    async def test_meta_question_routes_direct_under_orchestrate(self):
+        # "why did you stop?" is a meta aside → DIRECT even with the orchestrate
+        # toggle ON: no recall / verify / plan / dispatch, and a rendered answer.
+        _SCRIPT.extend([_text_call("I hit the turn budget and wrapped up.")])
+        events = await self._run(
+            force_mode="orchestrate", user_message="why did you stop?")
+        types = self.types(events)
+        starts = [e for e in events if e["type"] == "turn_start"]
+        self.assertEqual(starts[0]["payload"]["mode"], "direct")
+        for t in ("plan", "agent_called", "memory_recall", "verification"):
+            self.assertNotIn(t, types)
+        final_text = "".join(
+            e["payload"].get("content", "")
+            for e in events if e["type"] == "final_chunk")
+        self.assertIn("wrapped up", final_text)                 # rendered as final_*
+        self.assertIn("turn_done", types)
+
+    async def test_degrade_renders_final_answer_not_just_notice(self):
+        # Fix 2b: an unparseable plan degrades to a DIRECT answer that MUST render
+        # as final_* (the orchestrated bubble ignores plain `text`).
+        plan = _text_call("Sorry, prose only, no JSON here.")
+        direct = _text_call("Here is a real direct answer with substance.")
+        _SCRIPT.extend([plan, direct])
+        events = await self._run(
+            force_mode="orchestrate",
+            user_message="audit my entire account in great detail right now")
+        types = self.types(events)
+        self.assertNotIn("agent_called", types)
+        self.assertTrue(any(
+            e["type"] == "director_thought"
+            and "degrading" in (e["payload"].get("text") or "")
+            for e in events), "the degrade notice must still be shown")
+        final_text = "".join(
+            e["payload"].get("content", "")
+            for e in events if e["type"] == "final_chunk")
+        self.assertIn("real direct answer", final_text)         # answer renders
+        self.assertNotIn("text", types)                         # no unrendered text leak
+        self.assertSubsequence(["final_start", "final_done", "turn_done"], types)
+
+
+# ── Fix 3: read-only tool whitelist for chat-dispatched specialists ───
+class SpecialistToolScoping(_Base):
+    async def test_dispatched_specialist_gets_readonly_whitelist(self):
+        captured: list[dict] = []
+
+        async def _capturing(*args, **kwargs):
+            captured.append(kwargs)
+            events = _SCRIPT.pop(0) if _SCRIPT else [
+                {"type": "text", "content": "ok"}, {"type": "done", "cost": 0.0}]
+            for e in events:
+                yield e
+
+        agent_mod.stream_agent_response = _capturing
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+        spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```')
+        synth = _text_call("done")
+        _SCRIPT.extend([plan, spec, synth])
+        await self._run(
+            force_mode="orchestrate",
+            user_message="audit my conversion actions across the campaign in depth")
+
+        spec_calls = [k for k in captured if k.get("active_role") == "ppc_strategist"]
+        self.assertTrue(spec_calls, "the specialist must have been dispatched")
+        allow = spec_calls[0].get("tool_allowlist") or []
+        self.assertIn("search__execute_query", allow)           # a SELECT is reachable
+        self.assertNotIn("campaign__update_campaign", allow)    # a mutate is NOT reachable
+        # The Director's synth/plan stages stay tool-less (reconciliation only).
+        director_calls = [k for k in captured if k.get("active_role") == "director"]
+        self.assertTrue(director_calls)
+        for k in director_calls:
+            self.assertEqual(k.get("tool_allowlist"), [])
+
+
+class SpecialistWhitelistUnit(unittest.TestCase):
+    def test_readonly_whitelist_grants_select_no_mutate(self):
+        allow = chat_orchestrator._specialist_tool_allowlist([])
+        self.assertIn("search__execute_query", allow)
+        self.assertFalse(any(
+            ("update" in a) or ("mutate" in a) or ("create" in a) or ("remove" in a)
+            for a in allow), "the read-only whitelist must contain no mutate tools")
+
+    def test_plan_authorized_mutate_is_unioned(self):
+        allow = chat_orchestrator._specialist_tool_allowlist(["campaign__update_campaign"])
+        self.assertIn("search__execute_query", allow)            # reads granted
+        self.assertIn("campaign__update_campaign", allow)        # plan's tool preserved
+
+    def test_meta_question_detection(self):
+        for m in ("why did you stop?", "why the plan stopped", "what happened",
+                  "what did you just do?", "repeat that", "why you stopped",
+                  "you got cut off", "finish your thought"):
+            self.assertTrue(chat_orchestrator._is_meta_question(m), m)
+        for m in ("what happened to my conversions last week?",
+                  "should I pause AG4?", "increase budget on AG2 by 20%",
+                  "audit my whole account in depth", ""):
+            self.assertFalse(chat_orchestrator._is_meta_question(m), m)
+
+
+class MiddlewareReadOnlyEnforcement(unittest.IsolatedAsyncioTestCase):
+    """The REAL MCP middleware: given the read-only whitelist, a GAQL SELECT tool
+    passes and a mutate tool is blocked (Fix 3 acceptance test)."""
+
+    def _load_middleware(self):
+        import sys as _sys
+        from unittest import mock as _mock
+        # argparse runs at import — feed clean argv so it parses (default groups).
+        with _mock.patch.object(_sys, "argv", ["mcp_main.py"]):
+            from google_ads.mcp_main import CampaignScopeMiddleware
+        return CampaignScopeMiddleware
+
+    async def _call(self, mw, tool_name, sentinel):
+        import types as _types
+        ctx = _types.SimpleNamespace(
+            message=_types.SimpleNamespace(name=tool_name, arguments={}))
+
+        async def _next(_c):
+            return sentinel
+
+        return await mw.on_call_tool(ctx, _next)
+
+    async def test_whitelist_allows_select_blocks_mutate(self):
+        import os
+        mw = self._load_middleware()()
+        allow = ",".join(chat_orchestrator._specialist_tool_allowlist([]))
+        old_allow = os.environ.get("LANGAR_AGENT_TOOL_ALLOWLIST")
+        old_bound = os.environ.get("LANGAR_BOUND_CAMPAIGN_ID")
+        os.environ["LANGAR_AGENT_TOOL_ALLOWLIST"] = allow
+        os.environ.pop("LANGAR_BOUND_CAMPAIGN_ID", None)
+        sentinel = object()
+        try:
+            got = await self._call(mw, "search__execute_query", sentinel)
+            self.assertIs(got, sentinel)                        # SELECT reachable
+            with self.assertRaises(ValueError) as cm:
+                await self._call(mw, "campaign__update_campaign", sentinel)
+            self.assertIn("TOOL_NOT_ALLOWED", str(cm.exception))  # mutate blocked
+        finally:
+            if old_allow is None:
+                os.environ.pop("LANGAR_AGENT_TOOL_ALLOWLIST", None)
+            else:
+                os.environ["LANGAR_AGENT_TOOL_ALLOWLIST"] = old_allow
+            if old_bound is not None:
+                os.environ["LANGAR_BOUND_CAMPAIGN_ID"] = old_bound
+
+
+class ExecuteQueryReadOnlyGuard(unittest.IsolatedAsyncioTestCase):
+    """The GAQL query tool is constrained to SELECT — a non-SELECT is rejected
+    BEFORE any API call (Fix 3 defense-in-depth on the read surface)."""
+
+    class _Ctx:
+        async def log(self, *a, **k):  # FastMCP Context.log stand-in
+            return None
+
+    async def test_select_query_passes_guard(self):
+        from google_ads.services.metadata.search_service import SearchService
+        svc = SearchService()
+        # A SELECT clears the guard; it then fails at self.client (no SDK in tests)
+        # — proving the guard did NOT reject a legitimate read.
+        with self.assertRaises(Exception) as cm:
+            await svc.execute_query(self._Ctx(), "123", "SELECT campaign.id FROM campaign")
+        self.assertNotIn("read-only", str(cm.exception))
+
+    async def test_non_select_query_is_rejected(self):
+        from google_ads.services.metadata.search_service import SearchService
+        svc = SearchService()
+        for q in ("DELETE FROM campaign", "UPDATE campaign SET x=1", "drop table", ""):
+            with self.assertRaises(Exception) as cm:
+                await svc.execute_query(self._Ctx(), "123", q)
+            self.assertIn("read-only", str(cm.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

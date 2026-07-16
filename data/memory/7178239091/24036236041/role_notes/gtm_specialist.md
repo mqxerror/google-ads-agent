@@ -1,6 +1,6 @@
 # Gtm Specialist Notes
 
-**Last updated:** 2026-07-16 13:17
+**Last updated:** 2026-07-16 16:54
 
 **Task:** EXECUTE verification step 1 (user-approved) for campaign 24036236041 ONLY. (A) Load https://www.mercan.com/lp/panama-qualified-investor-program in the Chrome browser (new_page → take_screenshot → take
 Executing both in parallel — opening the landing page in Chrome and querying conversion actions via GAQL simultaneously.Let me search for the new_page tool and then execute both the browser navigation and GAQL query in parallel.Executing both in parallel now — Chrome browser render and GAQL conversion action pull simultaneously.
@@ -67,3 +67,104 @@ Once the action is live and firing, upload the arrived GCLID as a retroactive cl
     }
   ]
 }
+
+### 2026-07-16 14:11 — EXECUTE user-approved steps 1+2 for campaign 24036236041 (customer 7178239091) —
+
+**Task:** EXECUTE user-approved steps 1+2 for campaign 24036236041 (customer 7178239091) — with one critical correction the Director is making based on the LIVE conversion-action registry fetched THIS TURN (sup
+I'll attempt the three GAQL reads now — the earlier block was a tool-name mismatch, so let me load the schema properly first.Schemas loaded. Running all three reads in parallel.## GTM Specialist — Steps 1+2 Execution Report · Campaign 24036236041
+**Both steps BLOCKED at the tool layer. Nothing was created, changed, or uploaded.**
+- **Root cause (now precisely identified, not a guess):** this role's allowed set is `['google_ads__search_google_ads', 'conversion_upload__upload_click_conversions']` — **double underscore**. The registered MCP tools are `google_ads_search_google_ads` and `conversion_upload_upload_click_conversions` — **single underscore**. Exact-match check fails, so every GAQL read *and* the click-conversion up
+- **Action-config verdict:** UNVERIFIED. Cannot confirm 7607343274's type/category/window.
+- **Goal-mapping verdict:** UNVERIFIED. This is the decisive unknown.
+- **Conversions recorded:** UNVERIFIED — but live context still shows **0 conv across Jul 14–16**. Note the numbers moved: **$628.85 / 109 clicks / 1,533 impr** (Jul 16 alone: $379.29, 52 clicks, CPC $7.29 — up 75% from Jul 14's $4.17). The Director's $471.66 figure is stale.
+- **Upload payload:** PREPARED, not fired. Blocked twice — by the tool-name mismatch *and* by the missing GCLID.
+**Manual queries (Ads UI → Reports → Query, or a role with the fixed tool name):**
+**Ready-to-fire upload payload** (`conversion_upload_upload_click_conversions`):
+**What I need from you:** (1) the GCLID string, (2) the lead's submit timestamp, (3) the tool-name fix in the role config — or a 30-second manual check of **Campaign → Settings → Goals**, which answers the goal-mapping question outright.
+*— GTM Specialist*
+
+### 2026-07-16 14:13 — Orchestrated finding
+
+{
+  "summary": "Steps 1+2 blocked by a role-config tool-name mismatch (double vs single underscore) \u2014 nothing executed; queries and GCLID upload payload returned for manual run, and I still need the GCLID + submit timestamp from the CRM.",
+  "findings": [
+    {
+      "claim": "Fix the role's allowed-tool names (double-underscore \u2192 single-underscore) \u2014 this config bug, not a policy denial, is blocking every GAQL verification and the GCLID upload",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "TOOL_NOT_ALLOWED error naming allowed set ['google_ads__search_google_ads','conversion_upload__upload_click_conversions'] vs registered tools google_ads_search_google_ads / conversion_upload_upload_click_conversions"
+      ],
+      "disconfirmed_by": "The double-underscore names being real aliases that exist but are intentionally gated for this role",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Do NOT create a new Panama conversion action \u2014 verify existing action 7607343274 instead",
+      "severity": "high",
+      "confidence": 0.9,
+      "sources": [
+        "Director's live registry fetch this turn: Panama QIV Lead id 7607343274, ENABLED, primary=YES",
+        "account rule: one dedicated action per campaign"
+      ],
+      "disconfirmed_by": "A live pull showing 7607343274 is not WEBPAGE type or not mapped to this campaign's landing page",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Check campaign selective_optimization manually (Settings \u2192 Goals) \u2014 if a selective list exists without 7607343274, that is the live bug causing 0 conversions",
+      "severity": "high",
+      "confidence": 0.75,
+      "sources": [
+        "0 conv across Jul 14\u201316 despite user-confirmed GCLID lead",
+        "action exists and is PRIMARY, so inheritance would already feed Max Conversions"
+      ],
+      "disconfirmed_by": "Goals screen showing 7607343274 active on this campaign \u2014 which reduces the zero to tag-firing
+
+### 2026-07-16 16:53 — EXECUTE the approved verification for campaign 24036236041 (customer 7178239091)
+
+**Task:** EXECUTE the approved verification for campaign 24036236041 (customer 7178239091). UNBLOCKED: your allowed tools are now declared with the REGISTERED single-underscore names — google_ads_search_google_
+I'll run the three reads now — loading the registered tool schema first.Schemas loaded. Running all three reads in parallel now.`google_ads_search_google_ads` hits the known `PAGE_SIZE_NOT_SUPPORTED` API error. Switching to `search_execute_query` (the fixed variant) for all three.Allowed set is only `google_ads_search_google_ads`, whose default `page_size=1000` triggers the API rejection. Trying e
+## GTM Specialist — Verification Report · Campaign 24036236041
+**All three GAQL reads FAILED. The tool-name fix landed, but `google_ads_search_google_ads` is broken end-to-end for this role:**
+- `page_size` ≥1 (incl. the tool's own default 1000) → Google Ads API rejects: `PAGE_SIZE_NOT_SUPPORTED` (API fixes page size at 10000).
+- `page_size=0` → reaches Google, then dies locally: `Output validation error: outputSchema defined but no structured output returned`.
+- `search_execute_query` (the variant with the page_size fix already shipped) → `TOOL_NOT_ALLOWED` — not in this role's allowed set.
+**Verdicts:**
+- **Action config (7607343274):** UNVERIFIED — type/category/lookback window unconfirmed.
+- **Goal mapping:** UNVERIFIED by query. But in-context evidence is meaningful: Google Ads only counts a biddable primary action in the campaign's `conversions` column, and the daily table now shows **1 conv on Jul 16** (696 impr / 50 clicks / $370.79) on **Property Investors** (68 clicks / $361.50 / 1 conv) via **[PHRASE] buy property in panama** (61 clicks / 1 conv). A primary goal is firing and
+- **Attribution:** UNVERIFIED — which action recorded it is unknown.
+**Step 2 (GCLID upload): ON HOLD, not executed.** A conversion already recorded for this window; uploading the same lead risks double-counting the first bidding signal. I also still lack the **GCLID string** and **submit timestamp** — never fabricated.
+**Fix needed:** add `search_execute_query` to this role's allowed set (30-second config change), or check **Campaign → Settings → Goals** manually.
+
+### 2026-07-16 16:54 — Orchestrated finding
+
+{
+  "summary": "All three GAQL reads blocked by a broken tool (page_size rejected by API, page_size=0 fails output validation, search_execute_query not allowed) \u2014 but live context shows 1 conversion recorded Jul 16, so a primary goal is firing; GCLID upload stays ON HOLD to avoid double-counting, and I still need the GCLID string + submit timestamp.",
+  "findings": [
+    {
+      "claim": "Add 'search_execute_query' to this role's allowed tools \u2014 google_ads_search_google_ads is unusable (page_size>=1 hits PAGE_SIZE_NOT_SUPPORTED; page_size=0 fails MCP output validation)",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "Live this session: PAGE_SIZE_NOT_SUPPORTED at page_size=1000/10000; 'Output validation error: outputSchema defined but no structured output returned' at page_size=0; TOOL_NOT_ALLOWED on search_execute_query"
+      ],
+      "disconfirmed_by": "search_execute_query being intentionally gated for this role rather than an oversight",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Do NOT upload the GCLID \u2014 the Jul 16 conversion likely IS that lead, and re-uploading would double-count the campaign's first bidding signal",
+      "severity": "high",
+      "confidence": 0.7,
+      "sources": [
+        "Live daily table: 1 conv on 2026-07-16 (696 impr / 50 clicks / $370.79)",
+        "Property Investors ad group 68 clicks / 1 conv; [PHRASE] buy property in panama 61 clicks / 1 conv",
+        "Google Ads counts only biddable primary actions in the campaign conversions column"
+      ],
+      "disconfirmed_by": "An attribution query showing the Jul 16 conversion recorded against a different action than the user's CRM lead, with matching GCLID absent",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Goal mapping is functionally working \u2014 a primary biddable action is firing on this campaign, so no conversion action should be created",
+      "severity": "medium",
+      "confidence": 0.75,
+      "sources": [
+       

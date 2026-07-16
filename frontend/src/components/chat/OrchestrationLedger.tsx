@@ -7,6 +7,7 @@ import {
   Square,
   Gavel,
   AlertTriangle,
+  Hourglass,
   History as HistoryIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ import type {
   ClaimGatePayload,
   FinalDonePayload,
   TurnStoppedPayload,
+  BudgetNoticePayload,
   Finding,
 } from '@/types/orchestration';
 
@@ -160,6 +162,21 @@ interface StopWarningRow {
   affected: { name: string }[];
 }
 
+/** The turn budget (cost/time) was hit — DISPATCH was cut short and the answer
+ *  was wrapped up from state. Rendered as a quiet, honest notice (Fix 1). */
+interface BudgetNoticeRow {
+  kind: 'budget_notice';
+  order: number;
+  key: string;
+  reason: string;
+  cost: number;
+  capUsd: number;
+  elapsedS: number;
+  capS: number;
+  done: number;
+  total: number;
+}
+
 type LedgerRow =
   | RecallRow
   | VerifyRow
@@ -168,7 +185,8 @@ type LedgerRow =
   | ConflictRow
   | DecisionRow
   | ClaimGateRow
-  | StopWarningRow;
+  | StopWarningRow
+  | BudgetNoticeRow;
 
 interface LedgerModel {
   rows: LedgerRow[];
@@ -410,6 +428,23 @@ function buildModel(events: OrchestrationEvent[]): LedgerModel {
           passed: p.passed,
           rewritten: p.rewritten ?? [],
           flagged: p.flagged ?? [],
+        });
+        break;
+      }
+
+      case 'budget_notice': {
+        const p = payloadOf<BudgetNoticePayload>(ev);
+        rows.push({
+          kind: 'budget_notice',
+          order: idx,
+          key: `bn-${idx}`,
+          reason: p.reason,
+          cost: p.cost,
+          capUsd: p.cap_usd,
+          elapsedS: p.elapsed_s,
+          capS: p.cap_s,
+          done: p.specialists_done,
+          total: p.specialists_total,
         });
         break;
       }
@@ -911,6 +946,33 @@ function StopWarningLedgerRow({ row }: { row: StopWarningRow }) {
   );
 }
 
+// ---- budget-notice row (Fix 1) — the cap was hit; the turn wrapped up ------
+function BudgetNoticeLedgerRow({ row }: { row: BudgetNoticeRow }) {
+  const capLabel =
+    row.reason === 'time'
+      ? `${Math.round(row.elapsedS)}s of a ${Math.round(row.capS)}s budget`
+      : `$${row.cost.toFixed(2)} of a $${row.capUsd.toFixed(2)} budget`;
+  return (
+    <div className="-mx-2 rounded-md border border-warning/40 bg-warning-soft px-2 py-1.5">
+      <div className="flex items-start gap-2">
+        <Hourglass className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[12px] font-medium text-warning">
+            Turn budget reached — wrapped up with findings so far.
+          </p>
+          <p className="text-[11px] leading-snug text-warning/90">
+            Used {capLabel}
+            {row.total > 0
+              ? ` · ${row.done}/${row.total} specialist${row.total === 1 ? '' : 's'} finished`
+              : ''}
+            . Ask me to continue for the rest.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- one row dispatcher ----------------------------------------------------
 
 // FIX 2b — a stable content signature for one row, so React.memo can skip the
@@ -946,6 +1008,8 @@ function rowSignature(row: LedgerRow): string {
       return `cg${row.key}${row.checked}${row.passed}${row.rewritten.length}${row.flagged.length}`;
     case 'stop_warning':
       return `sw${row.key}${row.affected.map((a) => a.name).join('|')}`;
+    case 'budget_notice':
+      return `bn${row.key}${row.reason}${row.cost}${row.capUsd}${row.elapsedS}${row.done}${row.total}`;
     default:
       return JSON.stringify(row);
   }
@@ -991,6 +1055,8 @@ function LedgerRowViewImpl({
       return <ClaimGateLedgerRow row={row} />;
     case 'stop_warning':
       return <StopWarningLedgerRow row={row} />;
+    case 'budget_notice':
+      return <BudgetNoticeLedgerRow row={row} />;
     default:
       return null;
   }
@@ -1036,9 +1102,13 @@ export default function OrchestrationLedger({
   if (model.rows.length === 0) return null;
 
   // P0 safety — the stop-write warning must stay visible even when the turn
-  // completed collapsed, so surface it above the collapsed summary too.
+  // completed collapsed, so surface it above the collapsed summary too. The
+  // budget notice (Fix 1) rides along: it explains why the answer is a wrap-up.
   const stopWarnings = model.rows.filter(
     (r): r is StopWarningRow => r.kind === 'stop_warning'
+  );
+  const budgetNotices = model.rows.filter(
+    (r): r is BudgetNoticeRow => r.kind === 'budget_notice'
   );
 
   if (isComplete && collapsed) {
@@ -1046,6 +1116,9 @@ export default function OrchestrationLedger({
       <div className="mt-1 space-y-0.5 text-xs">
         {stopWarnings.map((row) => (
           <StopWarningLedgerRow key={row.key} row={row} />
+        ))}
+        {budgetNotices.map((row) => (
+          <BudgetNoticeLedgerRow key={row.key} row={row} />
         ))}
         <Row onClick={() => setCollapsed(false)} className="hover:bg-surface-2">
           <HistoryIcon className="h-3 w-3 shrink-0 text-muted-foreground" />

@@ -131,6 +131,19 @@ export interface ClaimGatePayload {
   flagged?: { claim: string; reason: string }[];
 }
 
+/** The turn budget (cost or wall-clock) was hit mid-turn. DISPATCH is cut short
+ *  and a COMPLETE wrap-up is synthesized from state — the turn never ends
+ *  mid-sentence. Rendered as a visible ledger notice. */
+export interface BudgetNoticePayload {
+  reason: 'cost' | 'time' | string;
+  cost: number;
+  cap_usd: number;
+  elapsed_s: number;
+  cap_s: number;
+  specialists_done: number;
+  specialists_total: number;
+}
+
 export interface TurnDonePayload {
   stop_reason?: string;
   cost?: number;
@@ -172,6 +185,7 @@ export type OrchestrationEventType =
   | 'final_chunk'
   | 'final_done'
   | 'claim_gate'
+  | 'budget_notice'
   | 'turn_done'
   | 'turn_error'
   | 'turn_stopped';
@@ -206,6 +220,7 @@ export const V2_EVENT_TYPES: ReadonlySet<string> = new Set<OrchestrationEventTyp
   'final_chunk',
   'final_done',
   'claim_gate',
+  'budget_notice',
   'turn_done',
   'turn_error',
   'turn_stopped',

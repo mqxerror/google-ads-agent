@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # CHAT_ORCH_STALE_MULTIPLIER as stale so a restart shows honest state.
     CHAT_ORCH_MAX_COST_USD: float = 5.0        # per-turn orchestration cost cap
     CHAT_ORCH_MAX_RUNTIME_MIN: float = 6.0     # per-turn wall-clock ceiling
+    # Headroom ring-fenced from the caps above for S6 SYNTHESIZE + S7 GATE so a
+    # turn NEVER ends mid-synthesis: DISPATCH is cut short once cost/time reaches
+    # (cap - reserve), leaving room for the Director's final reconciled answer.
+    CHAT_ORCH_SYNTH_RESERVE_USD: float = 1.0   # $ reserved from the cost cap for synthesis
+    CHAT_ORCH_SYNTH_RESERVE_SEC: float = 45.0  # seconds reserved from the runtime cap for synthesis
     CHAT_ORCH_MAX_SPECIALISTS: int = 3         # max parallel specialists per turn
     CHAT_ORCH_STALE_MULTIPLIER: float = 2.0    # zombie-sweep threshold = runtime * this
     CHAT_ORCH_SWEEP_INTERVAL_MINUTES: float = 5.0  # periodic chat-turn zombie sweep cadence

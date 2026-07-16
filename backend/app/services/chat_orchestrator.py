@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
 from typing import AsyncIterator, Optional
@@ -107,6 +108,143 @@ def _detect_write_intent(spec: dict) -> bool:
         " ".join(str(t) for t in (spec.get("tools") or [])),
     ]).lower()
     return any(v in haystack for v in _WRITE_VERBS)
+
+
+# ── Meta-question detection (Fix 2 — never orchestrate a conversational aside) ─
+# Questions ABOUT the agent or this conversation itself ("why did you stop?",
+# "what did you just do?", "repeat that") must route to DIRECT — no recall /
+# landing-page verify / conversion fetch / plan pipeline — EVEN under the
+# orchestrate toggle. Orchestrating a meta-question is the observed bug (it fired
+# recall + landing-page verify + conversion fetch for "why you stopped?"). The
+# regexes anchor on an agent/turn-referential subject so a CAMPAIGN question
+# ("what happened to conversions last week?") does NOT match.
+_META_QUESTION_RX = re.compile(
+    r"("
+    r"\bwhy\s+(did\s+|do\s+|would\s+|are\s+|is\s+|has\s+|have\s+|'d\s+)?"
+    r"(you|it|that|this|the\s+plan|the\s+turn|the\s+run|the\s+answer|the\s+response|the\s+message)"
+    r"\s+(just\s+)?(stop|stopp|cut|halt|end|freez|die|dying|quit|break|pause\s+writing)"
+    r"|\bwhy\s+(did\s+)?(the\s+)?(plan|turn|answer|response|synthesis|message)\s+"
+    r"(stop|stopp|cut|end|halt|die|break)"
+    r"|\bwhat\s+just\s+happened\b"
+    r"|\bwhat\s+(did|are|were)\s+you\s+(just\s+)?(do|doing|say|saying|writing|working)"
+    r"|\b(can|could|would)\s+you\s+repeat\b|\bplease\s+repeat\b"
+    r"|\brepeat\s+(that|it|your\s+last|the\s+last|your\s+answer)\b"
+    r"|\bsay\s+that\s+again\b|\bcome\s+again\b"
+    r"|\b(you|it|the\s+answer|the\s+response|the\s+message|the\s+text)\s+(got\s+)?"
+    r"(cut\s+off|cutoff|stopped|stopping|truncat)"
+    r"|\b(finish|continue|complete)\s+(your|that|the)\s+"
+    r"(answer|thought|response|reply|sentence|message|verdict|point)"
+    r"|\bdid\s+you\s+(finish|stop|complete|get\s+cut|hang)"
+    r")",
+    re.IGNORECASE,
+)
+
+# Terse bare meta phrases matched as a WHOLE message (after trimming ?/./!). Kept
+# separate from the regex so ultra-short follow-ups ("repeat", "continue") route
+# to DIRECT without risking a substring false-positive inside a real question.
+_META_EXACT = {
+    "what happened", "why did you stop", "why you stopped", "why'd you stop",
+    "why stop", "why did it stop", "why did the plan stop", "why the plan stopped",
+    "repeat", "repeat that", "repeat please", "say again", "say that again",
+    "come again", "continue", "keep going", "go on", "what were you saying",
+    "what did you do", "what did you just do",
+}
+
+
+def _is_meta_question(message: str) -> bool:
+    """True when the user turn is a meta-question about the agent / conversation
+    itself rather than the campaign. Such turns route to DIRECT — never
+    orchestrated — even when force_mode='orchestrate' (the orchestrate toggle)."""
+    norm = re.sub(r"\s+", " ", (message or "").strip().lower())
+    if not norm:
+        return False
+    if norm.rstrip("?.! ") in {m.rstrip("?.! ") for m in _META_EXACT}:
+        return True
+    # Only apply the regex to reasonably short follow-ups — meta asides are terse;
+    # this keeps false-positives on long strategic prompts near zero.
+    if len(norm) <= 140 and _META_QUESTION_RX.search(norm):
+        return True
+    return False
+
+
+# ── Read-only google-ads tool whitelist (Fix 3 — specialists can SELECT) ──────
+# Chat-dispatched specialists ALWAYS get this read-only surface so a plain GAQL
+# SELECT (conversion goals/actions, metrics, campaigns) works — the old
+# tools=[] → "__NONE__" wall blocked EVERY google-ads tool and left specialists
+# (and the GTM Specialist) in "analysis-only mode" on read queries. Every entry
+# is read-only: GAQL (`search__execute_query`) has NO mutation syntax, and
+# GenerateKeywordIdeas / ListAccessibleCustomers mutate nothing. A MUTATE tool's
+# name is not in this set, so it stays blocked by the SAME middleware — reads
+# open, writes stay gated exactly as today.
+_READ_ONLY_GADS_TOOLS = [
+    "search__execute_query",
+    "search__search_campaigns",
+    "search__search_ad_groups",
+    "search__search_keywords",
+    "search__list_accessible_customers",
+    "search__generate_keyword_ideas",
+]
+
+
+def _specialist_tool_allowlist(planned_tools: list) -> list[str]:
+    """Effective tool_allowlist for a chat-dispatched specialist: the read-only
+    whitelist UNION any tools the plan explicitly requested (a plan-authorized
+    mutate flows through exactly as before — the whitelist adds reads, never
+    removes the existing gating). De-duplicates, order-stable."""
+    merged = [*_READ_ONLY_GADS_TOOLS, *(str(t) for t in (planned_tools or []))]
+    return list(dict.fromkeys(merged))
+
+
+def _budget_snapshot(
+    *, reason: str, total_cost: float, elapsed_s: float, budget_cost: float,
+    budget_secs: float, specialists_done: int, specialists_total: int,
+) -> dict:
+    """Structured payload for the visible `budget_notice` ledger event (Fix 1).
+    reason ∈ {'cost','time'} — which cap forced the wrap-up."""
+    return {
+        "reason": reason,
+        "cost": round(total_cost, 4),
+        "cap_usd": round(budget_cost, 2),
+        "elapsed_s": round(elapsed_s, 1),
+        "cap_s": round(budget_secs, 1),
+        "specialists_done": specialists_done,
+        "specialists_total": specialists_total,
+    }
+
+
+def _compose_budget_wrapup(
+    specs: list[dict], findings_by_call: dict, summary_by_call: dict,
+    conflicts: list[dict],
+) -> str:
+    """Deterministic final Director line, built from state, for when the turn
+    budget is hit (Fix 1). A COMPLETE wrap-up — never a mid-sentence cut — that
+    summarizes each specialist that returned and flags what did not finish."""
+    lines = ["**Turn budget reached — here's where things stand:**", ""]
+    done = [s for s in specs if s["call_id"] in findings_by_call]
+    pending = [s for s in specs if s["call_id"] not in findings_by_call]
+    if done:
+        for s in done:
+            cid = s["call_id"]
+            summ = (summary_by_call.get(cid) or "").strip()
+            if not summ:
+                fs = findings_by_call.get(cid) or []
+                first = fs[0] if fs and isinstance(fs[0], dict) else {}
+                summ = (first.get("claim") or "reviewed; no clear finding surfaced").strip()
+            lines.append(f"- **{s['role_name']}:** {summ}")
+    else:
+        lines.append("- No specialist finished before the cap was reached.")
+    if pending:
+        names = ", ".join(s["role_name"] for s in pending)
+        lines.append("")
+        lines.append(
+            f"Still pending when the cap hit: {names}. Ask me to continue and "
+            "I'll pick up from here.")
+    if conflicts:
+        lines.append("")
+        lines.append(
+            f"Note: {len(conflicts)} specialist conflict(s) were left unreconciled "
+            "when the cap was reached.")
+    return "\n".join(lines)
 
 
 def _claim_tokens(text: str) -> set[str]:
@@ -203,8 +341,15 @@ async def _run_direct(
     conversation_id, base_guidelines, campaign_guidelines, model,
     active_role, cost_so_far: float = 0.0,
 ) -> AsyncIterator[dict]:
-    """Mirror chat.py's _direct_run_fn: stream one Director/persona answer,
-    translate events, persist the assistant message, end with turn_done."""
+    """Stream one Director/persona answer INSIDE the orchestrated envelope.
+
+    Fix 2(b): the orchestrated frontend renders the Director's bubble from
+    `final_*` events ONLY — plain `text`/`text_delta` land in the ledger and
+    NEVER reach the bubble. So the S0-direct answer AND the S3-degrade answer
+    (both routed through here) MUST stream as final_start/final_chunk/final_done,
+    exactly like the S6 synthesis. Emitting `text` here was why the degraded
+    answer rendered as just the notice line with no visible reply. Persists the
+    assistant message and OWNS the terminal turn_done."""
     from app.services.agent import stream_agent_response
 
     full_text_parts: list[str] = []
@@ -212,6 +357,9 @@ async def _run_direct(
     agent_role_id: Optional[str] = active_role
     agent_role_name: Optional[str] = None
     cost = cost_so_far
+    started = time.monotonic()
+
+    yield {"type": "final_start", "payload": {}}
     try:
         async for event in stream_agent_response(
             user_message=user_message,
@@ -226,28 +374,55 @@ async def _run_direct(
             proc_key=(turn_id, "director"),
         ):
             etype = event.get("type", "event")
-            payload = {k: v for k, v in event.items() if k != "type"}
             if etype in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
-                full_text_parts.append(event.get("content", ""))
+                chunk = event.get("content", "")
+                full_text_parts.append(chunk)
+                yield {"type": "final_chunk", "payload": {"content": chunk}}
             elif etype == "tool_call":
                 tool_calls_json.append(event)
+                # Keep tool visibility in the ledger (harmless if unrendered).
+                yield {"type": "tool_call",
+                       "payload": {k: v for k, v in event.items() if k != "type"}}
             elif etype == "routing":
                 agent_role_id = event.get("role_id") or agent_role_id
                 agent_role_name = event.get("role_name")
+                yield {"type": "routing",
+                       "payload": {k: v for k, v in event.items() if k != "type"}}
             elif etype == "done":
                 cost += float(event.get("cost") or 0.0)
-            yield {"type": etype, "payload": payload}
-    finally:
-        full_text = "".join(full_text_parts)
-        try:
-            await _persist_assistant_message(
-                conversation_id=conversation_id, content=full_text,
-                tool_calls=tool_calls_json or None,
-                agent_role_id=agent_role_id, agent_role_name=agent_role_name,
-                campaign_id=campaign_id, turn_id=turn_id,
-            )
-        except Exception as e:  # persistence must never break the stream
-            logger.warning("direct-path persist failed: %s", e)
+            elif etype == "error":
+                # Surface as a final_chunk so the bubble shows something, not silence.
+                full_text_parts.append(f"\n\n_[error: {event.get('message', '')}]_")
+                yield {"type": "final_chunk", "payload": {
+                    "content": f"\n\n_[error: {event.get('message', '')}]_"}}
+    except Exception as e:  # a stream failure must not leave an empty bubble
+        logger.warning("direct-path stream failed: %s", e)
+        full_text_parts.append(f"\n\n_[error: {e}]_")
+        yield {"type": "final_chunk", "payload": {"content": f"\n\n_[error: {e}]_"}}
+
+    full_text = "".join(full_text_parts).strip()
+    # Fix 2(b): never end on just the notice line — if the model produced no
+    # text, emit an honest minimal reply so the bubble is never empty.
+    if not full_text:
+        full_text = ("I don't have enough context to answer that directly right "
+                     "now — could you rephrase or give me a bit more to go on?")
+        yield {"type": "final_chunk", "payload": {"content": full_text}}
+
+    message_id = str(uuid.uuid4())
+    try:
+        message_id = await _persist_assistant_message(
+            conversation_id=conversation_id, content=full_text,
+            tool_calls=tool_calls_json or None,
+            agent_role_id=agent_role_id or "director",
+            agent_role_name=agent_role_name or "Marketing Director",
+            campaign_id=campaign_id, turn_id=turn_id,
+        )
+    except Exception as e:  # persistence must never break the stream
+        logger.warning("direct-path persist failed: %s", e)
+    yield {"type": "final_done", "payload": {
+        "message_id": message_id, "cost_total": round(cost, 4),
+        "duration_ms": int((time.monotonic() - started) * 1000),
+        "agents_used": 0, "conflicts_resolved": 0}}
     yield {"type": "turn_done", "payload": {"stop_reason": "natural", "cost": round(cost, 4)}}
 
 
@@ -266,13 +441,20 @@ async def _dispatch_specialist(
     role_name = spec.get("role_name", role_id)
     task = spec["task"]
     model = spec.get("model", "sonnet")
-    tools = spec.get("tools", []) or []
+    planned_tools = spec.get("tools", []) or []
     write_intent = bool(spec.get("write_intent"))
+
+    # Fix 3: grant the read-only google-ads whitelist so a plain GAQL SELECT
+    # (conversion actions/goals, metrics) works — the old empty allowlist became
+    # "__NONE__" and walled specialists into analysis-only mode on reads. Mutate
+    # tools are absent from the whitelist, so they stay blocked by the SAME
+    # middleware unless the plan explicitly authorized one (gated as today).
+    tools = _specialist_tool_allowlist(planned_tools)
 
     await out.put({
         "type": "agent_start", "call_id": call_id, "role_id": role_id,
-        "role_name": role_name, "task": task, "model": model, "tools": tools,
-        "write_intent": write_intent,
+        "role_name": role_name, "task": task, "model": model,
+        "tools": planned_tools, "write_intent": write_intent,
     })
 
     parts: list[str] = []
@@ -372,14 +554,22 @@ async def run_turn(
     # ══ S0 TRIAGE ═════════════════════════════════════════════════════
     intent = classify_intent(user_message or "")
     is_greeting = len((user_message or "").strip()) < 90
+    # Fix 2(a): a meta-question about the agent/conversation ("why did you stop?",
+    # "what did you just do?", "repeat that") is NEVER orchestrated — it routes to
+    # DIRECT even under force_mode='orchestrate'. Orchestrating it fired recall +
+    # landing-page verify + conversion fetch for a conversational aside.
+    is_meta = _is_meta_question(user_message or "")
     go_direct = (
         force_mode == "direct"
+        or is_meta
         or intent.get("gear") == 1
         or (force_mode != "orchestrate" and is_greeting)
     )
     needs: list[str] = []
 
-    if force_mode == "orchestrate":
+    if is_meta:
+        go_direct = True  # hard override — beats the orchestrate toggle
+    elif force_mode == "orchestrate":
         go_direct = False
     elif not go_direct:
         # ONE haiku triage call (safe default: any failure → DIRECT).
@@ -669,12 +859,21 @@ async def run_turn(
 
         budget_cost = float(settings.CHAT_ORCH_MAX_COST_USD)
         budget_secs = float(settings.CHAT_ORCH_MAX_RUNTIME_MIN) * 60.0
+        # Fix 1(b): ring-fence headroom for S6 SYNTHESIZE + S7 GATE. DISPATCH is
+        # cut short once cost/time reaches (cap - reserve), so the Director's
+        # final reconciled answer always has room to finish — the turn never ends
+        # mid-synthesis.
+        reserve_usd = float(getattr(settings, "CHAT_ORCH_SYNTH_RESERVE_USD", 0) or 0.0)
+        reserve_secs = float(getattr(settings, "CHAT_ORCH_SYNTH_RESERVE_SEC", 0) or 0.0)
+        dispatch_cost_cap = max(0.0, budget_cost - reserve_usd)
+        dispatch_secs_cap = max(0.0, budget_secs - reserve_secs)
         sem = asyncio.Semaphore(_MAX_PARALLEL)
         out: asyncio.Queue = asyncio.Queue()
         findings_by_call: dict[str, list[dict]] = {}
         role_by_call: dict[str, str] = {}
         summary_by_call: dict[str, str] = {}
         degraded = False
+        budget_notice_emitted = False
 
         async def _guarded(spec, seq):
             async with sem:
@@ -687,18 +886,25 @@ async def run_turn(
         gather_task = asyncio.gather(*tasks, return_exceptions=True)
 
         while not gather_task.done() or not out.empty():
-            # Budget backstop — cancel outstanding work, keep findings in hand.
+            # Ring-fence backstop — cancel outstanding work at (cap - reserve),
+            # keeping findings in hand + reserving budget for synthesis. Emits a
+            # VISIBLE budget_notice ledger event (Fix 1a) so the user sees why the
+            # dispatch stopped short.
+            _elapsed = time.monotonic() - turn_started
             if not degraded and (
-                total_cost >= budget_cost
-                or (time.monotonic() - turn_started) >= budget_secs
+                total_cost >= dispatch_cost_cap or _elapsed >= dispatch_secs_cap
             ):
                 degraded = True
                 for t in tasks:
                     if not t.done():
                         t.cancel()
-                yield {"type": "director_thought", "payload": {
-                    "text": "Budget/time cap hit — synthesizing with findings so far.",
-                    "stage": "resolve"}}
+                budget_notice_emitted = True
+                yield {"type": "budget_notice", "payload": _budget_snapshot(
+                    reason=("cost" if total_cost >= dispatch_cost_cap else "time"),
+                    total_cost=total_cost, elapsed_s=_elapsed,
+                    budget_cost=budget_cost, budget_secs=budget_secs,
+                    specialists_done=len(findings_by_call),
+                    specialists_total=len(specs))}
             try:
                 item = await asyncio.wait_for(out.get(), timeout=0.1)
             except asyncio.TimeoutError:
@@ -785,43 +991,67 @@ async def run_turn(
                 "stage": "resolve"}}
 
         # ══ S6 SYNTHESIZE ══════════════════════════════════════════════
-        findings_json = json.dumps(
-            {cid: fs for cid, fs in findings_by_call.items()}, indent=2)[:4000]
-        conflicts_json = json.dumps(conflicts, indent=2) if conflicts else "[]"
-        synth_prompt = (
-            "You are the Marketing Director. Reconcile the specialists' findings "
-            "into ONE answer, in a single voice, for the user's question.\n\n"
-            f"USER QUESTION: {user_message}\n" + prior_block + premise_block +
-            "\n\nSPECIALIST FINDINGS (JSON):\n" + findings_json +
-            "\n\nCONFLICTS the team flagged (JSON):\n" + conflicts_json +
-            "\n\nWrite the reconciled answer in prose. Cite prior work marked "
-            "reuse instead of re-deriving it."
-        )
-        if conflicts:
-            synth_prompt += (
-                "\n\nAfter the prose, emit ONE fenced JSON block resolving each "
-                "conflict:\n```json\n"
-                '{"decisions":[{"conflict_id":"cf1","ruling":"...","rationale":"..."}]}\n```'
-            )
+        # Fix 1(a): if the cap is truly blown by now (the reserve got eaten too),
+        # do NOT spend more on an LLM synthesis that could run past the cap and be
+        # cut mid-sentence — compose a COMPLETE wrap-up from state instead. The
+        # ring-fence above makes this rare; this is the belt-and-suspenders that
+        # guarantees the turn ends on a whole thought.
+        _elapsed_s = time.monotonic() - turn_started
+        budget_blown = total_cost >= budget_cost or _elapsed_s >= budget_secs
         yield {"type": "final_start", "payload": {}}
         final_parts: list[str] = []
-        async for ev in stream_agent_response(
-            user_message=synth_prompt, model=(model or "fable"),
-            active_role="director", tool_allowlist=[], account_id=account_id,
-            campaign_id=campaign_id, campaign_name=campaign_name,
-            conversation_id=conversation_id,
-        ):
-            etype = ev.get("type")
-            if etype in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
-                chunk = ev.get("content", "")
-                final_parts.append(chunk)
-                yield {"type": "final_chunk", "payload": {"content": chunk}}
-            elif etype == "done":
-                total_cost += float(ev.get("cost") or 0.0)
+        did_llm_synth = False
+        if budget_blown:
+            if not budget_notice_emitted:
+                budget_notice_emitted = True
+                yield {"type": "budget_notice", "payload": _budget_snapshot(
+                    reason=("cost" if total_cost >= budget_cost else "time"),
+                    total_cost=total_cost, elapsed_s=_elapsed_s,
+                    budget_cost=budget_cost, budget_secs=budget_secs,
+                    specialists_done=len(findings_by_call),
+                    specialists_total=len(specs))}
+            wrap = _compose_budget_wrapup(
+                specs, findings_by_call, summary_by_call, conflicts)
+            final_parts.append(wrap)
+            yield {"type": "final_chunk", "payload": {"content": wrap}}
+        else:
+            did_llm_synth = True
+            findings_json = json.dumps(
+                {cid: fs for cid, fs in findings_by_call.items()}, indent=2)[:4000]
+            conflicts_json = json.dumps(conflicts, indent=2) if conflicts else "[]"
+            synth_prompt = (
+                "You are the Marketing Director. Reconcile the specialists' "
+                "findings into ONE answer, in a single voice, for the user's "
+                "question.\n\n"
+                f"USER QUESTION: {user_message}\n" + prior_block + premise_block +
+                "\n\nSPECIALIST FINDINGS (JSON):\n" + findings_json +
+                "\n\nCONFLICTS the team flagged (JSON):\n" + conflicts_json +
+                "\n\nWrite the reconciled answer in prose. Cite prior work marked "
+                "reuse instead of re-deriving it."
+            )
+            if conflicts:
+                synth_prompt += (
+                    "\n\nAfter the prose, emit ONE fenced JSON block resolving each "
+                    "conflict:\n```json\n"
+                    '{"decisions":[{"conflict_id":"cf1","ruling":"...","rationale":"..."}]}\n```'
+                )
+            async for ev in stream_agent_response(
+                user_message=synth_prompt, model=(model or "fable"),
+                active_role="director", tool_allowlist=[], account_id=account_id,
+                campaign_id=campaign_id, campaign_name=campaign_name,
+                conversation_id=conversation_id,
+            ):
+                etype = ev.get("type")
+                if etype in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
+                    chunk = ev.get("content", "")
+                    final_parts.append(chunk)
+                    yield {"type": "final_chunk", "payload": {"content": chunk}}
+                elif etype == "done":
+                    total_cost += float(ev.get("cost") or 0.0)
         final_text = "".join(final_parts)
 
-        # Parse + emit conflict rulings.
-        if conflicts:
+        # Parse + emit conflict rulings (only the LLM synthesis emits the JSON).
+        if conflicts and did_llm_synth:
             dparsed = _extract_json(final_text)
             if dparsed and isinstance(dparsed.get("decisions"), list):
                 for d in dparsed["decisions"]:
