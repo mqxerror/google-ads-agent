@@ -896,6 +896,42 @@ async def fetch_ad_landing_pages(account_id: str | None, campaign_id: str | None
     return "\n".join(lines)
 
 
+async def fetch_conversion_actions(account_id: str | None) -> tuple[str, list[dict]]:
+    """Best-effort: pull THIS account's ENABLED conversion actions LIVE this turn
+    so the Director's "which conversion actions exist" claims trace to the live
+    account, not a stale/remembered registry (Fix 4).
+
+    Returns (block, rows):
+      * block — a compact text block for context injection + provenance harvest,
+        or "" when there is nothing to fetch / the fetch failed.
+      * rows  — the structured list [{id, name, status, primary_for_goal}, ...],
+        or [] on failure.
+
+    NEVER raises — every failure degrades to ("", []) so the caller treats the
+    registry as simply unrefreshed rather than crashing the turn.
+    """
+    if not account_id:
+        return "", []
+    try:
+        rows = await _ads_svc.get_conversion_actions(account_id)
+    except Exception:
+        return "", []
+    if not rows:
+        return "", []
+
+    lines = [
+        "LIVE CONVERSION ACTIONS (fetched this turn — supersedes any remembered "
+        "registry):",
+    ]
+    for ca in rows:
+        primary = "YES" if ca.get("primary_for_goal") else "no"
+        lines.append(
+            f"- {ca.get('name')} (id {ca.get('id')}) "
+            f"status={ca.get('status')} primary={primary}"
+        )
+    return "\n".join(lines), rows
+
+
 def _condense_for_memory(response_text: str, user_message: str, max_chars: int = 3000) -> str:
     """Condense an agent response into a memory-friendly format.
 

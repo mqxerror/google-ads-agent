@@ -15,6 +15,11 @@ import MemoryPanel from '@/components/chat/MemoryPanel';
 import { Input } from '@/components/ui/input';
 import type { ChatMessage, ToolCall, Campaign } from '@/types';
 
+// FIX 3 — window inside which an IDENTICAL trimmed message is treated as an
+// accidental duplicate (queue+lag re-fire) and dropped. A DIFFERENT message is
+// never affected; the same text after this window is a legit repeat and sends.
+const DEDUP_WINDOW_MS = 10_000;
+
 export default function ChatPanel() {
   const { chatPanelWidth, setChatPanelWidth, selectedCampaignId, chatPanelCollapsed, toggleChatPanel } = useAppStore();
   const navigate = useNavigate();
@@ -103,6 +108,20 @@ export default function ChatPanel() {
   const chatDisplayPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatDisplaySafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
+
+  // FIX 3 — duplicate-send guard. The last text we accepted for send + when.
+  // An identical trimmed string re-submitted within DEDUP_WINDOW_MS while the
+  // agent is busy (in-flight OR queued) is dropped — kills the double-bubble /
+  // double-turn cost from queue+lag re-fires. A DIFFERENT message, or the same
+  // text after the window, is never blocked (a legit repeat still works).
+  const lastSendRef = useRef<{ text: string; ts: number } | null>(null);
+  const [dupHint, setDupHint] = useState(false);
+  const dupHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // FIX 2c — optimistic stop. Flip true the instant Stop is clicked so the
+  // button shows a spinner + disables without waiting for the stopTurn
+  // round-trip; reset whenever a fresh turn begins.
+  const [stopping, setStopping] = useState(false);
 
   // Keep the identity anchor in sync with the live conversation state.
   useEffect(() => {
@@ -339,6 +358,13 @@ export default function ChatPanel() {
     };
   }, [conversationId, tearDownChatDisplayPoller]);
 
+  // FIX 3 — clear the dup-hint timer on unmount so it can't fire into a torn-down tree.
+  useEffect(() => {
+    return () => {
+      if (dupHintTimerRef.current) clearTimeout(dupHintTimerRef.current);
+    };
+  }, []);
+
   // Refresh edge case: a conversationId restored from sessionStorage points
   // at a thread bound to a campaign different from the user's
   // localStorage-restored selectedCampaignId. The campaign-switch effect
@@ -493,9 +519,36 @@ export default function ChatPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResponding, messageQueue.length]);
 
+  // Brief "already queued" hint (FIX 3) — auto-clears after a short beat.
+  const flashDupHint = useCallback(() => {
+    setDupHint(true);
+    if (dupHintTimerRef.current) clearTimeout(dupHintTimerRef.current);
+    dupHintTimerRef.current = setTimeout(() => setDupHint(false), 2500);
+  }, []);
+
   // Send message (queues if agent is busy)
   const handleSend = useCallback(
     (text: string, model: ModelId = 'fable', roleId?: string, attachments?: Attachment[], orchestrate?: boolean) => {
+      const trimmed = text.trim();
+
+      // FIX 3 — duplicate-send guard. Drop an IDENTICAL text re-submitted within
+      // DEDUP_WINDOW_MS while a send is in-flight OR queued (the queue+lag
+      // double-fire that produced two identical bubbles + double turn cost).
+      // A DIFFERENT message is never blocked; the same text after the window is
+      // a legit repeat and goes through.
+      const last = lastSendRef.current;
+      const busy = isResponding || messageQueue.length > 0;
+      if (
+        busy &&
+        last &&
+        last.text === trimmed &&
+        Date.now() - last.ts < DEDUP_WINDOW_MS
+      ) {
+        flashDupHint();
+        return;
+      }
+      lastSendRef.current = { text: trimmed, ts: Date.now() };
+
       if (isResponding) {
         // Queue the message — show it in chat with pending state
         const queuedMsg: ChatMessage = {
@@ -511,7 +564,8 @@ export default function ChatPanel() {
       }
       actualSend(text, model, roleId, attachments, orchestrate);
     },
-    [isResponding],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isResponding, messageQueue.length, flashDupHint],
   );
 
   // v2 orchestrated send — the two-step flow (story 3.1/3.2). Separate from the
@@ -528,6 +582,30 @@ export default function ChatPanel() {
       const assistantMsgId = `msg-${Date.now()}-orch`;
       let directorText = '';
       let turnId: string | null = null;
+
+      // FIX 2a — batched event ingestion. `onEvent` pushes into this buffer
+      // (cheap, no re-render) instead of calling setTurnEvents per event; a
+      // ~90ms interval drains the whole buffer into ONE setTurnEvents state
+      // update per tick. A turn's claim-gate alone emits ~66 events and
+      // token-level text_deltas add many more, so per-event state writes made
+      // the ledger re-render on every token. The identity guards + the
+      // final_chunk→bubble path stay per-event (below); only the ledger's
+      // turnEvents accumulation is batched.
+      let pendingEvents: OrchestrationEvent[] = [];
+      let flushTimer: ReturnType<typeof setInterval> | null = null;
+      const flushPending = () => {
+        if (pendingEvents.length === 0) return;
+        if (conversationIdRef.current !== convId) { pendingEvents = []; return; }
+        const batch = pendingEvents;
+        pendingEvents = [];
+        const tid = turnId;
+        if (!tid) return;
+        setTurnEvents((prev) => ({ ...prev, [tid]: [...(prev[tid] ?? []), ...batch] }));
+      };
+      const stopFlushTimer = () => {
+        if (flushTimer !== null) { clearInterval(flushTimer); flushTimer = null; }
+      };
+
       try {
         convId = await ensureConversation();
         const controller = new AbortController();
@@ -560,6 +638,11 @@ export default function ChatPanel() {
         ]);
         setTurnEvents((prev) => ({ ...prev, [turn_id]: [] }));
         setCompleteTurns((prev) => ({ ...prev, [turn_id]: false }));
+        setStopping(false); // fresh turn — clear any prior optimistic-stop state
+
+        // Start the batched drain now that turnId is known. ~90ms cadence keeps
+        // the ledger visibly live without a state write per token.
+        flushTimer = setInterval(flushPending, 90);
 
         const markComplete = () => {
           if (conversationIdRef.current === convId) {
@@ -572,13 +655,16 @@ export default function ChatPanel() {
         await streamTurn(convId, turn_id, 0, {
           signal: controller.signal,
           onEvent: (ev) => {
-            // Isolation guard: apply ONLY when the event's turn is the one we
-            // subscribed to AND this conversation is still displayed.
+            // Isolation guard (Epic-0): apply ONLY when the event's turn is the
+            // one we subscribed to AND this conversation is still displayed.
+            // Runs PER-EVENT, before buffering — a stale run never buffers.
             if (ev.turn_id && ev.turn_id !== turn_id) return;
             if (conversationIdRef.current !== convId) return;
 
-            // Accumulate every v2 event for the ledger's replayable model.
-            setTurnEvents((prev) => ({ ...prev, [turn_id]: [...(prev[turn_id] ?? []), ev] }));
+            // FIX 2a: buffer the event for the ledger's replayable model — the
+            // scheduled flush drains it into ONE setTurnEvents update per tick,
+            // instead of a re-render per event.
+            pendingEvents.push(ev);
 
             switch (ev.type) {
               case 'routing': {
@@ -619,6 +705,11 @@ export default function ChatPanel() {
                   directorText += '\n\n> Stopped by user.';
                   guardedSetMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: directorText } : m));
                 }
+                // FIX 2a: terminal event — drain the buffer synchronously so the
+                // ledger's final rows land in the SAME commit that marks the
+                // turn complete (no lingering ~90ms gap before it collapses).
+                stopFlushTimer();
+                flushPending();
                 markComplete();
                 break;
               }
@@ -629,8 +720,11 @@ export default function ChatPanel() {
             }
           },
         });
-        // Stream ended without an explicit terminal (rare) → mark complete so the
-        // ledger collapses honestly rather than spinning forever.
+        // Stream ended without an explicit terminal (rare) → drain any buffered
+        // tail + mark complete so the ledger collapses honestly rather than
+        // spinning forever.
+        stopFlushTimer();
+        flushPending();
         markComplete();
         if (conversationIdRef.current === convId) {
           queryClient.invalidateQueries({ queryKey: ['campaigns'] });
@@ -651,10 +745,16 @@ export default function ChatPanel() {
           setCompleteTurns((prev) => ({ ...prev, [turnId!]: true }));
         }
       } finally {
+        // FIX 2a: tear down the drain timer + flush any buffered tail (covers
+        // the abort/error paths where no terminal event ran). Guarded flush
+        // no-ops if this conversation is no longer displayed.
+        stopFlushTimer();
+        flushPending();
         abortControllerRef.current = null;
         if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = null;
         if (conversationIdRef.current === convId) {
           setIsResponding(false);
+          setStopping(false);
         }
       }
     },
@@ -1208,7 +1308,13 @@ export default function ChatPanel() {
             campaignName: c.campaignName || null,
             messageCount: c.messageCount || 0,
           }))}
+          stopping={stopping}
+          dupHint={dupHint}
           onStop={async () => {
+            // FIX 2c — optimistic stop: reflect the click in the UI (spinner +
+            // disabled) BEFORE the stopTurn round-trip. Reset happens when the
+            // turn actually terminates (orchestratedSend finally) or below.
+            setStopping(true);
             // 1. Abort the SSE fetch stream immediately
             if (abortControllerRef.current) {
               abortControllerRef.current.abort();
@@ -1235,8 +1341,11 @@ export default function ChatPanel() {
             //    drain. Frontend-only: an explicit user "continue" still
             //    resumes; we only kill the AUTOMATIC resurrection.
             setMessageQueue([]);
-            // 4. Reset UI state
+            // 4. Reset UI state (clear the optimistic-stop flag now the stop has
+            //    landed — covers the direct-mode path where orchestratedSend's
+            //    finally doesn't run).
             setIsResponding(false);
+            setStopping(false);
             // 5. Strip pending (queued) messages + mark any pending tool calls as stopped
             setMessages((prev) => prev
               .filter((m) => !m.isPending)

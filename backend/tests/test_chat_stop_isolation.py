@@ -136,6 +136,121 @@ class IsolationAcceptance(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(row["conversation_id"], "conv-imposter")
 
 
+# ── A2) STOP WRITE-DISPOSITION (Fix 1 — P0 safety) ═════════════════════
+
+
+class StopWriteDisposition(unittest.IsolatedAsyncioTestCase):
+    """A stopped turn must report, per write-intent specialist, whether the
+    approved write completed or was cut off — an approved write must never die
+    silently. _drive observes agent_called(+write_intent)/agent_result through
+    _emit and folds the result into the terminal turn_stopped payload."""
+
+    def _turn_stopped(self, turn_id):
+        buf = cr._chat_hubs[turn_id].buffer
+        evs = [e for e in buf if e["type"] == "turn_stopped"]
+        self.assertTrue(evs, "expected a terminal turn_stopped event")
+        return evs[-1]["payload"]
+
+    async def test_in_flight_write_specialist_reports_stopped_before_write(self):
+        # A specialist was dispatched with write_intent, streamed "Pushing all 20
+        # negatives now", then the turn hung — user presses stop before agent_result.
+        started = asyncio.Event()
+
+        async def run_fn(*, turn_id: str):
+            yield {"type": "turn_start", "payload": {"mode": "orchestrated"}}
+            yield {"type": "agent_called", "payload": {
+                "call_id": "c1", "role_id": "ppc_strategist",
+                "role_name": "PPC Strategist", "task": "push 20 negatives",
+                "model": "sonnet", "tools": ["mutate"], "write_intent": True}}
+            yield {"type": "agent_progress", "payload": {
+                "call_id": "c1", "kind": "text",
+                "content": "Pushing all 20 negatives now"}}
+            started.set()
+            await asyncio.sleep(30)              # hang until stopped (write never lands)
+            yield {"type": "agent_result", "payload": {"call_id": "c1"}}  # never reached
+
+        turn_id = await cr.start(run_fn, conversation_id="conv-w1", campaign_id="c")
+        await asyncio.wait_for(started.wait(), timeout=2.0)
+        await asyncio.sleep(0.02)
+
+        res = await cr.stop_turn(turn_id)
+        self.assertEqual(res["status"], "stopped")
+        await asyncio.sleep(0.02)
+
+        payload = self._turn_stopped(turn_id)
+        # Existing keys preserved.
+        self.assertEqual(payload["stopped_by"], "user")
+        self.assertTrue(payload["partial_persisted"])
+        # The write-intent specialist is reported as NOT executed.
+        specs = payload["specialists"]
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs[0]["role_id"], "ppc_strategist")
+        self.assertEqual(specs[0]["role_name"], "PPC Strategist")
+        self.assertEqual(specs[0]["disposition"], "stopped_before_write")
+
+    async def test_completed_write_specialist_reports_completed(self):
+        # A write-intent specialist that FINISHED (agent_result seen) before a
+        # later stop shows disposition 'completed'; a pure-read specialist that
+        # never had write_intent produces NO warning entry.
+        both_started = asyncio.Event()
+
+        async def run_fn(*, turn_id: str):
+            yield {"type": "turn_start", "payload": {"mode": "orchestrated"}}
+            # write-intent specialist that completes
+            yield {"type": "agent_called", "payload": {
+                "call_id": "c1", "role_id": "ppc_strategist",
+                "role_name": "PPC Strategist", "task": "push 20 negatives",
+                "model": "sonnet", "tools": ["mutate"], "write_intent": True}}
+            yield {"type": "agent_result", "payload": {
+                "call_id": "c1", "role_id": "ppc_strategist", "status": "ok"}}
+            # a pure-read specialist (no write_intent) — must NOT warn
+            yield {"type": "agent_called", "payload": {
+                "call_id": "c2", "role_id": "analytics_analyst",
+                "role_name": "Analytics Analyst", "task": "report trends",
+                "model": "sonnet", "tools": [], "write_intent": False}}
+            both_started.set()
+            await asyncio.sleep(30)              # hang until stopped
+            yield {"type": "turn_done", "payload": {}}  # never reached
+
+        turn_id = await cr.start(run_fn, conversation_id="conv-w2", campaign_id="c")
+        await asyncio.wait_for(both_started.wait(), timeout=2.0)
+        await asyncio.sleep(0.02)
+
+        await cr.stop_turn(turn_id)
+        await asyncio.sleep(0.02)
+
+        specs = self._turn_stopped(turn_id)["specialists"]
+        # Only the write-intent specialist appears; it is 'completed'.
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs[0]["role_id"], "ppc_strategist")
+        self.assertEqual(specs[0]["disposition"], "completed")
+
+    async def test_no_write_specialist_gives_empty_list(self):
+        # The common safe case: no write-intent specialist in flight → empty list,
+        # existing keys intact.
+        started = asyncio.Event()
+
+        async def run_fn(*, turn_id: str):
+            yield {"type": "turn_start", "payload": {"mode": "orchestrated"}}
+            yield {"type": "agent_called", "payload": {
+                "call_id": "c1", "role_id": "analytics_analyst",
+                "role_name": "Analytics Analyst", "task": "report trends",
+                "model": "sonnet", "tools": [], "write_intent": False}}
+            started.set()
+            await asyncio.sleep(30)
+            yield {"type": "turn_done", "payload": {}}
+
+        turn_id = await cr.start(run_fn, conversation_id="conv-w3", campaign_id="c")
+        await asyncio.wait_for(started.wait(), timeout=2.0)
+        await asyncio.sleep(0.02)
+        await cr.stop_turn(turn_id)
+        await asyncio.sleep(0.02)
+
+        payload = self._turn_stopped(turn_id)
+        self.assertEqual(payload["specialists"], [])
+        self.assertEqual(payload["stopped_by"], "user")
+
+
 # ── B) PROC REGISTRY STOP ROUTING (story 1.5 / 2.6) ════════════════════
 
 

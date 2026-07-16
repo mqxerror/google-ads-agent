@@ -374,6 +374,35 @@ class GoogleAdsService:
             "name": r.campaign.name,
         }
 
+    async def get_conversion_actions(self, customer_id: str) -> list[dict]:
+        """Live GAQL read of the account's ENABLED conversion actions (Fix 4).
+
+        Account-scoped (NOT campaign-scoped) — a conversion action belongs to the
+        customer. READ-ONLY SELECT; NEVER mutates. Returns a list of dicts::
+
+            {"id", "name", "status", "primary_for_goal"}
+
+        The orchestrator's VERIFY stage injects this LIVE list into the Director's
+        context so it SUPERSEDES any stale/remembered conversion registry.
+        """
+        query = (
+            "SELECT conversion_action.id, conversion_action.name, "
+            "conversion_action.status, conversion_action.primary_for_goal "
+            "FROM conversion_action "
+            "WHERE conversion_action.status = 'ENABLED'"
+        )
+        rows = await asyncio.to_thread(_run_query, _clean_id(customer_id), query)
+        out: list[dict] = []
+        for r in rows:
+            ca = r.conversion_action
+            out.append({
+                "id": str(ca.id),
+                "name": ca.name,
+                "status": ca.status.name,
+                "primary_for_goal": bool(ca.primary_for_goal),
+            })
+        return out
+
     # ── ad groups ────────────────────────────────────────────────
 
     async def get_adgroups(

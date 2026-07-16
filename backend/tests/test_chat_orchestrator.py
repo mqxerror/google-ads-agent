@@ -62,6 +62,10 @@ async def _fake_fetch(*args, **kwargs):
     return ""  # no network; VERIFY sees an empty block → "failed"
 
 
+async def _fake_conv_fetch(*args, **kwargs):
+    return "", []  # no network; S2b conversion pull sees nothing → "failed"
+
+
 def _text_call(text: str, cost: float = 0.1) -> list[dict]:
     return [{"type": "text", "content": text}, {"type": "done", "cost": cost}]
 
@@ -77,12 +81,15 @@ class _Base(unittest.IsolatedAsyncioTestCase):
         _SCRIPT.clear()
         self._orig_stream = agent_mod.stream_agent_response
         self._orig_fetch = agent_mod.fetch_ad_landing_pages
+        self._orig_conv = agent_mod.fetch_conversion_actions
         agent_mod.stream_agent_response = _fake_stream_factory()
         agent_mod.fetch_ad_landing_pages = _fake_fetch
+        agent_mod.fetch_conversion_actions = _fake_conv_fetch
 
     def tearDown(self):
         agent_mod.stream_agent_response = self._orig_stream
         agent_mod.fetch_ad_landing_pages = self._orig_fetch
+        agent_mod.fetch_conversion_actions = self._orig_conv
 
     async def _ensure_conversation(self, conversation_id):
         db = await get_db()
@@ -256,6 +263,163 @@ class RunTurnStateMachine(_Base):
         self.assertTrue(called)
         for k in ("call_id", "role_id"):
             self.assertIn(k, called[0]["payload"])
+
+
+# ── Live conversion-action injection (Fix 4) ──────────────────────────
+class LiveConversionActions(_Base):
+    """S2 pulls ENABLED conversion actions LIVE and injects them into the
+    Director's context (superseding any stale registry), tags them into the
+    provenance manifest as LIVE_API, and emits a verification event."""
+
+    _PANAMA_BLOCK = (
+        "LIVE CONVERSION ACTIONS (fetched this turn — supersedes any remembered "
+        "registry):\n"
+        "- Panama QIV Lead (id 7607343274) status=ENABLED primary=YES"
+    )
+
+    async def _panama_conv(self, *args, **kwargs):
+        return self._PANAMA_BLOCK, [{
+            "id": "7607343274", "name": "Panama QIV Lead",
+            "status": "ENABLED", "primary_for_goal": True}]
+
+    def _capturing_stream(self):
+        """A fake stream that records every user_message it is called with, so we
+        can assert the conversion block reached the Director's plan/synth prompt.
+        Still honors _SCRIPT for the returned events."""
+        prompts = self.captured_prompts = []
+
+        async def _fake(*args, **kwargs):
+            prompts.append(kwargs.get("user_message", ""))
+            events = _SCRIPT.pop(0) if _SCRIPT else [
+                {"type": "text", "content": "ok"}, {"type": "done", "cost": 0.0}]
+            for e in events:
+                yield e
+        return _fake
+
+    async def test_conversion_block_injected_manifest_and_verification(self):
+        agent_mod.fetch_conversion_actions = self._panama_conv
+        agent_mod.stream_agent_response = self._capturing_stream()
+
+        # Spy on the manifest so we capture the LIVE_API add for conversion actions.
+        from app.services import provenance as prov_mod
+        live_calls = []
+        orig_add = prov_mod.ProvenanceManifest.add_live_api
+
+        def _spy_add(self, output, ts, tool_name=""):
+            live_calls.append({"output": output, "tool_name": tool_name})
+            return orig_add(self, output, ts, tool_name=tool_name)
+
+        prov_mod.ProvenanceManifest.add_live_api = _spy_add
+        try:
+            plan = _text_call(
+                '```json\n{"specialists":['
+                '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+            spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```')
+            synth = _text_call("done")
+            _SCRIPT.extend([plan, spec, synth])
+
+            events = await self._run(
+                force_mode="orchestrate",
+                user_message="does a Panama QIP conversion action exist for this campaign?")
+        finally:
+            prov_mod.ProvenanceManifest.add_live_api = orig_add
+
+        # (a) The block reached the Director context (plan prompt is the first
+        # non-specialist call; the synth prompt also carries premise_block).
+        self.assertTrue(
+            any("Panama QIV Lead" in p and "id 7607343274" in p
+                for p in self.captured_prompts),
+            "live conversion block must be injected into the Director prompt")
+        self.assertTrue(
+            any("supersedes any remembered registry" in p
+                for p in self.captured_prompts))
+
+        # (b) It was added to the manifest as LIVE_API via conversion_action_gaql.
+        self.assertTrue(
+            any("Panama QIV Lead" in c["output"]
+                and c["tool_name"] == "conversion_action_gaql"
+                for c in live_calls),
+            "conversion actions must be tagged LIVE_API in the manifest")
+
+        # (c) A verification conversion_actions event fired, status=verified.
+        conv_evs = [e for e in events if e["type"] == "verification"
+                    and e["payload"].get("kind") == "conversion_actions"]
+        self.assertTrue(conv_evs)
+        self.assertEqual(conv_evs[0]["payload"]["status"], "verified")
+        self.assertIn("Panama QIV Lead", conv_evs[0]["payload"]["detail"])
+
+    async def test_conversion_fetch_failure_degrades_no_crash(self):
+        # The GAQL read raises → helper contract is that agent.fetch_conversion_actions
+        # NEVER raises; but even if the orchestrator's call path raised, the turn
+        # must survive and report status=failed. Simulate the failed/empty result.
+        async def _empty_conv(*args, **kwargs):
+            return "", []
+
+        agent_mod.fetch_conversion_actions = _empty_conv
+
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+        spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```')
+        synth = _text_call("done")
+        _SCRIPT.extend([plan, spec, synth])
+
+        events = await self._run(
+            force_mode="orchestrate", user_message="audit my conversions in depth")
+        types = self.types(events)
+        # No crash: the turn still terminates normally.
+        self.assertIn("turn_done", types)
+        conv_evs = [e for e in events if e["type"] == "verification"
+                    and e["payload"].get("kind") == "conversion_actions"]
+        self.assertTrue(conv_evs)
+        self.assertEqual(conv_evs[0]["payload"]["status"], "failed")
+
+    async def test_conversion_fetch_raising_is_caught(self):
+        # If the injected fetch itself raises, the orchestrator's guard degrades
+        # to status=failed and the turn still completes (belt-and-suspenders).
+        async def _raising_conv(*args, **kwargs):
+            raise RuntimeError("boom")
+
+        agent_mod.fetch_conversion_actions = _raising_conv
+
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+        spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```')
+        synth = _text_call("done")
+        _SCRIPT.extend([plan, spec, synth])
+
+        events = await self._run(
+            force_mode="orchestrate", user_message="audit my conversions in depth now")
+        types = self.types(events)
+        self.assertIn("turn_done", types)
+        conv_evs = [e for e in events if e["type"] == "verification"
+                    and e["payload"].get("kind") == "conversion_actions"]
+        self.assertTrue(conv_evs)
+        self.assertEqual(conv_evs[0]["payload"]["status"], "failed")
+
+
+# ── Write-intent detection unit (Fix 1) ───────────────────────────────
+class WriteIntentDetection(unittest.TestCase):
+    def test_explicit_flag_wins(self):
+        self.assertTrue(chat_orchestrator._detect_write_intent(
+            {"task": "just look", "tools": [], "write_intent": True}))
+        self.assertFalse(chat_orchestrator._detect_write_intent(
+            {"task": "push 20 negatives", "tools": ["mutate"], "write_intent": False}))
+
+    def test_verb_heuristic(self):
+        self.assertTrue(chat_orchestrator._detect_write_intent(
+            {"task": "push 20 negative keywords", "tools": []}))
+        self.assertTrue(chat_orchestrator._detect_write_intent(
+            {"task": "analyze then pause AG4", "tools": []}))
+        self.assertFalse(chat_orchestrator._detect_write_intent(
+            {"task": "report on last week's trends", "tools": []}))
+
+    def test_tool_heuristic(self):
+        self.assertTrue(chat_orchestrator._detect_write_intent(
+            {"task": "handle it", "tools": ["google_ads__mutate_campaign"]}))
+        self.assertFalse(chat_orchestrator._detect_write_intent(
+            {"task": "review it", "tools": ["search__execute_query"]}))
 
 
 if __name__ == "__main__":

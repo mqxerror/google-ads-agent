@@ -141,6 +141,14 @@ export interface TurnStoppedPayload {
   stopped_by?: 'user' | string;
   calls_killed?: string[];
   partial_persisted?: boolean;
+  /** Specialists whose task involved a write. `stopped_before_write` means an
+   *  approved write may not have executed — the user MUST be warned. Empty array
+   *  is the common safe case (no write was in flight). */
+  specialists?: Array<{
+    role_id?: string;
+    role_name?: string;
+    disposition: 'completed' | 'stopped_before_write';
+  }>;
 }
 
 export interface TurnErrorPayload {

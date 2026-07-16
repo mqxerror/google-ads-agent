@@ -245,6 +245,13 @@ async def _drive(
     flush_count = _flush_count()
     flush_ms = _flush_ms()
 
+    # Fix 1 (P0 stop safety): track every dispatched WRITE-intent specialist so
+    # a stop can report its disposition — an approved write must never die
+    # silently. Keyed by call_id: {role_id, role_name, completed}. Populated by
+    # observing agent_called(+write_intent) / agent_result as they flow through
+    # _emit (the runner OWNS the terminal turn_stopped, so it needs this locally).
+    dispatched_writes: dict[str, dict] = {}
+
     async def _flush() -> None:
         nonlocal pending, last_flush
         if pending:
@@ -252,9 +259,45 @@ async def _drive(
             await _persist_events(turn_id, batch)
             last_flush = asyncio.get_event_loop().time()
 
+    def _track_dispatch(raw: dict) -> None:
+        """Observe dispatch events to keep dispatched_writes current (Fix 1)."""
+        rtype = raw.get("type")
+        payload = raw.get("payload", {}) or {}
+        if rtype == "agent_called" and payload.get("write_intent"):
+            cid = payload.get("call_id")
+            if cid is not None:
+                dispatched_writes[cid] = {
+                    "role_id": payload.get("role_id"),
+                    "role_name": payload.get("role_name"),
+                    "completed": False,
+                }
+        elif rtype == "agent_result":
+            cid = payload.get("call_id")
+            if cid in dispatched_writes:
+                dispatched_writes[cid]["completed"] = True
+
+    def _stop_specialists() -> list[dict]:
+        """Build the per-specialist disposition list for turn_stopped (Fix 1).
+
+        completed             — the specialist's agent_result was seen before stop
+        stopped_before_write  — dispatched write-intent, never completed (the
+                                approved write did NOT execute)
+        We report EVERY tracked write-intent specialist. Incomplete ones use
+        'stopped_before_write' (the common, honest case: the batch never ran)."""
+        out: list[dict] = []
+        for _cid, info in dispatched_writes.items():
+            disposition = "completed" if info["completed"] else "stopped_before_write"
+            out.append({
+                "role_id": info.get("role_id"),
+                "role_name": info.get("role_name"),
+                "disposition": disposition,
+            })
+        return out
+
     def _emit(raw: dict) -> dict:
         nonlocal seq
         seq += 1
+        _track_dispatch(raw)
         env = _stamp(conversation_id, turn_id, seq, raw)
         hub.publish(env)
         pending.append(env)
@@ -278,7 +321,11 @@ async def _drive(
         # kill already happened in stop_turn (agent.stop_turn); this is the
         # task+event+row half.
         _emit({"type": "turn_stopped",
-               "payload": {"stopped_by": "user", "partial_persisted": True}})
+               "payload": {"stopped_by": "user", "partial_persisted": True,
+                           # Fix 1: per-specialist write disposition so the UI can
+                           # warn about an approved-but-not-executed mutation.
+                           # Empty list = the common safe case (no write in flight).
+                           "specialists": _stop_specialists()}})
         await _mark_turn(turn_id, "stopped", stop_reason="stopped by user")
         raise
     except Exception as e:  # pragma: no cover — run_fn has its own guards

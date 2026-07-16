@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Square,
   Gavel,
+  AlertTriangle,
   History as HistoryIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ import type {
   DecisionPayload,
   ClaimGatePayload,
   FinalDonePayload,
+  TurnStoppedPayload,
   Finding,
 } from '@/types/orchestration';
 
@@ -149,6 +151,15 @@ interface ClaimGateRow {
   flagged: { claim: string; reason: string }[];
 }
 
+/** P0 safety — a user pressed stop while an approved write was mid-dispatch, so
+ *  the write MAY NOT have executed. Rendered prominently; never silent (§P0). */
+interface StopWarningRow {
+  kind: 'stop_warning';
+  order: number;
+  key: string;
+  affected: { name: string }[];
+}
+
 type LedgerRow =
   | RecallRow
   | VerifyRow
@@ -156,7 +167,8 @@ type LedgerRow =
   | ThoughtRow
   | ConflictRow
   | DecisionRow
-  | ClaimGateRow;
+  | ClaimGateRow
+  | StopWarningRow;
 
 interface LedgerModel {
   rows: LedgerRow[];
@@ -407,9 +419,30 @@ function buildModel(events: OrchestrationEvent[]): LedgerModel {
         break;
       }
 
+      case 'turn_stopped': {
+        // P0 safety — if any write-bearing specialist stopped BEFORE its write
+        // completed, an approved mutation may have died silently. Warn loudly.
+        // A clean stop (all completed, or empty array) pushes nothing.
+        const p = payloadOf<TurnStoppedPayload>(ev);
+        const atRisk = (p.specialists ?? []).filter(
+          (s) => s.disposition === 'stopped_before_write'
+        );
+        if (atRisk.length > 0) {
+          rows.push({
+            kind: 'stop_warning',
+            order: idx,
+            key: `sw-${idx}`,
+            affected: atRisk.map((s) => ({
+              name: s.role_name || s.role_id || 'A specialist',
+            })),
+          });
+        }
+        break;
+      }
+
       default:
-        // turn_start / final_start / final_chunk / turn_done / turn_error /
-        // turn_stopped and any v1 leak → nothing to render in the ledger.
+        // turn_start / final_start / final_chunk / turn_done / turn_error and
+        // any v1 leak → nothing to render in the ledger.
         break;
     }
   });
@@ -850,9 +883,85 @@ function DecisionLedgerRow({ row }: { row: DecisionRow }) {
   );
 }
 
+// ---- stop-warning row (P0 safety) ------------------------------------------
+
+// Rendered when the user stopped a turn while an approved write was mid-dispatch.
+// Prominent by design — the whole bug being fixed is that a stopped approved
+// write died silently. Uses the standard danger-alert box (DESIGN.md danger
+// tokens), matching the studio error-box pattern.
+function StopWarningLedgerRow({ row }: { row: StopWarningRow }) {
+  return (
+    <div className="-mx-2 rounded-md border border-danger/40 bg-danger-soft px-2 py-1.5">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger" aria-hidden="true" />
+        <div className="min-w-0 space-y-1">
+          <p className="text-[12px] font-medium text-danger">
+            Approved write may not have executed. Verify before assuming it applied.
+          </p>
+          <div className="space-y-0.5">
+            {row.affected.map((a, i) => (
+              <p key={`swa-${i}`} className="text-[11px] leading-snug text-danger/90">
+                {a.name} stopped before its write completed
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- one row dispatcher ----------------------------------------------------
 
-function LedgerRowView({
+// FIX 2b — a stable content signature for one row, so React.memo can skip the
+// ~99% of rows that DON'T change when a token delta rebuilds the model. Every
+// buffered flush re-runs buildModel and produces FRESH row objects, so a plain
+// referential memo wouldn't help; this string captures exactly the fields each
+// row renders. When a token arrives, only the active specialist's textPreview
+// changes → only that row's signature changes → only that row re-renders. The
+// whole 300+ row ledger no longer re-renders per token.
+function rowSignature(row: LedgerRow): string {
+  switch (row.kind) {
+    case 'specialist':
+      return [
+        'sp', row.callId, row.status, row.roleId ?? '', row.roleName ?? '',
+        row.task ?? '', row.reason ?? '', row.reusedFrom ?? '',
+        row.textPreview, row.tools.length, row.summary ?? '',
+        row.findings.length, row.cost ?? '', row.durationMs ?? '',
+        // Findings identity — claim text can arrive after the row exists.
+        row.findings.map((f) => `${f.id}:${f.severity ?? ''}:${f.confidence ?? ''}`).join('|'),
+        row.tools.map((t) => t.key).join('|'),
+      ].join('');
+    case 'recall':
+      return `recall${row.found}${row.stale}${row.children.length}${row.ts ?? ''}`;
+    case 'verify':
+      return `vf${row.key}${row.status}${row.detail ?? ''}`;
+    case 'thought':
+      return `th${row.key}${row.text}`;
+    case 'conflict':
+      return `cf${row.key}${row.topic}${row.positions.map((p) => `${p.callId}:${p.roleName}:${p.stance}`).join('|')}`;
+    case 'decision':
+      return `dc${row.key}${row.ruling}${row.rationale ?? ''}${row.resolvesTopic ?? ''}`;
+    case 'claim_gate':
+      return `cg${row.key}${row.checked}${row.passed}${row.rewritten.length}${row.flagged.length}`;
+    case 'stop_warning':
+      return `sw${row.key}${row.affected.map((a) => a.name).join('|')}`;
+    default:
+      return JSON.stringify(row);
+  }
+}
+
+// Memoized row: re-renders only when its content signature changes (or the stop
+// handler identity flips live↔history). Token deltas touch one specialist row's
+// textPreview → only that row re-renders; the rest are skipped.
+const MemoLedgerRow = memo(
+  LedgerRowViewImpl,
+  (prev, next) =>
+    prev.onStopCall === next.onStopCall &&
+    rowSignature(prev.row) === rowSignature(next.row),
+);
+
+function LedgerRowViewImpl({
   row,
   onStopCall,
 }: {
@@ -880,6 +989,8 @@ function LedgerRowView({
       return <DecisionLedgerRow row={row} />;
     case 'claim_gate':
       return <ClaimGateLedgerRow row={row} />;
+    case 'stop_warning':
+      return <StopWarningLedgerRow row={row} />;
     default:
       return null;
   }
@@ -924,9 +1035,18 @@ export default function OrchestrationLedger({
   if (model.rows.length === 0 && !isComplete) return null;
   if (model.rows.length === 0) return null;
 
+  // P0 safety — the stop-write warning must stay visible even when the turn
+  // completed collapsed, so surface it above the collapsed summary too.
+  const stopWarnings = model.rows.filter(
+    (r): r is StopWarningRow => r.kind === 'stop_warning'
+  );
+
   if (isComplete && collapsed) {
     return (
-      <div className="mt-1 text-xs">
+      <div className="mt-1 space-y-0.5 text-xs">
+        {stopWarnings.map((row) => (
+          <StopWarningLedgerRow key={row.key} row={row} />
+        ))}
         <Row onClick={() => setCollapsed(false)} className="hover:bg-surface-2">
           <HistoryIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
           <SummaryLine model={model} />
@@ -947,7 +1067,7 @@ export default function OrchestrationLedger({
         </Row>
       )}
       {model.rows.map((row) => (
-        <LedgerRowView
+        <MemoLedgerRow
           key={rowKey(row)}
           row={row}
           onStopCall={onStopCall}

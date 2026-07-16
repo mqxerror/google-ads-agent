@@ -46,13 +46,18 @@ interface ChatInputProps {
   disabled: boolean;
   campaignName?: string | null;
   onStop?: () => void;
+  /** FIX 2c — optimistic stop: Stop was clicked; show a spinner + disable it
+   *  immediately, before the stop round-trip resolves. */
+  stopping?: boolean;
+  /** FIX 3 — a duplicate send was just dropped; show a brief inline hint. */
+  dupHint?: boolean;
   conversations?: ConversationRef[];
   conversationId?: string | null;
   onEnsureConversation?: () => Promise<string>;
   onVideoReady?: (url: string, script: string, thumbnail?: string) => void;
 }
 
-export default function ChatInput({ onSend, disabled, campaignName, onStop, conversations = [], conversationId, onEnsureConversation, onVideoReady }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, campaignName, onStop, stopping, dupHint, conversations = [], conversationId, onEnsureConversation, onVideoReady }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [model, setModel] = useState<ModelId>('fable');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -683,6 +688,14 @@ The question/topic: ${messageText}`;
         </div>
       )}
 
+      {/* FIX 3 — duplicate-send hint. Quiet inline note (no new colors), shown
+          briefly when an identical message was dropped while one was in flight. */}
+      {dupHint && (
+        <p className="px-1 text-[10px] text-subtle" role="status" aria-live="polite">
+          Already queued, waiting for the current reply.
+        </p>
+      )}
+
       {/* Input + send — one sunken well framed as a single control. */}
       <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface-2 px-2 py-1.5 transition-colors focus-within:border-accent">
         {/* Hidden file input */}
@@ -715,10 +728,15 @@ The question/topic: ${messageText}`;
         {disabled && onStop && (
           <button
             onClick={onStop}
-            title="Stop agent"
-            className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md bg-danger text-on-accent hover:opacity-90 transition-opacity"
+            disabled={stopping}
+            title={stopping ? 'Stopping…' : 'Stop agent'}
+            className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md bg-danger text-on-accent hover:opacity-90 disabled:opacity-70 transition-opacity"
           >
-            <Square className="h-4 w-4 fill-current" />
+            {stopping ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Square className="h-4 w-4 fill-current" />
+            )}
           </button>
         )}
         <button

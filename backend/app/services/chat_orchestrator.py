@@ -80,6 +80,35 @@ _STOPWORDS = {
 }
 
 
+# ── Write-intent detection (Fix 1 — P0 stop safety) ───────────────────
+# A specialist whose task involves a MUTATION needs a stop-disposition warning
+# so an approved-but-not-executed write never dies silently. We detect intent
+# from (a) a `write_intent` boolean the plan may set, else (b) a verb/tool
+# heuristic over the task text + requested tools.
+_WRITE_VERBS = (
+    "push", "create", "update", "add", "remove", "pause", "enable", "set",
+    "mutate", "apply", "delete", "disable", "adjust", "raise", "lower",
+    "increase", "decrease", "upload", "submit",
+)
+
+
+def _detect_write_intent(spec: dict) -> bool:
+    """True when this specialist's task looks like it MUTATES the account.
+
+    Honors an explicit `write_intent` flag from the plan JSON first; otherwise
+    scans the tool names + task text for mutating verbs. Conservative on the
+    side of warning (a false-positive warning is cheap; a silently-dropped write
+    is the P0 bug we're fixing)."""
+    explicit = spec.get("write_intent")
+    if isinstance(explicit, bool):
+        return explicit
+    haystack = " ".join([
+        str(spec.get("task", "") or ""),
+        " ".join(str(t) for t in (spec.get("tools") or [])),
+    ]).lower()
+    return any(v in haystack for v in _WRITE_VERBS)
+
+
 def _claim_tokens(text: str) -> set[str]:
     out: set[str] = set()
     word = []
@@ -238,10 +267,12 @@ async def _dispatch_specialist(
     task = spec["task"]
     model = spec.get("model", "sonnet")
     tools = spec.get("tools", []) or []
+    write_intent = bool(spec.get("write_intent"))
 
     await out.put({
         "type": "agent_start", "call_id": call_id, "role_id": role_id,
         "role_name": role_name, "task": task, "model": model, "tools": tools,
+        "write_intent": write_intent,
     })
 
     parts: list[str] = []
@@ -408,7 +439,8 @@ async def run_turn(
     # ══ ORCHESTRATE path — guard the WHOLE body ═══════════════════════
     try:
         from app.services import task_ledger
-        from app.services.agent import fetch_ad_landing_pages, stream_agent_response
+        from app.services.agent import (
+            fetch_ad_landing_pages, fetch_conversion_actions, stream_agent_response)
         from app.services.claim_gate import run_claim_gate
         from app.services.provenance import ProvenanceManifest
         from app.services.roles import list_roles
@@ -498,6 +530,33 @@ async def run_turn(
             yield {"type": "verification", "payload": {
                 "kind": "landing_page", "status": "skipped", "detail": ""}}
 
+        # ── S2b: live conversion-action registry (Fix 4) ──────────────
+        # One cheap, account-scoped, read-only GAQL pull EVERY orchestrated turn.
+        # The block is injected into the Director's context so it SUPERSEDES any
+        # stale/remembered conversion registry; it is tagged LIVE_API so the
+        # claim gate can verify conversion-action claims. A fetch failure degrades
+        # silently (status=failed) and never aborts the turn.
+        conv_block = ""
+        try:
+            conv_block, conv_rows = await fetch_conversion_actions(account_id)
+        except Exception as e:  # fetch_conversion_actions should never raise
+            logger.warning("conversion-action fetch failed: %s", e)
+            conv_block, conv_rows = "", []
+        if conv_block:
+            try:
+                manifest.add_live_api(
+                    conv_block, now_iso, tool_name="conversion_action_gaql")
+            except Exception as _e:
+                logger.debug("manifest conversion add skipped: %s", _e)
+            premise_block += "\n\n" + conv_block + "\n"
+            yield {"type": "verification", "payload": {
+                "kind": "conversion_actions", "status": "verified",
+                "detail": conv_block[:400]}}
+        else:
+            yield {"type": "verification", "payload": {
+                "kind": "conversion_actions", "status": "failed",
+                "detail": "could not fetch"}}
+
         # ══ S3 PLAN ════════════════════════════════════════════════════
         roster = [
             f"- {r['id']} ({r['name']}): {r['specialty']}"
@@ -562,7 +621,7 @@ async def run_turn(
                 continue
             role = get_role(s["role_id"])
             call_id = f"c{len(specs) + 1}"
-            specs.append({
+            spec_entry = {
                 "call_id": call_id,
                 "role_id": s["role_id"],
                 "role_name": role.name if role else s["role_id"],
@@ -570,7 +629,13 @@ async def run_turn(
                 "model": s.get("model") or "sonnet",
                 "tools": s.get("tools") or [],
                 "reason": s.get("reason") or "",
-            })
+                # honor an explicit plan flag when present (see _detect_write_intent)
+                "write_intent": s.get("write_intent"),
+            }
+            # Fix 1: pin write-intent per spec so the stop path can report a
+            # per-specialist disposition (an approved write must never die silently).
+            spec_entry["write_intent"] = _detect_write_intent(spec_entry)
+            specs.append(spec_entry)
 
         if not specs:
             yield {"type": "director_thought", "payload": {
@@ -592,7 +657,8 @@ async def run_turn(
             "specialists": [
                 {"call_id": s["call_id"], "role_id": s["role_id"],
                  "role_name": s["role_name"], "task": s["task"],
-                 "model": s["model"], "tools": s["tools"], "reason": s["reason"]}
+                 "model": s["model"], "tools": s["tools"], "reason": s["reason"],
+                 "write_intent": s["write_intent"]}
                 for s in specs
             ],
             "parallel_groups": [[s["call_id"] for s in specs]],
@@ -643,7 +709,8 @@ async def run_turn(
                 yield {"type": "agent_called", "payload": {
                     "call_id": item["call_id"], "role_id": item["role_id"],
                     "role_name": item["role_name"], "task": item["task"],
-                    "model": item["model"], "tools": item["tools"]}}
+                    "model": item["model"], "tools": item["tools"],
+                    "write_intent": bool(item.get("write_intent"))}}
             elif itype == "agent_text":
                 yield {"type": "agent_progress", "payload": {
                     "call_id": item["call_id"], "kind": "text",
