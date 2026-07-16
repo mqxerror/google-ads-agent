@@ -11,8 +11,9 @@ Convention: **Story** = the epic/story id it maps to, or `NEW — unplanned` if 
 
 | Date | Feature / change | Story | Files touched |
 |---|---|---|---|
+| 2026-07-16 | **`generate_keyword_ideas` read tool for the cmo-agent:** new read-only method + tool on `SearchService` (metadata) wrapping `KeywordPlanIdeaService.GenerateKeywordIdeas` — keyword research (ideas + avg_monthly_searches + competition + low/high top-of-page bid micros) seeded by `keywords` and/or `page_url`, `geo_target` (default "2124" Canada), `language` (default "1000" English), `limit` (default 50). Bare geo/language ids expanded to `geoTargetConstants/<id>` / `languageConstants/<id>`; picks Keyword/Url/KeywordAndUrl seed by args; response iterator capped at `limit`. GenerateKeywordIdeas MUTATES NOTHING → safe on the read surface. Mounted via the existing `search_server` (`--groups reporting`, namespace `search`) so it serves as wire name `search_generate_keyword_ideas` — CMO's 6th read tool on the google connector. Live-validated on customer 7178239091 (MCC login_customer_id from client config), 50 real rows (e.g. "citizenship by investment" 480/mo MEDIUM; "golden visa portugal" 390/mo MEDIUM). | NEW — unplanned (cmo-agent E3 MCP read-surface expansion) | backend/google_ads/services/metadata/search_service.py |
 
-_(empty — everything through 2026-07-14 reconciled; append new rows to the table above)_
+_(append new rows to the table above)_
 
 ## Reconciled
 

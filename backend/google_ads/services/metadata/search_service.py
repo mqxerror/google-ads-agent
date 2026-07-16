@@ -4,12 +4,21 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from fastmcp import Context, FastMCP
 from google.ads.googleads.errors import GoogleAdsException
+from google.ads.googleads.v23.enums.types.keyword_plan_network import (
+    KeywordPlanNetworkEnum,
+)
 from google.ads.googleads.v23.services.services.google_ads_service import (
     GoogleAdsServiceClient,
 )
 from google.ads.googleads.v23.services.types.google_ads_service import (
     GoogleAdsRow,
     SearchGoogleAdsRequest,
+)
+from google.ads.googleads.v23.services.types.keyword_plan_idea_service import (
+    GenerateKeywordIdeasRequest,
+    KeywordAndUrlSeed,
+    KeywordSeed,
+    UrlSeed,
 )
 
 from google_ads.sdk_client import get_sdk_client
@@ -402,6 +411,124 @@ class SearchService:
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
+    async def generate_keyword_ideas(
+        self,
+        ctx: Context,
+        customer_id: str,
+        keywords: Optional[List[str]] = None,
+        page_url: Optional[str] = None,
+        geo_target: str = "2124",
+        language: str = "1000",
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Research keyword ideas via KeywordPlanIdeaService.GenerateKeywordIdeas.
+
+        Read-only demand research: given seed keywords and/or a landing-page URL,
+        returns related keyword ideas with search volume, competition, and
+        top-of-page bid estimates. GenerateKeywordIdeas MUTATES NOTHING — no
+        keyword plan is created, no campaign / criterion is touched — so this is
+        safe on the read surface (the CMO's keyword-research tool).
+
+        Args:
+            ctx: FastMCP context
+            customer_id: Account the research is billed to. Must be a NON-manager
+                account (the API rejects MCC ids); the login_customer_id / MCC
+                header is supplied by the SDK client config, not here.
+            keywords: Optional list of seed keywords to expand.
+            page_url: Optional landing-page URL to derive ideas from. At least one
+                of `keywords` or `page_url` must be given.
+            geo_target: Geo target constant id (bare numeric; expanded to
+                geoTargetConstants/<id>). Default "2124" = Canada ("2840" = US).
+            language: Language constant id (bare numeric; expanded to
+                languageConstants/<id>). Default "1000" = English.
+            limit: Max number of ideas to return (API page size, max 10000).
+
+        Returns:
+            List of rows: {text, avg_monthly_searches, competition,
+            low_top_of_page_bid_micros, high_top_of_page_bid_micros}.
+        """
+        if not keywords and not page_url:
+            raise Exception(
+                "generate_keyword_ideas requires at least one of `keywords` or "
+                "`page_url` as a seed."
+            )
+        try:
+            customer_id = format_customer_id(customer_id)
+
+            # Build request. Ids arrive bare (e.g. "2124") and are expanded to the
+            # resource-name form the API expects.
+            request = GenerateKeywordIdeasRequest()
+            request.customer_id = customer_id
+            request.language = f"languageConstants/{language}"
+            request.geo_target_constants.append(f"geoTargetConstants/{geo_target}")
+            request.keyword_plan_network = (
+                KeywordPlanNetworkEnum.KeywordPlanNetwork.GOOGLE_SEARCH_AND_PARTNERS
+            )
+            request.page_size = limit
+
+            # Pick the seed by what was provided (keywords + url / keywords / url).
+            if keywords and page_url:
+                keyword_and_url_seed = KeywordAndUrlSeed()
+                keyword_and_url_seed.keywords.extend(keywords)
+                keyword_and_url_seed.url = page_url
+                request.keyword_and_url_seed = keyword_and_url_seed
+            elif keywords:
+                keyword_seed = KeywordSeed()
+                keyword_seed.keywords.extend(keywords)
+                request.keyword_seed = keyword_seed
+            else:
+                url_seed = UrlSeed()
+                url_seed.url = page_url
+                request.url_seed = url_seed
+
+            # KeywordPlanIdeaService is a distinct service from GoogleAdsService.
+            sdk_client = get_sdk_client()
+            kp_idea_client = sdk_client.client.get_service("KeywordPlanIdeaService")
+            response = kp_idea_client.generate_keyword_ideas(request=request)
+
+            # The response iterator auto-paginates, so cap total rows at `limit`.
+            results: List[Dict[str, Any]] = []
+            for idea in response:
+                if len(results) >= limit:
+                    break
+                metrics = idea.keyword_idea_metrics
+                results.append(
+                    {
+                        "text": idea.text,
+                        "avg_monthly_searches": metrics.avg_monthly_searches
+                        if metrics
+                        else None,
+                        "competition": metrics.competition.name
+                        if metrics and metrics.competition
+                        else None,
+                        "low_top_of_page_bid_micros": metrics.low_top_of_page_bid_micros
+                        if metrics
+                        else None,
+                        "high_top_of_page_bid_micros": (
+                            metrics.high_top_of_page_bid_micros if metrics else None
+                        ),
+                    }
+                )
+
+            await ctx.log(
+                level="info",
+                message=(
+                    f"Generated {len(results)} keyword ideas for customer "
+                    f"{customer_id}"
+                ),
+            )
+
+            return results
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to generate keyword ideas: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
 
 def create_search_tools(service: SearchService) -> List[Callable[..., Awaitable[Any]]]:
     """Create tool functions for the search service.
@@ -532,6 +659,47 @@ def create_search_tools(service: SearchService) -> List[Callable[..., Awaitable[
         """
         return await service.list_accessible_customers(ctx=ctx)
 
+    async def generate_keyword_ideas(
+        ctx: Context,
+        customer_id: str,
+        keywords: Optional[List[str]] = None,
+        page_url: Optional[str] = None,
+        geo_target: str = "2124",
+        language: str = "1000",
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Research keyword ideas (search volume + competition + bid estimates).
+
+        Read-only keyword research via KeywordPlanIdeaService.GenerateKeywordIdeas,
+        which mutates nothing (no keyword plan, campaign, or criterion is created).
+        Seed with `keywords`, a `page_url`, or both — at least one is required.
+
+        Args:
+            customer_id: A NON-manager account id the research is billed to (the
+                API rejects MCC ids; the login_customer_id header comes from the
+                SDK config, not this arg).
+            keywords: Optional seed keywords to expand (e.g.
+                ["golden visa portugal"]).
+            page_url: Optional landing-page URL to derive ideas from.
+            geo_target: Geo target constant id, bare numeric (default "2124" =
+                Canada; "2840" = US).
+            language: Language constant id, bare numeric (default "1000" = English).
+            limit: Max ideas to return (default 50).
+
+        Returns:
+            List of {text, avg_monthly_searches, competition,
+            low_top_of_page_bid_micros, high_top_of_page_bid_micros}.
+        """
+        return await service.generate_keyword_ideas(
+            ctx=ctx,
+            customer_id=customer_id,
+            keywords=keywords,
+            page_url=page_url,
+            geo_target=geo_target,
+            language=language,
+            limit=limit,
+        )
+
     tools.extend(
         [
             search_campaigns,
@@ -539,6 +707,7 @@ def create_search_tools(service: SearchService) -> List[Callable[..., Awaitable[
             search_keywords,
             execute_query,
             list_accessible_customers,
+            generate_keyword_ideas,
         ]
     )
     return tools
