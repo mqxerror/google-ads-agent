@@ -70,6 +70,7 @@ class ConversionService:
         attribution_model: str = "GOOGLE_SEARCH_ATTRIBUTION_DATA_DRIVEN",
         click_through_lookback_window_days: int = 30,
         view_through_lookback_window_days: int = 1,
+        primary_for_goal: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Create a new conversion action.
 
@@ -85,6 +86,8 @@ class ConversionService:
             attribution_model: Attribution model (DATA_DRIVEN, LAST_CLICK, etc.)
             click_through_lookback_window_days: Click lookback window (1-90)
             view_through_lookback_window_days: View lookback window (1-30)
+            primary_for_goal: Whether the action is primary for its conversion
+                goal (optional). None leaves it to the API default.
 
         Returns:
             Created conversion action details
@@ -148,6 +151,10 @@ class ConversionService:
                 view_through_lookback_window_days
             )
 
+            # Set primary_for_goal only when explicitly provided (else API default)
+            if primary_for_goal is not None:
+                conversion_action.primary_for_goal = primary_for_goal
+
             # Create operation
             operation = ConversionActionOperation()
             operation.create = conversion_action
@@ -183,6 +190,7 @@ class ConversionService:
         default_value: Optional[float] = None,
         always_use_default_value: Optional[bool] = None,
         counting_type: Optional[str] = None,
+        primary_for_goal: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Update an existing conversion action.
 
@@ -195,6 +203,9 @@ class ConversionService:
             default_value: New default value (optional)
             always_use_default_value: Whether to always use default value (optional)
             counting_type: New counting type (optional)
+            primary_for_goal: Whether this action is primary for its conversion
+                goal (optional). Set to False to demote a deprecated action from
+                primary to secondary. None leaves the flag untouched.
 
         Returns:
             Updated conversion action details
@@ -228,6 +239,10 @@ class ConversionService:
                     counting_type,
                 )
                 update_mask_fields.append("counting_type")
+
+            if primary_for_goal is not None:
+                conversion_action.primary_for_goal = primary_for_goal
+                update_mask_fields.append("primary_for_goal")
 
             # Update value settings if any value-related field is provided
             if default_value is not None or always_use_default_value is not None:
@@ -294,6 +309,7 @@ def create_conversion_tools(
         attribution_model: str = "GOOGLE_SEARCH_ATTRIBUTION_DATA_DRIVEN",
         click_through_lookback_window_days: int = 30,
         view_through_lookback_window_days: int = 1,
+        primary_for_goal: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Create a new conversion action.
 
@@ -310,6 +326,8 @@ def create_conversion_tools(
             attribution_model: Attribution model - GOOGLE_SEARCH_ATTRIBUTION_DATA_DRIVEN, GOOGLE_ADS_LAST_CLICK, GOOGLE_SEARCH_ATTRIBUTION_FIRST_CLICK, GOOGLE_SEARCH_ATTRIBUTION_LINEAR, GOOGLE_SEARCH_ATTRIBUTION_TIME_DECAY, GOOGLE_SEARCH_ATTRIBUTION_POSITION_BASED
             click_through_lookback_window_days: Click lookback window (1-90 days)
             view_through_lookback_window_days: View lookback window (1-30 days)
+            primary_for_goal: Whether the action is primary for its conversion
+                goal (optional). None leaves it to the API default.
 
         Returns:
             Created conversion action details
@@ -326,6 +344,7 @@ def create_conversion_tools(
             attribution_model=attribution_model,
             click_through_lookback_window_days=click_through_lookback_window_days,
             view_through_lookback_window_days=view_through_lookback_window_days,
+            primary_for_goal=primary_for_goal,
         )
 
     async def update_conversion_action(
@@ -337,6 +356,7 @@ def create_conversion_tools(
         default_value: Optional[float] = None,
         always_use_default_value: Optional[bool] = None,
         counting_type: Optional[str] = None,
+        primary_for_goal: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Update an existing conversion action.
 
@@ -348,6 +368,9 @@ def create_conversion_tools(
             default_value: New default value (optional)
             always_use_default_value: Whether to always use default value (optional)
             counting_type: New counting type - ONE_PER_CLICK or MANY_PER_CLICK (optional)
+            primary_for_goal: Whether this action is primary for its conversion
+                goal (optional). Pass False to demote a deprecated action from
+                primary to secondary; True to promote. None leaves it unchanged.
 
         Returns:
             Updated conversion action details
@@ -361,6 +384,7 @@ def create_conversion_tools(
             default_value=default_value,
             always_use_default_value=always_use_default_value,
             counting_type=counting_type,
+            primary_for_goal=primary_for_goal,
         )
 
     tools.extend([create_conversion_action, update_conversion_action])

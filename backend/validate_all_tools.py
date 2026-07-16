@@ -1193,10 +1193,13 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         }],
     },
     # ── conversion (update) ───────────────────────────────────────────────
+    # primary_for_goal=False exercises the primary→secondary demote mask path
+    # (WS-added field) under validate_only — fail-closed, no live mutation.
     "conversion_update_conversion_action": lambda ids: {
         "customer_id": CUSTOMER_ID,
         "conversion_action_id": _req(ids["conversion_action_id"], "no conversion_action_id"),
         "status": "ENABLED",
+        "primary_for_goal": False,
     },
     "conversion_upload_upload_call_conversions": lambda ids: {
         "customer_id": CUSTOMER_ID,
