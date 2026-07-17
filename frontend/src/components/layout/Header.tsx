@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Settings, Command, Sun, Moon, Plus, LayoutDashboard, Trash2, Home, Brain, Film, ScrollText, BookOpen, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
@@ -30,7 +31,6 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
     switchAccount,
     setShowDashboard,
     showStudio,
-    setShowStudio,
     showChangelog,
     setShowChangelog,
     showGuidelines,
@@ -41,6 +41,7 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
     toggleDarkMode,
   } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Fetch V2 accounts and sync to store
   const { refetch } = useQuery({
@@ -160,7 +161,7 @@ export default function Header({ onOpenCommandPalette, onOpenSettings, onOpenInt
             'text-xs gap-1',
             showStudio ? 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent' : 'text-muted-foreground'
           )}
-          onClick={() => setShowStudio(!showStudio)}
+          onClick={() => navigate(showStudio ? '/' : '/studio')}
           title="Ad Studio — generate and manage creative"
         >
           <Film className="h-3 w-3" />

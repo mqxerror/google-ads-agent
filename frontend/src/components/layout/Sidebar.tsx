@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronRight,
@@ -202,9 +203,14 @@ export default function Sidebar({ isHome = false, bare = false }: { isHome?: boo
     setSelectedCampaign, setShowDashboard, setShowStudio, setShowChangelog, setShowGuidelines, setShowConversations,
   } = useAppStore();
 
+  const navigate = useNavigate();
   // Home rail affordance (C3): clear the campaign selection + every takeover
   // panel — the same move the Header's Home button and the `g h` chord make.
+  // navigate('/') is the load-bearing step: from inside /studio the campaign is
+  // already null, so clearing it wouldn't move the URL — only the route change
+  // leaves the Studio surface (and the two-way bridge closes showStudio).
   const goHome = () => {
+    navigate('/');
     setSelectedCampaign(null);
     setShowDashboard(false);
     setShowStudio(false);

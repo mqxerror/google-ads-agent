@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate, type NavigateFunction } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 
 /**
@@ -39,8 +40,12 @@ function isTypingOrModal(): boolean {
   return false;
 }
 
-/** Home = no campaign selected AND every takeover panel/page off. */
-function goHome() {
+/** Home = no campaign selected AND every takeover panel/page off. The
+ *  navigate('/') is load-bearing: from inside /studio the campaign is already
+ *  null, so clearing it wouldn't move the URL — only the route change leaves the
+ *  Studio surface (and the two-way URL⇆showStudio bridge closes it). */
+function goHome(navigate: NavigateFunction) {
+  navigate('/');
   const s = useAppStore.getState();
   s.setSelectedCampaign(null);
   s.setShowDashboard(false);
@@ -75,6 +80,9 @@ export function useKeyboardNav() {
   // lands within the window; a lone `g` harmlessly expires.
   const gAt = useRef(0);
   const CHORD_MS = 1000;
+  // react-router's navigate is referentially stable, so listing it as a dep
+  // keeps the mount-once contract while giving the handler a live navigator.
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -88,7 +96,7 @@ export function useKeyboardNav() {
       if (e.key === 'Escape') {
         if (useAppStore.getState().selectedCampaignId) {
           e.preventDefault();
-          goHome();
+          goHome(navigate);
         }
         return;
       }
@@ -108,7 +116,7 @@ export function useKeyboardNav() {
       if (key === 'h') {
         e.preventDefault();
         gAt.current = 0;
-        goHome();
+        goHome(navigate);
       } else if (key === 'c') {
         e.preventDefault();
         gAt.current = 0;
@@ -125,5 +133,5 @@ export function useKeyboardNav() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [navigate]);
 }

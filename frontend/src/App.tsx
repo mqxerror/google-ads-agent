@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -73,16 +73,19 @@ function MainLayout() {
     }
   }, [selectedCampaignId]);
 
-  // URL → showStudio bridge. `/studio` and `/studio/c/:assetId` both
-  // open the Studio overlay (same shape as the /c/:conversationId
-  // route → ChatPanel sync). Pushing to either URL out-of-band (e.g.
-  // pasting a /studio/c/<id> link) opens the Studio with that asset
-  // selected. Closing the Studio (its onClose) navigates back to "/".
+  // URL ⇆ showStudio bridge — now TWO-WAY so showStudio is a pure function of
+  // the URL, exactly like `isStudio` below. Landing on /studio* opens the
+  // Studio surface; navigating ANYWHERE else closes it. Before, the bridge only
+  // ever set showStudio=true, so any exit that flipped just the store bool (the
+  // StudioHome "Back to campaigns" button, the Home rail/chords) left the
+  // /studio URL behind — the view left Studio but the URL didn't, and a refresh
+  // dropped you right back in. Deriving the bool from the path makes that
+  // impossible: the URL is the single driver for the Studio surface too.
   const location = useLocation();
   const navigate = useNavigate();
   const setShowStudio = useAppStore((s) => s.setShowStudio);
   useEffect(() => {
-    if (location.pathname.startsWith('/studio')) setShowStudio(true);
+    setShowStudio(location.pathname.startsWith('/studio'));
   }, [location.pathname, setShowStudio]);
 
   // C2: campaign as a real route. Two-way URL sync, same shape as /studio + /c.
@@ -94,34 +97,49 @@ function MainLayout() {
   // Both guarded to avoid navigation loops (only act on a genuine mismatch), and
   // scoped so the studio / chat / setup routes are never hijacked.
   const setSelectedCampaign = useAppStore((s) => s.setSelectedCampaign);
-  // URL → store. Landing on /campaign/:id selects it; landing on "/" (incl.
-  // browser-back from a campaign) CLEARS the selection so home is truly home —
-  // this is what makes back-from-campaign land on the command center, not
-  // bounce straight back to the campaign. Scoped to the two managed paths only.
+  // ── URL → store (the SINGLE sync direction) ──────────────────────────────
+  // Fires ONLY on a genuine URL change (deep-link, refresh, browser
+  // back/forward, or the store→URL push below). `selectedCampaignId` is
+  // deliberately NOT a dependency — it's read FRESH via getState(). THIS is the
+  // desync fix: while it was a dep, a fresh user selection re-ran this effect
+  // against the STILL-STALE path and stomped the store back to the old id,
+  // fighting the store→URL push in a render thrash — the URL froze on the old
+  // campaign while the view showed the new one (and the chat chrome degraded).
   useEffect(() => {
     const m = /^\/campaign\/([^/]+)$/.exec(location.pathname);
+    const current = useAppStore.getState().selectedCampaignId;
     if (m) {
-      if (m[1] !== selectedCampaignId) setSelectedCampaign(m[1]);
-    } else if (location.pathname === '/' && selectedCampaignId) {
+      if (m[1] !== current) setSelectedCampaign(m[1]);
+    } else if (location.pathname === '/' && current) {
       setSelectedCampaign(null);
     }
-  }, [location.pathname, selectedCampaignId, setSelectedCampaign]);
-  // store → URL. Selecting a campaign while on a managed path pushes
-  // /campaign/:id (shareable, refresh-safe). Home selection is reflected as "/".
-  // Only touches the campaign<->home URL pair; never stomps /studio, /c, /setup.
+  }, [location.pathname, setSelectedCampaign]);
+  // ── store → URL (reflect a user selection into the path) ─────────────────
+  // Fires ONLY when the store selection actually CHANGES (guarded by a prev-ref
+  // so mount / StrictMode replay never fire it — otherwise the initial null
+  // selection would navigate a /campaign/:id deep-link straight back to "/").
+  // Because it does NOT depend on location.pathname it can never co-fire with
+  // the URL→store effect above — that decoupling is what removes the loop.
+  // A selection now reflects into the path from ANYWHERE (incl. /studio, /c), so
+  // clicking a campaign in the sidebar/flyout while inside the Studio escapes to
+  // /campaign/:id with full chrome restored — no refresh, no flash. Clearing the
+  // selection reflects home ONLY from a /campaign/ URL, so it never stomps
+  // /studio, /c or /setup.
+  const prevCampaignRef = useRef(selectedCampaignId);
   useEffect(() => {
-    const onCampaignRoute = location.pathname.startsWith('/campaign/');
-    const onManagedRoute = onCampaignRoute || location.pathname === '/';
-    if (!onManagedRoute) return;
-    if (selectedCampaignId && location.pathname !== `/campaign/${selectedCampaignId}`) {
-      navigate(`/campaign/${selectedCampaignId}`);
-    } else if (!selectedCampaignId && onCampaignRoute) {
-      // Selection cleared while still on a campaign URL (e.g. the `g h` chord
-      // or the Home rail) → reflect home in the URL. Not triggered by
-      // browser-back (that already put us on "/"), so no bounce-back loop.
+    if (prevCampaignRef.current === selectedCampaignId) return; // mount / no real change
+    prevCampaignRef.current = selectedCampaignId;
+    if (selectedCampaignId) {
+      if (location.pathname !== `/campaign/${selectedCampaignId}`) {
+        navigate(`/campaign/${selectedCampaignId}`);
+      }
+    } else if (location.pathname.startsWith('/campaign/')) {
       navigate('/');
     }
-  }, [selectedCampaignId, location.pathname, navigate]);
+    // location.pathname + navigate are read fresh from the render that changed
+    // selectedCampaignId; listing them as deps would re-introduce the co-fire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCampaignId]);
 
   const showingDashboard = showDashboard || (!selectedAccountId && connectedAccounts.length > 1);
 

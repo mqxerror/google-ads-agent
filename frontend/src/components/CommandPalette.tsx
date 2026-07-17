@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Command } from 'cmdk';
 import { Home, ArrowLeftToLine, CalendarClock } from 'lucide-react';
@@ -17,6 +18,7 @@ interface CommandPaletteProps {
 export default function CommandPalette({ open, onOpenChange, disableHotkey = false }: CommandPaletteProps) {
   const { setSelectedCampaign, setSelectedAccount } = useAppStore();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Get campaigns from TanStack Query cache
   const campaigns = (queryClient.getQueryData<Campaign[]>(['campaigns', '7178239091']) ?? []);
@@ -36,6 +38,10 @@ export default function CommandPalette({ open, onOpenChange, disableHotkey = fal
   // Navigation commands (C3) — mirror the keyboard chords (g h / g c / g p) so
   // the palette is a discoverable second path to the same three moves.
   const goHome = () => {
+    // navigate('/') is load-bearing: from inside /studio the campaign is already
+    // null, so clearing it wouldn't move the URL — only the route change leaves
+    // the Studio surface (the two-way URL⇆showStudio bridge then closes it).
+    navigate('/');
     const s = useAppStore.getState();
     s.setSelectedCampaign(null);
     s.setShowDashboard(false);

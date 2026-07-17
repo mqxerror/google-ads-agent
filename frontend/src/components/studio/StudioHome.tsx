@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { useAppStore } from '@/stores/appStore';
 import { fetchCampaigns, studioBalance } from '@/lib/api';
 import type { MarketingHook, SoulCharacter } from '@/lib/api';
 import MarketingPresetsPanel from './MarketingPresetsPanel';
@@ -41,7 +40,6 @@ const SECTIONS: { key: HubSection; label: string }[] = [
 export default function StudioHome() {
   const accountId = useClientAccountId();
   const queryClient = useQueryClient();
-  const { setShowStudio } = useAppStore();
   const navigate = useNavigate();
 
   const [section, setSection] = useState<HubSection>('library');
@@ -202,7 +200,7 @@ export default function StudioHome() {
             local only
           </span>
           <button
-            onClick={() => setShowStudio(false)}
+            onClick={() => navigate('/')}
             className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
           >
             Back to campaigns
