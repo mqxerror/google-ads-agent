@@ -162,12 +162,14 @@ interface StopWarningRow {
   affected: { name: string }[];
 }
 
-/** The turn budget (cost/time) was hit — DISPATCH was cut short and the answer
- *  was wrapped up from state. Rendered as a quiet, honest notice (Fix 1). */
+/** A budget threshold was crossed. `variant` picks the render:
+ *  'notice' = the $5 WATCH level (quiet chip, turn still running);
+ *  'stop'   = the runaway BACKSTOP (prominent wrap-up banner). Fix 1 / retune. */
 interface BudgetNoticeRow {
   kind: 'budget_notice';
   order: number;
   key: string;
+  variant: string;
   reason: string;
   cost: number;
   capUsd: number;
@@ -438,6 +440,7 @@ function buildModel(events: OrchestrationEvent[]): LedgerModel {
           kind: 'budget_notice',
           order: idx,
           key: `bn-${idx}`,
+          variant: p.kind ?? 'stop',
           reason: p.reason,
           cost: p.cost,
           capUsd: p.cap_usd,
@@ -946,8 +949,25 @@ function StopWarningLedgerRow({ row }: { row: StopWarningRow }) {
   );
 }
 
-// ---- budget-notice row (Fix 1) — the cap was hit; the turn wrapped up ------
+// ---- budget-notice row — WATCH-level chip (still running) OR BACKSTOP banner
 function BudgetNoticeLedgerRow({ row }: { row: BudgetNoticeRow }) {
+  // $5 WATCH level — a quiet one-line amber chip. The turn is STILL running;
+  // no 'ask me to continue' copy. Purely "heads up, this turn got pricey".
+  if (row.variant === 'notice') {
+    return (
+      <Row>
+        <Hourglass className="h-3 w-3 shrink-0 text-warning" aria-hidden="true" />
+        <span className="min-w-0 truncate text-warning/90">
+          This turn passed the ${row.capUsd.toFixed(0)} watch level — still running
+        </span>
+        <span className="ml-auto shrink-0 text-subtle">
+          est. compute ${row.cost.toFixed(2)}
+        </span>
+      </Row>
+    );
+  }
+  // BACKSTOP — the runaway ceiling was hit; DISPATCH was cut short and the answer
+  // was wrapped up from state. Today's prominent wrap-up banner (unchanged).
   const capLabel =
     row.reason === 'time'
       ? `${Math.round(row.elapsedS)}s of a ${Math.round(row.capS)}s budget`
@@ -1009,7 +1029,7 @@ function rowSignature(row: LedgerRow): string {
     case 'stop_warning':
       return `sw${row.key}${row.affected.map((a) => a.name).join('|')}`;
     case 'budget_notice':
-      return `bn${row.key}${row.reason}${row.cost}${row.capUsd}${row.elapsedS}${row.done}${row.total}`;
+      return `bn${row.key}${row.variant}${row.reason}${row.cost}${row.capUsd}${row.elapsedS}${row.done}${row.total}`;
     default:
       return JSON.stringify(row);
   }
@@ -1107,8 +1127,12 @@ export default function OrchestrationLedger({
   const stopWarnings = model.rows.filter(
     (r): r is StopWarningRow => r.kind === 'stop_warning'
   );
+  // Only the BACKSTOP wrap-up rides along above the collapsed summary — it
+  // explains why the answer is a wrap-up. The $5 WATCH notice is a mid-turn
+  // "still running" marker; it stays inside the expanded ledger, never pinned
+  // to a completed, collapsed turn (where "still running" would be stale).
   const budgetNotices = model.rows.filter(
-    (r): r is BudgetNoticeRow => r.kind === 'budget_notice'
+    (r): r is BudgetNoticeRow => r.kind === 'budget_notice' && r.variant !== 'notice'
   );
 
   if (isComplete && collapsed) {

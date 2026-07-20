@@ -78,12 +78,17 @@ class Settings(BaseSettings):
 
     # Chat Orchestration v2 (Epic 1+). The turn runner executes each chat turn
     # in a detached background task decoupled from the SSE viewer (mirrors the
-    # workflow runner). These caps bound an orchestrated turn; the sweeper marks
-    # any chat_turn still 'running' past CHAT_ORCH_MAX_RUNTIME_MIN *
-    # CHAT_ORCH_STALE_MULTIPLIER as stale so a restart shows honest state.
-    CHAT_ORCH_MAX_COST_USD: float = 5.0        # per-turn orchestration cost cap
-    CHAT_ORCH_MAX_RUNTIME_MIN: float = 6.0     # per-turn wall-clock ceiling
-    # Headroom ring-fenced from the caps above for S6 SYNTHESIZE + S7 GATE so a
+    # workflow runner). On CLI/subscription there is NO pacing limit (Wassim,
+    # 2026-07-16: "we don't need a limit, but I want to SEE if a turn costs more
+    # than $5"). So a $5 WATCH level surfaces a ONE-SHOT informational notice and
+    # the turn keeps running; a high cost/time BACKSTOP degrades DISPATCH only for
+    # true runaways. The sweeper marks any chat_turn still 'running' past
+    # CHAT_ORCH_MAX_RUNTIME_MIN * CHAT_ORCH_STALE_MULTIPLIER as stale so a restart
+    # shows honest state.
+    CHAT_ORCH_COST_NOTICE_USD: float = 5.0     # WATCH level — informational only; crossing it emits ONE budget_notice(kind="notice") then keeps running normally
+    CHAT_ORCH_COST_CAP_USD: float = 50.0       # RUNAWAY BACKSTOP — per-turn cost ceiling; only here does DISPATCH degrade + wrap up (was 5)
+    CHAT_ORCH_MAX_RUNTIME_MIN: float = 15.0    # RUNAWAY BACKSTOP wall-clock ceiling (was 6; runaway guard, not pacing)
+    # Headroom ring-fenced from the BACKSTOP caps for S6 SYNTHESIZE + S7 GATE so a
     # turn NEVER ends mid-synthesis: DISPATCH is cut short once cost/time reaches
     # (cap - reserve), leaving room for the Director's final reconciled answer.
     CHAT_ORCH_SYNTH_RESERVE_USD: float = 1.0   # $ reserved from the cost cap for synthesis

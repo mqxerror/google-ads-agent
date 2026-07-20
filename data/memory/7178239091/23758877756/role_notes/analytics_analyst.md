@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-07-14 15:47
+**Last updated:** 2026-07-19 00:00
 
 **Task:** Conversion-tracking + attribution audit for Greece Golden Visa - Turkey (23758877756). Context: GTM-WZKDXFH8 V12 fixed the trigger May 20 (regex greece-golden-visa|yunanistan-altin-vize), conversion l
 
@@ -167,3 +167,17 @@ The LP form fix (9→3 fields + dead-click bugs) remains the dominant conversion
     },
     {
       "claim": "Whether label fxvWCM-vu6scELCTg4oD is set PRIMARY at campaign goal level remains unverified \u2014 open since Jun 2; if non-PRIMARY, the bidding algori
+
+### 2026-07-17 11:33 — Orchestrated finding
+
+{
+  "summary": "",
+  "findings": []
+}
+
+### 2026-07-19 00:00 — Orchestrated finding
+
+{
+  "summary": "",
+  "findings": []
+}

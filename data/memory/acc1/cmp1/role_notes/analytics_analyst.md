@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-07-16 19:43
+**Last updated:** 2026-07-20 16:37
 
 {
   "summary": "steady",
@@ -1769,6 +1769,96 @@
 }
 
 ### 2026-07-16 19:43 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
 
 {
   "summary": "steady",

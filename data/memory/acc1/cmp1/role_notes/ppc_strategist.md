@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-07-16 19:43
+**Last updated:** 2026-07-20 16:37
 
 {
   "summary": "steady",
@@ -5675,6 +5675,529 @@
 }
 
 ### 2026-07-16 19:43 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "AG4 bids are too high",
+  "findings": [
+    {
+      "claim": "cut AG4 bids",
+      "severity": "high",
+      "confidence": 0.8,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a volume drop",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "bids fine",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "AG4 bids are too high",
+  "findings": [
+    {
+      "claim": "cut AG4 bids",
+      "severity": "high",
+      "confidence": 0.8,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a volume drop",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "bids fine",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:32 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "AG4 bids are too high",
+  "findings": [
+    {
+      "claim": "cut AG4 bids",
+      "severity": "high",
+      "confidence": 0.8,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a volume drop",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "bids fine",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:35 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "AG4 bids are too high",
+  "findings": [
+    {
+      "claim": "cut AG4 bids",
+      "severity": "high",
+      "confidence": 0.8,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a volume drop",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "bids fine",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "AG4 bids are too high",
+  "findings": [
+    {
+      "claim": "cut AG4 bids",
+      "severity": "high",
+      "confidence": 0.8,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a volume drop",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "bids fine",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c1-f0"
+    }
+  ]
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
+
+{
+  "summary": "x",
+  "findings": []
+}
+
+### 2026-07-20 16:37 — Orchestrated finding
 
 {
   "summary": "x",

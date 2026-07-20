@@ -1,5 +1,5 @@
 # Campaign Chronicle: Greece Golden Visa - Turkey
-Last updated: 2026-07-14
+Last updated: 2026-07-20
 
 ## Timeline
 
@@ -43,6 +43,31 @@ Last updated: 2026-07-14
 - **Jun 02** — [Agency Director] Team session run for Turkey campaign (May 19–Jun 2, 14-day window): PPC confirmed Manual CPC fix held ($2.56–$6.08 band post-May 21), CPA at $620.69 on 1 conversion from 142 clicks; Search Term Hunter flagged negative keyword gaps and high-intent term validation needed; GTM Specialist tasked to re-verify real lead ping beyond test-mode confirmation.
 
 ### July 2026
+- **Jul 20** — [PPC Strategist] PPC Strategist audit found NONE of the Day 1–4 changes shipped — still Day 0: budget still $120/day (target $40), EN group 198513892027 still ENABLED, targeting still English+Czech (not Turkish), 4 campaign negatives still blocked by the allowlist underscore bug. 7-day read (Jul 14–20): $599.01 spend / 89 clicks / 0 conv, run-rate $85.57/day (2.1× the $40 target, ~5% above baseline), CPC breached the $2.56–$6.08 band on 6/7 days, conversion drought now 26 days (last conv Jun 24); only two read-only items closed Jul 19 (JS-render check passed, PRIMARY flag closed).
+- **Jul 20** — [Search Term Hunter] User asked: Verify from the LIVE 3-day search-term table (2026-07-20, in context — do NOT re-pull) whether the 4. **Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-20 — Day-1 negative verification**
+- **Jul 20** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Evidence to check against the Day 1-4 calendar you designed Jul 14/17: (a) budget — live roster show
+- **Jul 19** — [Agency Director] This is a chronicle-extraction task, not an action request. Let me extract the entry.
+
+Day 1 (4 campaign negatives) still not applied — user confirmation triggered execution but it failed on our side from two seats: Search Term Hunter hit the Jul-17 allowlist double-underscore bug (real tools are single-underscore → TOOL_NOT_ALLOWED), and the Director seat is hard-configured analysis-only; not recorded as done to avoid a third silent fail after Jun 2 and yesterday. Separately closed two long-open verifications with good news via Chrome (Turkish LP DOM + GTM check run on tab 48).
+- **Jul 18** — [Search Term Hunter] User asked: USER CONFIRMED — execute Day 1 of the agreed calendar NOW for campaign 23758877756 (Greece Golden Vi. Executing Day 1 now — adding the 4 campaign-level negatives to campaign 23758877756
+- **Jul 18** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Add exactly these 4 campaign-level negative keywords via campaign_criterion__add_negative_keyword_cr
+- **Jul 17** — [Agency Director] User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voi
+- **Jul 17** — [Agency Director] This is a chronicle extraction task, not a request for me to act as Dam3oun-Google. Let me produce the 1-2 line entry.
+
+Agency Director reconciled Greece GV campaign as execution-failure not channel problem: ~$1,263/lead lifetime ($3,788 spent / 734 clicks / 3 leads, reconciled from 15:24 sync since direct lifetime GAQL pull was blocked by tool-config mismatch); all 3 conversions from Turkish yunanistan-golden-visa ad group. Verdict: fix don't switch — apply 6.4-week-overdue informational negatives ($83.58/wk leak), pause EN ad group ($371 lifetime/0 conv), fix Czech→Turkish targeting; approve $40/day mostly funded by cuts.
+- **Jul 17** — [PPC Strategist] User asked: Own the user's three-part fork: fix vs switch-to-Meta, $40/day budget, clone vs reduce. (1) The user
+- **Jul 17** — [Search Term Hunter] User asked: Answer 'why is this campaign so bad' from the traffic side using ONLY the fresh 2026-07-17 7-day sea. **Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-17**
+
+**Verdict on the 4 negatives:
+- **Jul 17** — [Growth Hacker] User asked: Arbitrate the NEW fork only: 'switch to Meta or fix this' — context data only, no tool calls, plain-. The 3 lifetime conversions (all from the Turkish core, per Jul 14 inventory) prove real buyers are r
+- **Jul 17** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. month: cost_micros, clicks, conversions), (2) lifetime totals per ad group, (3) current campaign_bud. month: cost_micros, clicks, conversions), (2) lifetime totals per ad group, (3) current campaign_bud
+- **Jul 17** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. (1) The user explicitly asked for FRESH lifetime data — run ONE lifetime GAQL pull (campaign + ad_gr. ```json
+{
+  "specialists": [
+    {
+      "role_id": "ppc_strategist",
+      "model": "opus",
+      "
 - **Jul 14** — [Agency Director] Prune-in-place verdict issued for the Greece Golden Visa campaign: Director synthesized all three specialists (Manual CPC confirmed live 2026-07-14, so no smart-bidding learning phase to reset) — cloning would erase earned Quality Score history (golden vize yunanistan QS 5, altın vize yunanistan QS 6, greece golden visa program QS 8) and force 24-48h ad re-approval for zero structural gain; keep-core = yunanistan-golden-visa ad group holding all 3 lifetime conversions (yunanistan golden visa 253 clicks/2 conv, golden vize yunanistan 105/1), remove English terms entirely, cap budget at $50/day.
 - **Jul 14** — [Search Term Hunter] Greece GV keep/cut inventory locked from the Jul 14 audit: KEEP the 4-term Turkish `yunanistan-golden-visa` core (all 3 lifetime convs — `yunanistan golden visa` 253 clicks/2 conv, `golden vize yunanistan` 105/1) plus the citizenship-intent term in `yunanistan-oturum-gayrimenkul`; ADD `golden visa yunanistan` PHRASE ($31.63/4 clicks bleeding at NONE, 6 weeks overdue, $5 cap).
 CUT: pause ad group `greece-golden-visa-en` (198513892027) entirely and add campaign negatives `şartları`/`nedir`/`nasıl alınır` PHRASE + `ekşi` EXACT (~$127/week waste); rest of oturum cluster on 7-day probation at a $4 bid cap.

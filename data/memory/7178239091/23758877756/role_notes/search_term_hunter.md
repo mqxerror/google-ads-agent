@@ -1,6 +1,6 @@
 # Search Term Hunter Notes
 
-**Last updated:** 2026-07-14 16:57
+**Last updated:** 2026-07-20 16:22
 
 **Task:** Search-term + match-type audit for Greece Golden Visa - Turkey (23758877756) from the 7-day search-term report in context. 1) Waste analysis: quantify spend on low-intent/informational terms (nedir, ş
 ## Search Term Hunter — 7-Day Audit | Greece Golden Visa - Turkey (23758877756)
@@ -204,4 +204,141 @@ At $50/day: EN pause frees ~$8/day, negatives cut ~$18/day — together absorb t
         "Ad group data: 198513892027 $361.22 lifetime / 0 conv / 67 clicks",
         "Creative Director Jul 14: EN group removal confirmed \u2014 conversion action contamination + audience mismatch"
       ],
-  
+
+### 2026-07-17 11:31 — Answer 'why is this campaign so bad' from the traffic side using ONLY the fresh 
+
+**Task:** Answer 'why is this campaign so bad' from the traffic side using ONLY the fresh 2026-07-17 7-day search-term table already in context — no tool calls, and cite your Jul 14 audit for history instead of
+**Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-17**
+**Verdict on the 4 negatives: NEVER applied.** Jul 14 confirmed all 4 still matching; this week they're still spending. 6.4 weeks of identified waste continues unblocked.
+**This week's informational waste (Jul 17 search-term table):**
+| Cluster | Active terms + cost | Total |
+|---------|-------------------|-------|
+All 4 first flagged **Jun 2**. Re-confirmed Jul 4 (Analyst), Jul 14 (Hunter). Today = Jul 17. **6.4 weeks overdue, still executing zero.**
+**golden visa yunanistan:** CONFIRMED NONE — 5 clicks / $39.40 this week. Jun 2 PHRASE add = 6.4 weeks overdue.
+**Executable list:**
+| Action | Term | Match | Level | $ Impact |
+|--------|------|-------|-------|----------|
+Total recoverable from negatives alone: **$83.58/week.**
+
+### 2026-07-17 11:33 — Orchestrated finding
+
+{
+  "summary": "4 negatives are 6.4 weeks overdue and burning $83.58/week (30% of visible spend); 'golden visa yunanistan' bleeding $39.40 at NONE is the top uncontrolled keyword leak \u2014 both are one-session fixes.",
+  "findings": [
+    {
+      "claim": "The 4 agreed campaign negatives (\u015fartlar\u0131 PHRASE, nedir PHRASE, nas\u0131l al\u0131n\u0131r PHRASE, ek\u015fi EXACT) were never applied \u2014 all 4 clusters are still spending 6.4 weeks after first recommendation",
+      "severity": "high",
+      "confidence": 0.97,
+      "sources": [
+        "2026-07-17 search-term table: nedir $20.62, nas\u0131l al\u0131n\u0131r $11.90, ek\u015fi $1.14, \u015fartlar\u0131 variants $49.92 all at NONE status",
+        "Jul 14 Search Term Hunter: identical 4 clusters confirmed unexecuted",
+        "Jun 2 chronicle: '3 criteria created' but these 4 still matching on Jul 14 and Jul 17"
+      ],
+      "disconfirmed_by": "A live pull of campaign-level negative criteria showing \u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r/ek\u015fi applied between Jul 14\u201317, with data lag masking the effect in this snapshot",
+      "id": "c2-f0"
+    },
+    {
+      "claim": "Informational waste is $83.58/week (29.7% of visible spend), down from 43.5% on Jul 14 in dollar-share but still the campaign's single largest fixable cost leak with zero conversion path",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "2026-07-17 search-term table: \u015fartlar\u0131 $49.92 + nedir $20.62 + nas\u0131l al\u0131n\u0131r $11.90 + ek\u015fi $1.14 = $83.58",
+        "Visible spend total: $281.52 summed from 22 non-zero terms in the top-40 table"
+      ],
+      "disconfirmed_by": "Any \u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r term recording a conversion in account history",
+      "id": "c2-f1"
+    },
+    {
+      "claim": "'golden visa yunanistan' remains NONE status at 5 clicks/$39.40 this week \u2014 budget is bleeding uncontrolled on this term for the
+
+### 2026-07-18 23:55 — USER CONFIRMED — execute Day 1 of the agreed calendar NOW for campaign 237588777
+
+**Task:** USER CONFIRMED — execute Day 1 of the agreed calendar NOW for campaign 23758877756 (Greece Golden Visa - Turkey) ONLY. Add exactly these 4 campaign-level negative keywords via campaign_criterion__add_
+I'll execute Day 1 now. First, let me load the google-ads MCP tool schemas I need — the negative-keyword add tool and a GAQL query tool for verification.Tools loaded. Executing Day 1 now — adding the 4 campaign-level negatives to campaign 23758877756.The allowlist entry uses a **double-underscore** name (`campaign_criterion__add_negative_keyword_criteria`) but the actual registered tool is **singl
+I could not add the 4 negatives, and I will not claim otherwise. Both required tools are blocked by a config bug, not applied.
+- **What I attempted:** `campaign_criterion_add_negative_keyword_criteria` on campaign 23758877756 with şartları PHRASE, nedir PHRASE, nasıl alınır PHRASE, ekşi EXACT — my own overdue recommendation ($83.58/wk waste, 6.4 weeks overdue per the Jun 2 / Jul 14 / Jul 17 audit; waste math not redone).
+- **Blocker:** the allowlist expects **double-underscore** names (`campaign_criterion__add_negative_keyword_criteria`, `search__execute_query`) but the live MCP tools are **single-underscore** (`..._add_negative_...`, `search_execute_query`). The double-underscore variants don't exist; the single-underscore ones return `TOOL_NOT_ALLOWED`. Same underscore mismatch the PPC Strategist logged Jul 17.
+- **Verification:** also impossible from this seat — `search_execute_query` is blocked by the identical mismatch, so I have zero criterion IDs to report and cannot confirm live state.
+- **Status unchanged:** the 4 clusters remain uncontrolled. This is a **second** silent-fail risk on top of Jun 2 — do NOT record Day 1 as done.
+- **Fix needed:** correct the agent tool-allowlist to the real single-underscore names, then re-run this exact add + the campaign_criterion verification pull.
+
+### 2026-07-19 00:00 — Orchestrated finding
+
+{
+  "summary": "Day 1 NOT executed \u2014 the 4 negatives are still unapplied; a tool-allowlist underscore mismatch blocks both the add and its verification. Fix the allowlist, then re-run. Do not mark Day 1 complete.",
+  "findings": [
+    {
+      "claim": "Day 1 negatives (\u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r PHRASE + ek\u015fi EXACT) are still NOT applied \u2014 execution blocked by tool-allowlist underscore mismatch, not a Google API error",
+      "severity": "high",
+      "confidence": 0.98,
+      "sources": [
+        "Live TOOL_NOT_ALLOWED error naming allowed set with '__' vs registered '_' tools",
+        "ToolSearch confirms no double-underscore variant exists",
+        "Jul 17 PPC Strategist logged identical mismatch on search__execute_query"
+      ],
+      "disconfirmed_by": "A successful add call returning criterion IDs, or an allowlist entry matching the real single-underscore tool name",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Fix the agent tool-allowlist (map to single-underscore names) before any write/verify work on this account can proceed",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "Both write tool and search_execute_query blocked by same mismatch this session"
+      ],
+      "disconfirmed_by": "Either tool executing successfully under the current allowlist",
+      "id": "c1-f1"
+    }
+  ]
+}
+
+### 2026-07-20 16:21 — Verify from the LIVE 3-day search-term table (2026-07-20, in context — do NOT re
+
+**Task:** Verify from the LIVE 3-day search-term table (2026-07-20, in context — do NOT re-pull) whether the 4 Day-1 negatives you attempted Jul 18 are live. Cite your own Jul 18 execution report (REUSE — do no
+**Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-20 — Day-1 negative verification**
+- **Negatives NOT live — confirmed.** Per my Jul 18 execution report (reuse), both `campaign_criterion_add_negative_keyword_criteria` and `search_execute_query` were blocked by the tool-allowlist underscore mismatch, so Day 1 never applied. The live 3-day table corroborates it: every targeted informational term still matches at **NONE** status — `yunanistan golden visa şartları` 4c/$28.75, `yunani
+- **Waste (3-day):** $28.75+$5.92+$7.71+$7.95+$5.93 = **$56.26** → ~**$131/week** projected — at or above my Jul 17 $83.58/week figure (cited, not rebuilt). Waste continuing undiminished.
+- **`golden visa yunanistan` still uncontrolled:** 3c/$23.54, NONE — 7 weeks since my Jun 2 add recommendation.
+**Verdict:** Negatives NOT applied; waste continuing at ≥ the prior rate; blocker remains the tool-allowlist fix.
+— *Search Term Hunter*
+
+### 2026-07-20 16:22 — Orchestrated finding
+
+{
+  "summary": "Day 1 negatives never applied \u2014 live table shows all 4 informational clusters still matching at NONE, ~$131/week waste continuing, blocker remains the tool-allowlist underscore fix.",
+  "findings": [
+    {
+      "claim": "The 4 Day-1 campaign negatives (\u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r PHRASE + ek\u015fi EXACT) are still NOT applied \u2014 all target terms remain at NONE status in the live 3-day table",
+      "severity": "high",
+      "confidence": 0.98,
+      "sources": [
+        "Jul 18 execution report: both add tool + search_execute_query blocked by allowlist underscore mismatch",
+        "2026-07-20 3-day search-term table: \u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r/ek\u015fi variants all status NONE"
+      ],
+      "disconfirmed_by": "Any of these terms showing 'Excluded' status or a live campaign-criterion pull listing them as negatives",
+      "id": "c2-f0"
+    },
+    {
+      "claim": "Informational waste is continuing undiminished \u2014 $56.26 over 3 days projects to ~$131/week, at or above the Jul 17 $83.58/week baseline",
+      "severity": "high",
+      "confidence": 0.9,
+      "sources": [
+        "2026-07-20 3-day table: $28.75+$5.92+$7.71+$7.95+$5.93",
+        "Jul 17 Search Term Hunter $83.58/week figure (cited)"
+      ],
+      "disconfirmed_by": "Any \u015fartlar\u0131/nedir/nas\u0131l al\u0131n\u0131r term recording a conversion, or a data-lag artifact inflating the 3-day snapshot",
+      "id": "c2-f1"
+    },
+    {
+      "claim": "'golden visa yunanistan' remains uncontrolled at 3 clicks/$23.54 NONE \u2014 7 weeks past the Jun 2 add-as-PHRASE recommendation",
+      "severity": "medium",
+      "confidence": 0.97,
+      "sources": [
+        "2026-07-20 3-day table: golden visa yunanistan 3c/$23.54 NONE",
+        "Jun 2 Search Term Hunter add recommendation"
+      ],
+      "disconfirmed_by": "A PHRASE/EXACT keyword now capturing this term (status ADDED)",
+      "id": "c2-f2"
+    }
+  ]
+}

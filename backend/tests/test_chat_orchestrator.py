@@ -422,18 +422,54 @@ class WriteIntentDetection(unittest.TestCase):
             {"task": "review it", "tools": ["search__execute_query"]}))
 
 
-# ── Fix 1: turn-budget wrap-up (never ends mid-synthesis) ─────────────
+# ── turn-budget: $5 WATCH notice (informational) + runaway BACKSTOP wrap-up ──
 class BudgetWrapup(_Base):
-    """When the turn budget is hit, the turn emits a VISIBLE budget_notice ledger
-    event AND a COMPLETE final answer composed from state — never a mid-sentence
-    cut, and never a wasted LLM synthesis that could burn past the cap."""
+    """Retuned budget (2026-07-16, Wassim: on CLI/subscription — no hard limit,
+    but SHOW when a turn passes $5). Crossing the $5 WATCH level emits a quiet
+    kind='notice' and the turn KEEPS running; only the $50/15-min runaway
+    BACKSTOP degrades DISPATCH and emits a kind='stop' + COMPLETE wrap-up (never
+    a mid-sentence cut, never a wasted LLM synth past the cap)."""
 
-    async def test_blown_budget_emits_notice_and_complete_wrapup(self):
+    async def test_watch_notice_emitted_and_turn_keeps_running(self):
+        # A single specialist crosses the $5 WATCH level (cost 6.0) but stays well
+        # under the $50 backstop → ONE kind='notice', NOTHING cancelled/degraded,
+        # and the LLM synthesis still runs to completion.
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze"}]}\n```')
+        spec = _text_call(
+            'Bids ok.\n```json\n{"findings":[],"summary":"bids fine"}\n```', cost=6.0)
+        synth = _text_call("Reconciled: bids are fine, keep steady.", cost=0.1)
+        _SCRIPT.extend([plan, spec, synth])
+        events = await self._run(
+            force_mode="orchestrate",
+            user_message="audit my bidding across the whole campaign in depth")
+
+        notices = [e for e in events if e["type"] == "budget_notice"]
+        self.assertEqual(len(notices), 1, "exactly one WATCH-level budget_notice")
+        p = notices[0]["payload"]
+        self.assertEqual(p["kind"], "notice")
+        self.assertEqual(p["reason"], "cost")
+        self.assertAlmostEqual(p["cap_usd"], 5.0)          # WATCH level, not the $50 backstop
+        # Nothing was stopped: no kind='stop', every specialist finished ok.
+        self.assertFalse([n for n in notices if n["payload"].get("kind") == "stop"])
+        results = [e for e in events if e["type"] == "agent_result"]
+        self.assertTrue(results and all(
+            r["payload"]["status"] == "ok" for r in results),
+            "no specialist was cancelled — the turn kept running")
+        # The Director's LLM synthesis ran (NOT the deterministic wrap-up).
+        final_text = "".join(
+            e["payload"].get("content", "")
+            for e in events if e["type"] == "final_chunk")
+        self.assertIn("Reconciled: bids are fine", final_text)
+        self.assertNotIn("Turn budget reached", final_text)
+
+    async def test_backstop_blown_emits_stop_and_complete_wrapup(self):
         plan = _text_call(
             '```json\n{"specialists":['
             '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"analyze bids"}]}\n```')
-        # This specialist alone blows the $5 cap (cost 6.0) → S6 must take the
-        # deterministic wrap-up path. NO synth entry is scripted: if the code
+        # This specialist alone blows the $50 backstop (cost 60.0) → S6 must take
+        # the deterministic wrap-up path. NO synth entry is scripted: if the code
         # wrongly called the LLM, the fake would return the bland "ok".
         spec = [
             {"type": "text", "content":
@@ -441,7 +477,7 @@ class BudgetWrapup(_Base):
                 "\"severity\":\"high\",\"confidence\":0.8,\"sources\":[\"ctx\"],"
                 "\"disconfirmed_by\":\"a volume drop\"}],"
                 "\"summary\":\"AG4 bids are too high\"}\n```"},
-            {"type": "done", "cost": 6.0},
+            {"type": "done", "cost": 60.0},
         ]
         _SCRIPT.extend([plan, spec])  # deliberately NO synth entry
         events = await self._run(
@@ -451,10 +487,13 @@ class BudgetWrapup(_Base):
 
         notices = [e for e in events if e["type"] == "budget_notice"]
         self.assertTrue(notices, "a visible budget_notice must be emitted")
-        for k in ("reason", "cost", "cap_usd", "elapsed_s", "cap_s",
+        stop = [n for n in notices if n["payload"].get("kind") == "stop"]
+        self.assertTrue(stop, "the runaway backstop must emit a kind='stop' notice")
+        for k in ("kind", "reason", "cost", "cap_usd", "elapsed_s", "cap_s",
                   "specialists_done", "specialists_total"):
-            self.assertIn(k, notices[0]["payload"])
-        self.assertEqual(notices[0]["payload"]["reason"], "cost")
+            self.assertIn(k, stop[0]["payload"])
+        self.assertEqual(stop[0]["payload"]["reason"], "cost")
+        self.assertAlmostEqual(stop[0]["payload"]["cap_usd"], 50.0)  # the backstop cap
 
         final_text = "".join(
             e["payload"].get("content", "")
@@ -480,6 +519,23 @@ class BudgetWrapup(_Base):
             e["payload"].get("content", "")
             for e in events if e["type"] == "final_chunk")
         self.assertIn("Reconciled: keep bids steady.", final_text)
+
+
+# ── retuned budget: config defaults (soft $5 watch, $50/15-min backstop) ──
+class BudgetConfigDefaults(unittest.TestCase):
+    """Lock the retuned defaults (2026-07-16): a $5 informational WATCH level and
+    a high $50 / 15-min RUNAWAY backstop — never the other way around."""
+
+    def test_defaults(self):
+        self.assertEqual(settings.CHAT_ORCH_COST_NOTICE_USD, 5.0)
+        self.assertEqual(settings.CHAT_ORCH_COST_CAP_USD, 50.0)
+        self.assertEqual(settings.CHAT_ORCH_MAX_RUNTIME_MIN, 15.0)
+        # The watch level must sit well below the runaway backstop, and the synth
+        # reserve must fit inside the cap so DISPATCH always keeps headroom.
+        self.assertLess(
+            settings.CHAT_ORCH_COST_NOTICE_USD, settings.CHAT_ORCH_COST_CAP_USD)
+        self.assertLess(
+            settings.CHAT_ORCH_SYNTH_RESERVE_USD, settings.CHAT_ORCH_COST_CAP_USD)
 
 
 # ── Fix 2: meta-question triage + degrade renders a real answer ───────

@@ -1,6 +1,6 @@
 # Gtm Specialist Notes
 
-**Last updated:** 2026-05-20 13:17
+**Last updated:** 2026-07-19 00:00
 
 **Task:** fix language and garbage keywords , the tracking conversion is headless wordpress where a react form converted into gravity forms we have the gtm installed and other forms works we need to plan this a
 
@@ -97,3 +97,10 @@ The Turkish LP is now live + correctly indexed by Google. QS 1 on `yunanistan go
 **3. Verify the fix works**
 Submit a test lead on `mercan.com/tr/yunanistan-altin-vize` and check network requests for a ping to `googleadservices.com` with label `fxvWCM-vu6scELCTg4oD`. Want me to run that test now?
 — *GTM Specialist*
+
+### 2026-07-19 00:00 — Orchestrated finding
+
+{
+  "summary": "",
+  "findings": []
+}

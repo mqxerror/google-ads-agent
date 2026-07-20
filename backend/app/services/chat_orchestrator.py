@@ -196,12 +196,17 @@ def _specialist_tool_allowlist(planned_tools: list) -> list[str]:
 
 
 def _budget_snapshot(
-    *, reason: str, total_cost: float, elapsed_s: float, budget_cost: float,
+    *, kind: str, reason: str, total_cost: float, elapsed_s: float, budget_cost: float,
     budget_secs: float, specialists_done: int, specialists_total: int,
 ) -> dict:
-    """Structured payload for the visible `budget_notice` ledger event (Fix 1).
-    reason ∈ {'cost','time'} — which cap forced the wrap-up."""
+    """Structured payload for the visible `budget_notice` ledger event.
+    kind  ∈ {'notice','stop'} — 'notice' = the $5 WATCH level was crossed
+            (informational; the turn KEEPS running), 'stop' = the runaway BACKSTOP
+            was hit (DISPATCH degraded + deterministic wrap-up).
+    reason ∈ {'cost','time'} — which threshold triggered it. For a 'notice',
+            `cap_usd` carries the WATCH level (not the backstop cap)."""
     return {
+        "kind": kind,
         "reason": reason,
         "cost": round(total_cost, 4),
         "cap_usd": round(budget_cost, 2),
@@ -857,8 +862,13 @@ async def run_turn(
         # ══ S4 DISPATCH ════════════════════════════════════════════════
         from app.services.workflow_orchestrator import _MAX_PARALLEL
 
-        budget_cost = float(settings.CHAT_ORCH_MAX_COST_USD)
+        # RUNAWAY BACKSTOP caps (not a pacing limit — see config). The turn only
+        # degrades/wraps-up at these; the $5 watch level below is informational.
+        budget_cost = float(settings.CHAT_ORCH_COST_CAP_USD)
         budget_secs = float(settings.CHAT_ORCH_MAX_RUNTIME_MIN) * 60.0
+        # $5 WATCH level — crossing it (while still under the backstop) emits ONE
+        # informational budget_notice(kind="notice") and the turn KEEPS running.
+        cost_notice_usd = float(getattr(settings, "CHAT_ORCH_COST_NOTICE_USD", 0) or 0.0)
         # Fix 1(b): ring-fence headroom for S6 SYNTHESIZE + S7 GATE. DISPATCH is
         # cut short once cost/time reaches (cap - reserve), so the Director's
         # final reconciled answer always has room to finish — the turn never ends
@@ -873,7 +883,8 @@ async def run_turn(
         role_by_call: dict[str, str] = {}
         summary_by_call: dict[str, str] = {}
         degraded = False
-        budget_notice_emitted = False
+        budget_notice_emitted = False   # the BACKSTOP (kind="stop") notice
+        notice_emitted = False          # the $5 WATCH (kind="notice") notice
 
         async def _guarded(spec, seq):
             async with sem:
@@ -900,6 +911,7 @@ async def run_turn(
                         t.cancel()
                 budget_notice_emitted = True
                 yield {"type": "budget_notice", "payload": _budget_snapshot(
+                    kind="stop",
                     reason=("cost" if total_cost >= dispatch_cost_cap else "time"),
                     total_cost=total_cost, elapsed_s=_elapsed,
                     budget_cost=budget_cost, budget_secs=budget_secs,
@@ -944,6 +956,19 @@ async def run_turn(
                     "duration_ms": item.get("duration_ms", 0),
                     "findings": item.get("findings", []),
                     "summary": item.get("summary", "")}}
+                # $5 WATCH level (Wassim: on CLI/subscription, no hard limit — just
+                # SHOW when a turn gets expensive). One-shot, cost-only, emitted the
+                # moment total cost first crosses the watch level while still under
+                # the backstop cap. Does NOT cancel/degrade — the turn keeps running.
+                if not notice_emitted and cost_notice_usd <= total_cost < budget_cost:
+                    notice_emitted = True
+                    yield {"type": "budget_notice", "payload": _budget_snapshot(
+                        kind="notice", reason="cost",
+                        total_cost=total_cost,
+                        elapsed_s=time.monotonic() - turn_started,
+                        budget_cost=cost_notice_usd, budget_secs=budget_secs,
+                        specialists_done=len(findings_by_call),
+                        specialists_total=len(specs))}
 
         try:
             await gather_task
@@ -1005,6 +1030,7 @@ async def run_turn(
             if not budget_notice_emitted:
                 budget_notice_emitted = True
                 yield {"type": "budget_notice", "payload": _budget_snapshot(
+                    kind="stop",
                     reason=("cost" if total_cost >= budget_cost else "time"),
                     total_cost=total_cost, elapsed_s=_elapsed_s,
                     budget_cost=budget_cost, budget_secs=budget_secs,

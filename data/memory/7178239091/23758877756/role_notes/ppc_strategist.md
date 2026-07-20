@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-07-14 16:57
+**Last updated:** 2026-07-20 16:22
 
 **Task:** Bid strategy review for "Greece Golden Visa - Turkey":
 
@@ -323,3 +323,118 @@ On Manual CPC there is no algorithmic state to reset. What cloning costs vs. buy
       "sources": [
         "15-day daily table: Jul 6 $172.82, Jul 12 $152.70",
         "Account rule: >20% budge
+
+### 2026-07-17 11:32 — Own the user's three-part fork: fix vs switch-to-Meta, $40/day budget, clone vs 
+
+**Task:** Own the user's three-part fork: fix vs switch-to-Meta, $40/day budget, clone vs reduce. (1) The user explicitly asked for FRESH lifetime data — run ONE lifetime GAQL pull (campaign + ad_group level: c
+I'll run the one lifetime GAQL pull the task requires, then reconcile. Let me load the google-ads query tool.The stream tool isn't in my allowed set. Let me use the allowed query tool.**Lifetime pull blocked** — the GAQL tool rejected both call forms (allowlist expects `search__execute_query`, loaded tool is `search_execute_query`; underscore mismatch). Reconciling instead against today's synced s
+## PPC Strategist — Three-Part Fork | Greece GV Turkey (23758877756)
+**1. Lifetime reconciliation (synced today).** $371.13 + $2,706.57 + $710.31 = **$3,788.01 / 734 clicks / 3 conv = $1,263/lead** — matches the cited baseline exactly. All 3 conversions sit in `yunanistan-golden-visa`; EN group ($371) and `oturum-gayrimenkul` ($710) are 0-conv.
+**2. Clone vs prune — REUSE verdict B, prune in place.** Manual CPC has no learning state to reset; cloning erases earned QS (golden vize 5, altın vize 6, greece golden visa program 8) and adds 24–48h re-approval for zero gain. **Updated budget math:** Jul 3–17 avg = $1,223/15 = **$81.5/day**. EN pause (−$6–9) + 4 negatives (−$18) → ~$54–57/day, still ~$15 over. Close to $40 via bid-cap the 3 Jul-
+**3. Meta vs fix.** The fixes were agreed Jun 2/Jul 14 and **never executed** — the campaign has never run in fixed form, so switching now tests nothing and forfeits earned QS. **Rule:** execute prune, run 14 days at $40/day (~$560); ≥1 verified lead → keep+optimize; 0 conv with tracking confirmed → pivot to Meta.
+**Calendar (one change/day):** D1 — 4 campaign negatives (şartları PHRASE, nedir PHRASE, nasıl alınır PHRASE, ekşi EXACT); D2 — pause EN group `198513892027` + set $40/day (CONFIRM); D3 — Czech 1021→Turkish 1037; D4 — bid-cap Jul-6 citizenship keywords $4 + add "golden visa yunanistan" PHRASE at $5.
+
+### 2026-07-17 11:33 — Orchestrated finding
+
+{
+  "summary": "Prune in place (never clone), cut to $40/day via EN pause + 4 negatives + Jul-6 bid-caps ($40 cap needs confirm), and fix-don't-switch: run 14 days at $40 and pivot to Meta only if 0 verified conversions.",
+  "findings": [
+    {
+      "claim": "Lifetime reconciles to $3,788 / 734 clicks / 3 conv = $1,263/lead, with all 3 conversions in the yunanistan-golden-visa ad group",
+      "severity": "high",
+      "confidence": 0.9,
+      "sources": [
+        "2026-07-17 15:24 synced ad-group lifetime totals (live GAQL pull blocked by tool-allowlist underscore mismatch)"
+      ],
+      "disconfirmed_by": "A successful lifetime GAQL pull returning materially different cost/conv totals",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Prune in place \u2014 do NOT clone; Manual CPC has no learning state and cloning erases earned QS 4/5/6/8",
+      "severity": "high",
+      "confidence": 0.93,
+      "sources": [
+        "Jul 14 arbitration (verbatim)",
+        "MANUAL_CPC confirmed in roster 2026-07-17",
+        "keyword QS in context"
+      ],
+      "disconfirmed_by": "Evidence an automated bidding strategy is actually active",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "EN pause (\u2212$6-9) + 4 negatives (\u2212$18) reach ~$55/day; bid-caps on Jul-6 citizenship keywords + a hard $40/day budget close the gap to $40",
+      "severity": "high",
+      "confidence": 0.85,
+      "sources": [
+        "Jul 3-17 daily table = $1,223/15 = $81.5/day",
+        "Jul 14 Hunter waste math"
+      ],
+      "disconfirmed_by": "Live pull showing current daily budget already \u2264$40",
+      "id": "c1-f2"
+    },
+    {
+      "claim": "Fix beats switching to Meta \u2014 the diagnosed fixes were never executed, so run 14 days at $40/day and pivot only if 0 conv with tracking verified",
+      "severity": "high",
+      "confidence": 0.82,
+      "sources": [
+        "Chronicle: EN pause/negatives/Czech fix agreed Jun 2 & Jul 14, no execution entries",
+        "$20K-100K deal valu
+
+### 2026-07-17 11:35 — Orchestrated finding
+
+{
+  "summary": "",
+  "findings": []
+}
+
+### 2026-07-20 16:22 — Answer 'how is the campaign doing since the changes' — but FIRST audit whether t
+
+**Task:** Answer 'how is the campaign doing since the changes' — but FIRST audit whether the agreed changes actually shipped, using ONLY the 2026-07-20 live data in context (no tool calls). Evidence to check ag
+**Nothing shipped. We are still at Day 0 for campaign changes** — the premise "since the changes" has to be corrected before any performance read.
+|---|---|---|
+**7-day read (Jul 14–20):** $599.01 spend / 89 clicks / **0 conv**. Run-rate **$85.57/day** — 2.1× the $40 target and *slightly above* the $81.5/day baseline I set Jul 17. Spend is not down, it's up ~5%. CPC breached the certified $2.56–$6.08 band on **6 of 7 days** ($6.57–$7.49); only Jul 19 ($5.85) held inside. Conversion drought now **26 days** (last conv Jun 24).
+**Bottom line:** it's performing exactly as before — ~$85/day, zero leads — because it was never touched. Only two *read-only* items closed Jul 19: browser JS-render check PASSED, PRIMARY flag CLOSED (per Jul 19 Director reconciliation). Measurement doubt is gone, so the drought is a real traffic/funnel problem — Day 1 is more urgent, not less. Execute.
+— *PPC Strategist*
+
+### 2026-07-20 16:22 — Orchestrated finding
+
+{
+  "summary": "Zero calendar changes shipped \u2014 we're at Day 0; last 7 days = $599/89 clicks/0 conv at $85.57/day (above target AND baseline), CPC breaching band 6 of 7 days, 26-day drought; measurement is now cleared so execute the negatives.",
+  "findings": [
+    {
+      "claim": "None of the Day 1-4 calendar changes shipped \u2014 budget still $120/day, EN group still ENABLED, targeting still English+Czech, negatives blocked; campaign is at Day 0",
+      "severity": "high",
+      "confidence": 0.98,
+      "sources": [
+        "Live roster: Greece Golden Visa - Turkey $120.0/d MANUAL_CPC",
+        "Ad-group list: 198513892027 ENABLED 70 clicks",
+        "Targeting line: Turkiye | English, Czech",
+        "Search Term Hunter Jul 18 execution report: allowlist underscore mismatch, Day 1 NOT applied"
+      ],
+      "disconfirmed_by": "A live pull showing budget=$40, EN group PAUSED, or Turkish (1037) applied",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Spend has not fallen \u2014 7-day run-rate is $85.57/day, above both the $40 target (2.1x) and the $81.5/day Jul-17 baseline",
+      "severity": "high",
+      "confidence": 0.99,
+      "sources": [
+        "Jul 14-20 daily table: $599.01 / 89 clicks summed",
+        "Jul 17 baseline computation $1,223/15=$81.5/day"
+      ],
+      "disconfirmed_by": "A recount of the daily table totaling materially less than $599 over the 7 days",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "CPC is running hot \u2014 6 of 7 days ($6.57-$7.49) breach the certified $2.56-$6.08 band; only Jul 19 ($5.85) held",
+      "severity": "medium",
+      "confidence": 0.95,
+      "sources": [
+        "Jul 14-20 daily CPC column",
+        "Certified band $2.56-$6.08 from Jun 2 PPC audit"
+      ],
+      "disconfirmed_by": "Bid caps proven live that would pull CPC back under $6.08",
+      "id": "c1-f2"
+    },
+    {
+      "claim": "Execute Day 1 (4 campaign negatives) now \u2014 26-day conversion drought is a confirmed real traffic/funnel 

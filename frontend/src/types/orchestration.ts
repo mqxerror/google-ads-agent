@@ -131,10 +131,17 @@ export interface ClaimGatePayload {
   flagged?: { claim: string; reason: string }[];
 }
 
-/** The turn budget (cost or wall-clock) was hit mid-turn. DISPATCH is cut short
- *  and a COMPLETE wrap-up is synthesized from state — the turn never ends
- *  mid-sentence. Rendered as a visible ledger notice. */
+/** A budget threshold was crossed mid-turn. Two flavors, keyed by `kind`:
+ *  - 'notice' — the $5 WATCH level was crossed; the turn KEEPS running. Purely
+ *    informational (Wassim: on CLI/subscription, no hard limit — just SHOW when a
+ *    turn gets expensive). `cap_usd` carries the WATCH level, `cost` the running
+ *    estimate. Rendered as a quiet one-line amber chip.
+ *  - 'stop'   — the runaway BACKSTOP was hit; DISPATCH was cut short and a
+ *    COMPLETE wrap-up was synthesized from state (the turn never ends
+ *    mid-sentence). Rendered as the prominent wrap-up banner.
+ *  Absent `kind` (legacy events) is treated as 'stop'. */
 export interface BudgetNoticePayload {
+  kind?: 'notice' | 'stop' | string;
   reason: 'cost' | 'time' | string;
   cost: number;
   cap_usd: number;
