@@ -171,6 +171,7 @@ from google_ads.servers.smart_campaign_server import smart_campaign_server
 # from google_ads.sdk_servers.extension_feed_item_server import extension_feed_item_sdk_server  # Not available in v20
 from google_ads.servers.user_data_server import user_data_server
 from google_ads.servers.user_list_server import user_list_server
+from google_ads.tool_registry import allowlist_matches
 from google_ads.utils import get_logger, load_dotenv
 
 logger = get_logger(__name__)
@@ -516,7 +517,13 @@ class CampaignScopeMiddleware(Middleware):
                     f"Do not call Google Ads tools."
                 )
             allowed = [a.strip() for a in allowlist_raw.split(",") if a.strip()]
-            if not any(a in tool_name for a in allowed):
+            # Canonical substring match (google_ads.tool_registry) — the SAME
+            # comparison the chat allowlist audit uses. Normalizing both sides
+            # (collapse `__`→`_`, casefold) means a single-vs-double underscore
+            # or case drift can never again silently zero this allowlist (the
+            # 2026-07-16 `search__execute_query` money bug). Substring semantics
+            # are preserved: plan-authorized names from the model may be partial.
+            if not allowlist_matches(tool_name, allowed):
                 raise ValueError(
                     f"TOOL_NOT_ALLOWED: tool '{tool_name}' is not in this agent's "
                     f"allowed set ({allowed}). Use only your assigned tools, or "

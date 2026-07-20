@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-07-20 16:22
+**Last updated:** 2026-07-20 17:01
 
 **Task:** Bid strategy review for "Greece Golden Visa - Turkey":
 
@@ -437,4 +437,111 @@ I'll run the one lifetime GAQL pull the task requires, then reconcile. Let me lo
       "id": "c1-f2"
     },
     {
-      "claim": "Execute Day 1 (4 campaign negatives) now \u2014 26-day conversion drought is a confirmed real traffic/funnel 
+      "claim": "Execute Day 1 (4 campaign negatives) now \u2014 26-day conversion drought is a confirmed real traffic/funnel
+
+### 2026-07-20 16:41 — Deliver the FINAL user-facing answer to 'how is the campaign doing since the cha
+
+**Task:** Deliver the FINAL user-facing answer to 'how is the campaign doing since the changes' by CITING (not redoing) the two 2026-07-20 reuse reports: your own Day-0 audit (nothing shipped — budget still $12
+**How is the campaign since the changes?** Plain truth first: **no changes have shipped**, so "since the changes" = *since nothing changed*. Every item from the Day 1–4 calendar is still ✗.
+| Calendar item | Live state | Shipped? |
+|---|---|---|
+**7-day read (Jul 14–20):** $599.01 / 89 clicks / **0 conv**. Run-rate **$85.57/day** — 2.1× the $40 target, ~5% *above* the $81.5/day Jul-17 baseline. CPC breached the $2.56–$6.08 band **6 of 7 days**. Conversion drought now **26 days**.
+**Two genuine positives (closed Jul 19):** browser JS-render check **PASSED**; "Greece GV Lead" (7607343055) confirmed **PRIMARY**. Measurement doubt is gone — so the drought is a real traffic/funnel problem, not a tracking ghost.
+**Single next action:** fix the tool-allowlist underscore mismatch, then execute Day 1 (4 negatives) — your Jul 18 confirmation still stands. Waste continuing at ~$131/week until it lands.
+— *PPC Strategist*
+
+### 2026-07-20 16:42 — Orchestrated finding
+
+{
+  "summary": "Nothing shipped \u2014 we're at Day 0; $599/89 clicks/0 conv at $85.57/day, CPC hot 6 of 7 days, 26-day drought; measurement now cleared, so fix the allowlist and execute the 4 negatives.",
+  "findings": [
+    {
+      "claim": "No Day 1-4 calendar change has shipped \u2014 budget still $120/day, EN group 198513892027 ENABLED, targeting English+Czech, 4 negatives blocked at NONE",
+      "severity": "high",
+      "confidence": 0.98,
+      "sources": [
+        "2026-07-20 PPC Day-0 audit (reuse)",
+        "Search Term Hunter Jul-20 negative verification (reuse)",
+        "in-context live roster + targeting line"
+      ],
+      "disconfirmed_by": "A live pull showing budget=$40, EN group PAUSED, or Turkish (1037) applied",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Spend has not fallen \u2014 7-day run-rate $85.57/day, 2.1x the $40 target and ~5% above the $81.5/day baseline, 0 conv over 89 clicks",
+      "severity": "high",
+      "confidence": 0.99,
+      "sources": [
+        "Jul 14-20 daily table in context: $599.01/89 clicks",
+        "Jul-17 $81.5/day baseline (cited)"
+      ],
+      "disconfirmed_by": "A recount of the daily table totaling materially less than $599",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Measurement doubt is cleared (JS-render PASSED, 7607343055 PRIMARY) so the 26-day drought is a real traffic/funnel problem \u2014 execute Day 1 negatives once the allowlist is fixed",
+      "severity": "high",
+      "confidence": 0.9,
+      "sources": [
+        "Jul 19 Director reconciliation (reuse)",
+        "Jul 18 user confirmation still standing"
+      ],
+      "disconfirmed_by": "A browser check showing the LP form/GTM actually broken",
+      "id": "c1-f2"
+    }
+  ]
+}
+
+### 2026-07-20 17:00 — EXECUTE the campaign pause NOW — the user has explicitly commanded it ('pause th
+
+**Task:** EXECUTE the campaign pause NOW — the user has explicitly commanded it ('pause the entire campaign'), which satisfies the high-impact confirmation requirement; do NOT re-ask for approval. Steps: (1) Ca
+I'll execute the pause now — the user's explicit command satisfies the high-impact confirmation. First, let me load the exact tool schemas (accounting for the underscore mismatch that blocked Jul 18).Direct select found nothing — the google-ads MCP tools weren't in the deferred list under those names. Let me search by keyword to find the real registered tool names.Tool loaded — the real name is si
+**Why this was right:** pausing stops the **~$85.57/day bleed** immediately — the last 7 days ran $599.01 / 89 clicks / **0 conversions**, a 26-day drought (last conv Jun 24), CPC breaching band 6 of 7 days. That's real money going out for nothing while the fixes sat unexecuted.
+**What the pause preserves:** earned Quality Scores survive a pause far better than a delete — golden vize 5, altın vize 6, greece golden visa program 8, yunanistan golden visa 4 all remain intact for restart.
+**Restart condition (do NOT re-enable until done):** apply the Day 1–4 calendar to the *paused* campaign first, so it never runs another day unfixed:
+1. 4 campaign negatives — şartları PHRASE, nedir PHRASE, nasıl alınır PHRASE, ekşi EXACT
+2. Pause EN ad group 198513892027
+3. Czech (1021) → Turkish (1037)
+4. Add `golden visa yunanistan` PHRASE + bid caps; set $40/day budget
+Only then re-enable.
+— *PPC Strategist*
+
+### 2026-07-20 17:01 — Orchestrated finding
+
+{
+  "summary": "Campaign PAUSED and verified live \u2014 bleed stopped; keep it paused until the Day 1-4 fixes ship, then re-enable.",
+  "findings": [
+    {
+      "claim": "Campaign 23758877756 is now PAUSED, verified live via GAQL",
+      "severity": "high",
+      "confidence": 0.99,
+      "sources": [
+        "campaign_update_campaign returned success",
+        "search_execute_query returned status=PAUSED this session"
+      ],
+      "disconfirmed_by": "A fresh GAQL pull showing status=ENABLED",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Pausing stops ~$85.57/day of zero-return spend immediately",
+      "severity": "high",
+      "confidence": 0.97,
+      "sources": [
+        "Jul 14-20 daily table: $599.01/89 clicks/0 conv",
+        "26-day drought since Jun 24"
+      ],
+      "disconfirmed_by": "Evidence conversions were being recorded but not shown",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Do not re-enable until Day 1-4 fixes are applied to the paused campaign",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "4 negatives/EN pause/Czech\u2192Turkish/keyword all still unexecuted per Jul 20 audit"
+      ],
+      "disconfirmed_by": "A live pull showing the fixes already applied",
+      "id": "c1-f2"
+    }
+  ]
+}

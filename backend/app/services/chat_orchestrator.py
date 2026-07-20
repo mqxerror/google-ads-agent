@@ -172,17 +172,22 @@ def _is_meta_question(message: str) -> bool:
 # SELECT (conversion goals/actions, metrics, campaigns) works — the old
 # tools=[] → "__NONE__" wall blocked EVERY google-ads tool and left specialists
 # (and the GTM Specialist) in "analysis-only mode" on read queries. Every entry
-# is read-only: GAQL (`search__execute_query`) has NO mutation syntax, and
+# is read-only: GAQL (`search_execute_query`) has NO mutation syntax, and
 # GenerateKeywordIdeas / ListAccessibleCustomers mutate nothing. A MUTATE tool's
 # name is not in this set, so it stays blocked by the SAME middleware — reads
 # open, writes stay gated exactly as today.
+# NAMES MUST MATCH THE LIVE REGISTRY EXACTLY — single underscore joins namespace
+# + tool (the `search` server's `execute_query` → `search_execute_query`). The
+# prior DOUBLE-underscore names matched NOTHING and severed every read (the
+# 2026-07-16 money bug). test_tool_registry.py now asserts each entry matches a
+# real registered tool, so this list can never silently drift from reality again.
 _READ_ONLY_GADS_TOOLS = [
-    "search__execute_query",
-    "search__search_campaigns",
-    "search__search_ad_groups",
-    "search__search_keywords",
-    "search__list_accessible_customers",
-    "search__generate_keyword_ideas",
+    "search_execute_query",
+    "search_search_campaigns",
+    "search_search_ad_groups",
+    "search_search_keywords",
+    "search_list_accessible_customers",
+    "search_generate_keyword_ideas",
 ]
 
 
@@ -193,6 +198,27 @@ def _specialist_tool_allowlist(planned_tools: list) -> list[str]:
     removes the existing gating). De-duplicates, order-stable."""
     merged = [*_READ_ONLY_GADS_TOOLS, *(str(t) for t in (planned_tools or []))]
     return list(dict.fromkeys(merged))
+
+
+async def _audit_tool_allowlist(entries: list[str]) -> list[str]:
+    """Fail-loud guard for the 2026-07-16 money bug: return the allowlist
+    `entries` that match ZERO live-registered MCP tools (under the SAME canonical
+    match the enforcement middleware uses). A non-empty result means a
+    name-convention drift has silently severed tooling — the caller surfaces it
+    on the turn ledger instead of letting it fail as a mystery block.
+
+    Registry enumeration is a heavy, cached import run OFF the event loop; any
+    failure degrades to `[]` (no false alarms). CI's `test_tool_registry.py` is
+    the primary guard — this is the runtime backstop."""
+    try:
+        from google_ads.tool_registry import (
+            registered_tool_names, unmatched_allowlist_entries)
+        names = await asyncio.to_thread(registered_tool_names)
+    except Exception:  # pragma: no cover - defensive; never break dispatch
+        logger.warning("tool-registry enumeration failed; skipping allowlist "
+                       "audit", exc_info=True)
+        return []
+    return unmatched_allowlist_entries(entries, names)
 
 
 def _budget_snapshot(
@@ -858,6 +884,23 @@ async def run_turn(
             ],
             "parallel_groups": [[s["call_id"] for s in specs]],
         }}
+
+        # ── Fail-loud allowlist audit (money-bug 2026-07-16) ───────────────
+        # Every specialist's effective allowlist is checked against the LIVE MCP
+        # registry BEFORE dispatch. If an entry matches no registered tool, a
+        # name-convention drift (e.g. `search__execute_query` vs the live
+        # `search_execute_query`) has silently severed tooling — surface it as a
+        # visible verification event on the ledger instead of a mystery block
+        # that once let a campaign waste ~$131/week. Deduped across specialists.
+        _audit_entries = sorted({
+            e for s in specs
+            for e in _specialist_tool_allowlist(s.get("tools") or [])
+        })
+        for _entry in await _audit_tool_allowlist(_audit_entries):
+            yield {"type": "verification", "payload": {
+                "kind": "tool_allowlist", "status": "failed",
+                "detail": (f"tool allowlist entry '{_entry}' matches no "
+                           f"registered tool")}}
 
         # ══ S4 DISPATCH ════════════════════════════════════════════════
         from app.services.workflow_orchestrator import _MAX_PARALLEL

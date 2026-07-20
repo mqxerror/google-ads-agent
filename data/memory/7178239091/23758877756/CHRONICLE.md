@@ -43,6 +43,30 @@ Last updated: 2026-07-20
 - **Jun 02** — [Agency Director] Team session run for Turkey campaign (May 19–Jun 2, 14-day window): PPC confirmed Manual CPC fix held ($2.56–$6.08 band post-May 21), CPA at $620.69 on 1 conversion from 142 clicks; Search Term Hunter flagged negative keyword gaps and high-intent term validation needed; GTM Specialist tasked to re-verify real lead ping beyond test-mode confirmation.
 
 ### July 2026
+- **Jul 20** — [Agency Director] User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voi. 01 for 89 clicks and 0 conversions — the drought is at 26 days (last conversion Jun 24), CPC breache
+- **Jul 20** — [PPC Strategist] User asked: EXECUTE the campaign pause NOW — the user has explicitly commanded it ('pause the entire campaign'),
+- **Jul 20** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo
+- **Jul 20** — [Agency Director] User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voi. **
+
+Per the PPC Strategist's Day-0 audit and the Search Term Hunter's negative verification (both ru
+- **Jul 20** — [PPC Strategist] User asked: Deliver the FINAL user-facing answer to 'how is the campaign doing since the changes' by CITING (not. | Calendar item | Live state | Shipped? |
+|---|---|---|
+| Day 1 — 4 negatives (şartları/nedir/nasıl . | Calendar item | Live state | Shipped? |
+|---|---|---|
+| Day 1 — 4 negatives (şartları/nedir/nasıl
+- **Jul 20** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. ```json
+{
+  "specialists": [
+    {
+      "role_id": "ppc_strategist",
+      "model": "opus",
+      ". ```json
+{
+  "specialists": [
+    {
+      "role_id": "ppc_strategist",
+      "model": "opus",
+      "
 - **Jul 20** — [PPC Strategist] PPC Strategist audit found NONE of the Day 1–4 changes shipped — still Day 0: budget still $120/day (target $40), EN group 198513892027 still ENABLED, targeting still English+Czech (not Turkish), 4 campaign negatives still blocked by the allowlist underscore bug. 7-day read (Jul 14–20): $599.01 spend / 89 clicks / 0 conv, run-rate $85.57/day (2.1× the $40 target, ~5% above baseline), CPC breached the $2.56–$6.08 band on 6/7 days, conversion drought now 26 days (last conv Jun 24); only two read-only items closed Jul 19 (JS-render check passed, PRIMARY flag closed).
 - **Jul 20** — [Search Term Hunter] User asked: Verify from the LIVE 3-day search-term table (2026-07-20, in context — do NOT re-pull) whether the 4. **Search Term Hunter | Greece GV Turkey (23758877756) | 2026-07-20 — Day-1 negative verification**
 - **Jul 20** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Evidence to check against the Day 1-4 calendar you designed Jul 14/17: (a) budget — live roster show

@@ -417,9 +417,9 @@ class WriteIntentDetection(unittest.TestCase):
 
     def test_tool_heuristic(self):
         self.assertTrue(chat_orchestrator._detect_write_intent(
-            {"task": "handle it", "tools": ["google_ads__mutate_campaign"]}))
+            {"task": "handle it", "tools": ["campaign_mutate_campaign"]}))
         self.assertFalse(chat_orchestrator._detect_write_intent(
-            {"task": "review it", "tools": ["search__execute_query"]}))
+            {"task": "review it", "tools": ["search_execute_query"]}))
 
 
 # ── turn-budget: $5 WATCH notice (informational) + runaway BACKSTOP wrap-up ──
@@ -606,8 +606,8 @@ class SpecialistToolScoping(_Base):
         spec_calls = [k for k in captured if k.get("active_role") == "ppc_strategist"]
         self.assertTrue(spec_calls, "the specialist must have been dispatched")
         allow = spec_calls[0].get("tool_allowlist") or []
-        self.assertIn("search__execute_query", allow)           # a SELECT is reachable
-        self.assertNotIn("campaign__update_campaign", allow)    # a mutate is NOT reachable
+        self.assertIn("search_execute_query", allow)            # a SELECT is reachable
+        self.assertNotIn("campaign_update_campaign", allow)     # a mutate is NOT reachable
         # The Director's synth/plan stages stay tool-less (reconciliation only).
         director_calls = [k for k in captured if k.get("active_role") == "director"]
         self.assertTrue(director_calls)
@@ -618,15 +618,15 @@ class SpecialistToolScoping(_Base):
 class SpecialistWhitelistUnit(unittest.TestCase):
     def test_readonly_whitelist_grants_select_no_mutate(self):
         allow = chat_orchestrator._specialist_tool_allowlist([])
-        self.assertIn("search__execute_query", allow)
+        self.assertIn("search_execute_query", allow)
         self.assertFalse(any(
             ("update" in a) or ("mutate" in a) or ("create" in a) or ("remove" in a)
             for a in allow), "the read-only whitelist must contain no mutate tools")
 
     def test_plan_authorized_mutate_is_unioned(self):
-        allow = chat_orchestrator._specialist_tool_allowlist(["campaign__update_campaign"])
-        self.assertIn("search__execute_query", allow)            # reads granted
-        self.assertIn("campaign__update_campaign", allow)        # plan's tool preserved
+        allow = chat_orchestrator._specialist_tool_allowlist(["campaign_update_campaign"])
+        self.assertIn("search_execute_query", allow)             # reads granted
+        self.assertIn("campaign_update_campaign", allow)         # plan's tool preserved
 
     def test_meta_question_detection(self):
         for m in ("why did you stop?", "why the plan stopped", "what happened",
@@ -671,10 +671,14 @@ class MiddlewareReadOnlyEnforcement(unittest.IsolatedAsyncioTestCase):
         os.environ.pop("LANGAR_BOUND_CAMPAIGN_ID", None)
         sentinel = object()
         try:
-            got = await self._call(mw, "search__execute_query", sentinel)
+            # REAL live tool names (single underscore joining namespace+tool) —
+            # NOT the fabricated double-underscore names this test used before,
+            # which matched the equally-wrong allowlist and let the 2026-07-16
+            # money bug ship green against names that did not exist.
+            got = await self._call(mw, "search_execute_query", sentinel)
             self.assertIs(got, sentinel)                        # SELECT reachable
             with self.assertRaises(ValueError) as cm:
-                await self._call(mw, "campaign__update_campaign", sentinel)
+                await self._call(mw, "campaign_update_campaign", sentinel)
             self.assertIn("TOOL_NOT_ALLOWED", str(cm.exception))  # mutate blocked
         finally:
             if old_allow is None:
