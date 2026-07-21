@@ -1,9 +1,21 @@
 # Campaign Chronicle: Panama QIP — US — Search — v2
-Last updated: 2026-07-16
+Last updated: 2026-07-21
 
 ## Timeline
 
 ### July 2026
+- **Jul 21** — [Agency Director] Panama QIP US Search v2 week-1 audit (LIVE): $1,499.65 spend / 265 clicks / 2 conversions → CPA $749.82 (under $800 bar), but both conversions came from one keyword (`[PHRASE] buy property in panama`) in Property Investors ($870.14 = 58% of spend); the four higher-intent ad groups spent $629.51 with zero conversions. IS 28.3%, lost-to-rank 47.2%, lost-to-budget 24.5% — Director verdict: "pass on the number, fail on the structure."
+- **Jul 21** — [Creative Director] Creative Director produced a Panama QIP ad-copy counter-strategy: hold $300K (no price-match vs Henley's $100K tier), counter Orience's false EU claim with "Government-Approved Program"/"Real Panama Residency", and close Latitude's Ad Rank gap (119 ads, pos 1.9) with six sitelinks at zero CPC risk.
+Delivered a 15-headline bank with "Licensed Immigration Advisors" pinned at H2 across all ad groups, H1 differentiated per group, freeze-locked for the Jul 23 launch.
+- **Jul 21** — [PPC Strategist] Panama QIP US v2 (24036236041) week-1 live pull: $1,499.65 spend / 265 clicks / 2 conversions → lifetime CPA $749.82, under the $800 bar; second conversion pinned to Jul 19. Avg imp share 28.3% with 47.2% lost to rank and 24.5% lost to budget (peaking Jul 17 at 64.9% budget-lost).
+- **Jul 21** — [Competitor Intel] Position gap vs Latitude (pos 2.8 vs 1.9) traced to three causes: QS 1-3 on the four core Panama exact-match auctions, budget starvation (56%+ of clicks in Property Investors residential intent vs 3 lifetime clicks on Investor Program High Intent), and asset depth 51 ads vs Latitude's 119. Non-freeze levers identified for Jul 23: RSA rewrites pinning "$300,000 Investment"/"~30 Days" to mirror LP h1, sitelink battery, and adding [EXACT] `panama permanent residency by investment` (16 advertisers, zero Mercan presence).
+- **Jul 21** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. ```json
+{
+  "specialists": [
+    {
+      "role_id": "ppc_strategist",
+      "model": "sonnet",
+     . cost_micros, clicks, impressions, conversions, conversions_value, search_impression_share, search_ra
 - **Jul 16** — [Agency Director] Verified live that Panama QIP — US — Search — v2 (24036236041) still has `goal_config_level = CAMPAIGN` with custom goal `customConversionGoals/6458374995` (Panama QIV Lead) assigned — the earlier write is holding. Declined to assign the goal to Oman + Jordan (24002195025) from this thread per the conversation↔campaign binding rule; routed Wassim to that campaign's own conversation for the single assignment write.
 - **Jul 16** — [Agency Director] Panama conversion design ratified as an account-wide standing rule: ONE action (Panama QIV Lead, 7607343274) + ONE custom goal (customConversionGoals/6458374995) for every Panama campaign — QIP, Friendly Nations, future; new landing pages extend the existing action's URL rules rather than spawning a second action (the double-counting trap). US v2 verified live with the goal assigned; Panama QIP — Oman + Jordan (24002195025) still on account-default and needs the assignment from its own thread; three paused Panama campaigns deferred to reactivation checklist.
 - **Jul 16** — [Agency Director] Flipped `[DEPRECATED] Greece GV Turkey CP` (7576883475) to secondary via the new `primary_for_goal` MCP capability, created custom goal "Panama QIV Lead" (customConversionGoals/6458374995 → action 7607343274), and switched campaign 24036236041 to campaign-level goal config — all three verified live. Kept `buy property in panama` (the keyword that drove the conversion); pause stays on hold pending the 7-day post-negative pull.

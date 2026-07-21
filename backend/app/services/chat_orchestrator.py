@@ -200,6 +200,97 @@ def _specialist_tool_allowlist(planned_tools: list) -> list[str]:
     return list(dict.fromkeys(merged))
 
 
+# MCP SERVER names the Director may mistakenly emit as a `tools` entry (the
+# 2026-07-20 interface-contract bug: plan carried tools=['google-ads'] — a SERVER
+# name grants NO tool BY NAME and stranded a user-approved write). Server names
+# are ALWAYS invalid as an execution grant; mutate tools must be granted by exact
+# tool name. Compared case/underscore-insensitively (`google_ads` → `google-ads`).
+_MCP_SERVER_NAMES = {"google-ads", "chrome"}
+
+
+async def _format_tool_catalog() -> str:
+    """Compact, registry-grounded tool catalog for the Director's PLAN prompt:
+    grouped read/write REAL tool names + the exact-name contract line. The
+    Director must name execution tools VERBATIM from this catalog — a server name
+    like 'google-ads' authorizes nothing. Enumerates the live surface OFF the
+    event loop (cached); returns '' only if the registry can't be enumerated (so
+    planning is never blocked — reads stay covered by the baked whitelist)."""
+    try:
+        from google_ads.tool_registry import execution_catalog
+        cat = await asyncio.to_thread(execution_catalog)
+    except Exception:  # pragma: no cover - defensive; never break planning
+        logger.warning("tool-registry enumeration failed; plan prompt omits the "
+                       "tool catalog", exc_info=True)
+        return ""
+    reads = cat.get("read") or []
+    writes = cat.get("write") or []
+    if not reads and not writes:
+        return ""
+    lines = ["\n\nTOOL CATALOG (exact registered tool names — use these VERBATIM "
+             "in each specialist's `tools`):"]
+    if reads:
+        lines.append("  read:  " + ", ".join(reads))
+    if writes:
+        lines.append("  write: " + ", ".join(writes))
+    lines.append(
+        "CONTRACT: every `tools` entry MUST be an EXACT tool name from this "
+        "catalog. MCP SERVER names (e.g. 'google-ads', 'chrome') are INVALID and "
+        "grant NOTHING — an approved write named by a server name cannot execute. "
+        "Use [] for analysis-only.")
+    return "\n".join(lines)
+
+
+def _plan_reask_prompt(original_prompt: str, invalid: list[str],
+                       catalog_block: str) -> str:
+    """One corrective re-ask when a plan named tools that can't grant execution.
+    Restates the ORIGINAL plan ask + the real catalog + the exact invalid entries
+    so the Director re-emits the same JSON with EXACT tool names."""
+    return (
+        original_prompt
+        + "\n\n── CORRECTION REQUIRED ──\n"
+        + ("Your previous plan named `tools` that are NOT valid execution tools: "
+           f"{', '.join(invalid)}.\n")
+        + "These are MCP SERVER names or unknown strings; a server name grants NO "
+          "tool and would BLOCK an approved write.\n"
+        + (catalog_block or "")
+        + "\nRe-emit the SAME JSON shape, but every `tools` entry MUST be an EXACT "
+          "tool name from the catalog above (or [] for analysis-only)."
+    )
+
+
+async def _validate_plan_tools(specs: list[dict]) -> list[str]:
+    """Resolve every plan `tools` entry across `specs` against the LIVE MCP
+    registry. Return the order-stable, de-duplicated entries that CANNOT grant
+    execution — a known MCP server name, or an entry matching ZERO registered
+    tools. Empty result = every named tool is real and grantable BY NAME.
+
+    This is the interface-contract enforcement the plan-stage `verification` audit
+    could not do (2026-07-20): that audit ran AFTER the plan event as a passive
+    `verification/failed` note — no re-ask, no correction — so a server-name grant
+    still stranded the approved batch. Registry-enumeration failure degrades to
+    [] (no false alarm; the baked read-only whitelist still covers reads)."""
+    entries: list[str] = []
+    for s in specs:
+        for t in (s.get("tools") or []):
+            t = str(t)
+            if t and t.strip() and t not in entries:
+                entries.append(t)
+    if not entries:
+        return []
+    try:
+        from google_ads.tool_registry import (
+            registered_tool_names, unmatched_allowlist_entries)
+        names = await asyncio.to_thread(registered_tool_names)
+    except Exception:  # pragma: no cover - defensive; never break dispatch
+        logger.warning("tool-registry enumeration failed; skipping plan-tool "
+                       "validation", exc_info=True)
+        return []
+    unresolved = set(unmatched_allowlist_entries(entries, names))
+    server = {e for e in entries
+              if e.strip().lower().replace("_", "-") in _MCP_SERVER_NAMES}
+    return [e for e in entries if e in unresolved or e in server]
+
+
 async def _audit_tool_allowlist(entries: list[str]) -> list[str]:
     """Fail-loud guard for the 2026-07-16 money bug: return the allowlist
     `entries` that match ZERO live-registered MCP tools (under the SAME canonical
@@ -440,12 +531,13 @@ async def _run_direct(
         yield {"type": "final_chunk", "payload": {"content": full_text}}
 
     message_id = str(uuid.uuid4())
+    _role_id = agent_role_id or "director"
+    _role_name = agent_role_name or "Marketing Director"
     try:
         message_id = await _persist_assistant_message(
             conversation_id=conversation_id, content=full_text,
             tool_calls=tool_calls_json or None,
-            agent_role_id=agent_role_id or "director",
-            agent_role_name=agent_role_name or "Marketing Director",
+            agent_role_id=_role_id, agent_role_name=_role_name,
             campaign_id=campaign_id, turn_id=turn_id,
         )
     except Exception as e:  # persistence must never break the stream
@@ -453,7 +545,9 @@ async def _run_direct(
     yield {"type": "final_done", "payload": {
         "message_id": message_id, "cost_total": round(cost, 4),
         "duration_ms": int((time.monotonic() - started) * 1000),
-        "agents_used": 0, "conflicts_resolved": 0}}
+        "agents_used": 0, "conflicts_resolved": 0,
+        # persona for the live bubble → export uses the display name, not "Assistant"
+        "agent_role": _role_id, "agent_role_name": _role_name}}
     yield {"type": "turn_done", "payload": {"stop_reason": "natural", "cost": round(cost, 4)}}
 
 
@@ -791,15 +885,21 @@ async def run_turn(
         prior_block = ("\n\nPRIOR WORK (reuse = cite it, do NOT redo; reverify = "
                        "may re-run):\n" + "\n".join(prior_lines)) if prior_lines else ""
         max_spec = int(settings.CHAT_ORCH_MAX_SPECIALISTS)
+        # Registry-grounded catalog of REAL tool names — reused for the plan
+        # prompt AND (if needed) the corrective re-ask. A plan must name execution
+        # tools BY EXACT NAME from this catalog; a server name grants nothing.
+        catalog_block = await _format_tool_catalog()
         plan_prompt = (
             "You are the Marketing Director planning a focused multi-specialist "
             "response to ONE user question about this campaign.\n\n"
             f"USER QUESTION: {user_message}\n\n"
             "Available specialists (pick only the ones that fit; tailor each "
             "task):\n" + "\n".join(roster) + prior_block + premise_block +
+            catalog_block +
             "\n\nDo NOT dispatch a specialist to redo work marked reuse — cite it "
             f"instead. Use at most {max_spec} specialists. Prefer tools=[] "
-            "(analysis over data already in context).\n\n"
+            "(analysis over data already in context); when execution IS needed, "
+            "grant the exact write tool name(s) from the catalog above.\n\n"
             "Respond with ONLY a JSON object, no prose:\n"
             "```json\n"
             "{\n"
@@ -836,27 +936,32 @@ async def run_turn(
                 yield ev
             return
 
-        specs: list[dict] = []
-        for i, s in enumerate(raw_specs[:max_spec]):
-            if not isinstance(s, dict) or not s.get("role_id"):
-                continue
-            role = get_role(s["role_id"])
-            call_id = f"c{len(specs) + 1}"
-            spec_entry = {
-                "call_id": call_id,
-                "role_id": s["role_id"],
-                "role_name": role.name if role else s["role_id"],
-                "task": (s.get("task") or user_message or "") + _V2_FINDINGS_SUFFIX,
-                "model": s.get("model") or "sonnet",
-                "tools": s.get("tools") or [],
-                "reason": s.get("reason") or "",
-                # honor an explicit plan flag when present (see _detect_write_intent)
-                "write_intent": s.get("write_intent"),
-            }
-            # Fix 1: pin write-intent per spec so the stop path can report a
-            # per-specialist disposition (an approved write must never die silently).
-            spec_entry["write_intent"] = _detect_write_intent(spec_entry)
-            specs.append(spec_entry)
+        def _build_specs(raw: list | None) -> list[dict]:
+            """Parse Director plan `specialists` into runnable specs. Reused for
+            the corrective re-ask so the two paths can't drift."""
+            out: list[dict] = []
+            for s in (raw or [])[:max_spec]:
+                if not isinstance(s, dict) or not s.get("role_id"):
+                    continue
+                role = get_role(s["role_id"])
+                spec_entry = {
+                    "call_id": f"c{len(out) + 1}",
+                    "role_id": s["role_id"],
+                    "role_name": role.name if role else s["role_id"],
+                    "task": (s.get("task") or user_message or "") + _V2_FINDINGS_SUFFIX,
+                    "model": s.get("model") or "sonnet",
+                    "tools": s.get("tools") or [],
+                    "reason": s.get("reason") or "",
+                    # honor an explicit plan flag when present (see _detect_write_intent)
+                    "write_intent": s.get("write_intent"),
+                }
+                # Fix 1: pin write-intent per spec so the stop path can report a
+                # per-specialist disposition (an approved write must never die silently).
+                spec_entry["write_intent"] = _detect_write_intent(spec_entry)
+                out.append(spec_entry)
+            return out
+
+        specs = _build_specs(raw_specs)
 
         if not specs:
             yield {"type": "director_thought", "payload": {
@@ -871,6 +976,58 @@ async def run_turn(
             ):
                 yield ev
             return
+
+        # ── Plan execution-grant contract (2026-07-20 interface-contract bug) ──
+        # The Director's plan may name an MCP SERVER ('google-ads') instead of an
+        # exact TOOL name; a server name grants NO tool BY NAME, so a user-APPROVED
+        # write is silently stranded (5× TOOL_NOT_ALLOWED — no seat could execute).
+        # Resolve every plan `tools` entry against the LIVE registry; on any
+        # unresolved / server-name entry, re-ask the Director ONCE with the real
+        # catalog, then (if still invalid) STRIP the bad entries and surface a
+        # PROMINENT ledger event so an approved batch can never silently strand.
+        invalid_tools = await _validate_plan_tools(specs)
+        if invalid_tools:
+            yield {"type": "director_thought", "payload": {
+                "text": ("Plan named tools that aren't real execution tools: "
+                         f"{', '.join(invalid_tools)}. Re-asking the Director to "
+                         "use exact tool names from the catalog."),
+                "stage": "plan"}}
+            reask_prompt = _plan_reask_prompt(plan_prompt, invalid_tools, catalog_block)
+            reask_parts: list[str] = []
+            async for ev in stream_agent_response(
+                user_message=reask_prompt, model="fable", active_role="director",
+                tool_allowlist=[], account_id=account_id, campaign_id=campaign_id,
+                campaign_name=campaign_name, conversation_id=conversation_id,
+            ):
+                if ev.get("type") in ("text", "text_delta"):
+                    reask_parts.append(ev.get("content", ""))
+                elif ev.get("type") == "done":
+                    total_cost += float(ev.get("cost") or 0.0)
+            reask_plan = _extract_json("".join(reask_parts))
+            reask_specs = _build_specs(
+                reask_plan.get("specialists") if reask_plan else None)
+            if reask_specs:
+                specs = reask_specs
+            invalid_tools = await _validate_plan_tools(specs)
+            if invalid_tools:
+                # Still invalid after ONE re-ask: STRIP the bad entries (reads stay
+                # whitelisted) and surface a PROMINENT, machine-detectable ledger
+                # event so an approved write can never again die as a mystery
+                # TOOL_NOT_ALLOWED. Valid entries survive → real mutates still land.
+                _bad = set(invalid_tools)
+                for s in specs:
+                    s["tools"] = [t for t in (s.get("tools") or []) if str(t) not in _bad]
+                _bad_list = ", ".join(sorted(_bad))
+                yield {"type": "director_thought", "payload": {
+                    "text": (f"⚠️ Plan authorized unknown tools {_bad_list} — "
+                             "execution will be BLOCKED for those. Proceeding with "
+                             "read-only tools; an approved write cannot land until "
+                             "the plan names exact tool names."),
+                    "stage": "plan"}}
+                yield {"type": "verification", "payload": {
+                    "kind": "plan_tools", "status": "failed",
+                    "detail": (f"plan authorized unknown tools {_bad_list} — "
+                               "execution will be blocked")}}
 
         yield {"type": "director_thought", "payload": {
             "text": f"Plan ready · {len(specs)} specialist(s).", "stage": "plan"}}
@@ -1146,11 +1303,16 @@ async def run_turn(
 
         # Persist ONLY the Director synthesis (GATED text) as the assistant
         # message. A persist failure must NOT abort the turn (final_done still
-        # emits).
+        # emits). The persona is captured in locals so the PERSISTED row and the
+        # final_done event agree BY CONSTRUCTION — an orchestrated turn's message
+        # must carry the Director persona, not fall back to a bare "Assistant" in
+        # a live-session export (2026-07-20 export-labeling bug).
+        synth_role_id = "director"
+        synth_role_name = "Marketing Director"
         try:
             message_id = await _persist_assistant_message(
                 conversation_id=conversation_id, content=final_text, tool_calls=None,
-                agent_role_id="director", agent_role_name="Marketing Director",
+                agent_role_id=synth_role_id, agent_role_name=synth_role_name,
                 campaign_id=campaign_id, turn_id=turn_id)
         except Exception as e:
             logger.warning("synthesis persist failed: %s", e)
@@ -1159,7 +1321,9 @@ async def run_turn(
         yield {"type": "final_done", "payload": {
             "message_id": message_id, "cost_total": round(total_cost, 4),
             "duration_ms": turn_ms, "agents_used": len(specs),
-            "conflicts_resolved": len(conflicts)}}
+            "conflicts_resolved": len(conflicts),
+            # persona for the live bubble → export uses the display name, not "Assistant"
+            "agent_role": synth_role_id, "agent_role_name": synth_role_name}}
 
         # Emit the real claim_gate event (shape {checked, passed, rewritten,
         # flagged}; the frontend type keys off checked/passed/rewritten).

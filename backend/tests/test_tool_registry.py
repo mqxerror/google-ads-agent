@@ -162,5 +162,38 @@ class DispatchAudit(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bad, [])
 
 
+class ExecutionCatalog(unittest.TestCase):
+    """The Director's plan-stage tool catalog: grouped, non-empty, and every
+    listed name is a REAL registered tool (2026-07-20 interface-contract bug —
+    the plan must name execution tools BY EXACT NAME, never a server name)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from google_ads.tool_registry import execution_catalog
+        cls.cat = execution_catalog()
+        cls.names = registered_tool_names()
+
+    def test_catalog_nonempty_reads_and_writes(self):
+        self.assertTrue(self.cat["read"], "catalog must surface read tools")
+        self.assertTrue(self.cat["write"], "catalog must surface write tools")
+
+    def test_every_catalog_entry_is_a_real_tool(self):
+        for group in ("read", "write"):
+            for name in self.cat[group]:
+                self.assertIn(name, self.names,
+                              f"catalog {group} entry '{name}' is not registered")
+
+    def test_catalog_carries_the_common_execution_ops(self):
+        writes = set(self.cat["write"])
+        # the negative-keyword + budget mutates the chat agent actually executes
+        self.assertIn("campaign_criterion_add_negative_keyword_criteria", writes)
+        self.assertIn("budget_update_campaign_budget", writes)
+
+    def test_catalog_never_contains_a_server_name(self):
+        flat = self.cat["read"] + self.cat["write"]
+        self.assertNotIn("google-ads", flat)
+        self.assertNotIn("chrome", flat)
+
+
 if __name__ == "__main__":
     unittest.main()

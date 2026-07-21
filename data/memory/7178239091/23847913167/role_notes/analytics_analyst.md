@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-07-05 16:47
+**Last updated:** 2026-07-21 16:51
 
 **Task:** analyze clarity data for this campaign
 Let me pull Clarity data for the landing page across multiple dimensions in parallel.Now let me get one more data point — mobile vs desktop conversion behavior.# Clarity Behavioral Analysis — MapleRoots Landing Page
@@ -142,3 +142,116 @@ The good news: with Meta carrying demand-gen, Search doesn't need to chase volum
 2. **QS rehab** — Creative Director adds "applying for" as a pinned H1 in AG4 (fixes the QS1 exact) and mirrors "through ancestry" language in AG1. This is now the highest-leverage move on the CPC per the auction data.
 3. *(Optional)* I can pull the **real domain-level Auction Insights via Chrome** if you want to see exactly *which* competitors entered and their outranking share — the API can't, the UI can.
 — *Analytics Analyst*
+
+### 2026-07-21 16:39 — Verify and report TODAY's live performance (2026-07-21) for campaign 23847913167
+
+**Task:** Verify and report TODAY's live performance (2026-07-21) for campaign 23847913167 ONLY. The context snapshot (synced 20:30 UTC) shows 27 clicks / $147.34 / 3 conv today, but the user reports 5 conversi
+Pulling today's live data via the streaming query tool now — two parallel queries for conversion-action breakdown and ad-group/keyword attribution.Running both queries in parallel now.Fixing the conversion-action query (remove the prohibited segments) — running now alongside a campaign-level today total.Got everything. Let me compile the report.
+## Today's Live Performance — MapleRoots 23847913167 · Jul 21, 2026 (PROVISIONAL)
+**Live API pull (post-snapshot):** 28 clicks / **$152.68** / **3 conversions** / $5.45 avg CPC
+**Conversion-action breakdown (primary only):**
+| Action | ID | Conv Today |
+|---|---|---|
+All 3 land on the PRIMARY. Zero bleed into the secondary. Tracking is clean.
+**Where today's 3 conversions landed:**
+| Keyword | Ad Group | Clicks | Cost | Conv |
+|---|---|---|---|---|
+**On the "5 conversions" discrepancy:** The API confirms **3 primary conversions**. The most likely source of the 5 you see in the Google Ads UI is **"All conversions" view** — 3 Canada Descent Lead + 2 GA4 form_submit (secondary). The primary count is the authoritative number; treat 3 as real, 5 as inflated by secondary GA4 fires.
+**Efficiency reassessment:**
+The "drift to $64" cited earlier was the **Jul 7–21 blended window**, which was dragged down by a brutal Jul 7–14 week:
+| Window | Conv | Spend | CPA |
+|---|---|---|---|
+The last 7 days at **$46.83 CPA are running *below* the Jun 21–Jul 4 baseline** — the drift story is wrong when you segment properly. The Jul 7–14 week (high CPC, one zero-conversion day) was the anomaly; this week has recovered. Today's 3-conv day ($50.89 CPA, provisional) is in-line with the healthy baseline and does not change the week's direction.
+**One flag:** Today's CPC is **$5.45** — a new campaign record. It's a Tuesday so no holiday explanation. Worth watching tomorrow; if CPC stays above $5 on Jul 22, that's a real signal, not noise.
+— *Analytics Analyst*
+
+### 2026-07-21 16:40 — Orchestrated finding
+
+{
+  "summary": "API confirms 3 primary conversions today (not 5 \u2014 the difference is GA4 secondary fires in the UI); last 7 days CPA is $46.83, below baseline \u2014 the drift story is corrected; watch the $5.45 CPC on Jul 22.",
+  "findings": [
+    {
+      "claim": "The reported '5 conversions' includes GA4 form_submit (secondary) \u2014 only 3 are primary Canada Descent Lead; the campaign did NOT set a primary-conversion record today",
+      "severity": "high",
+      "confidence": 0.9,
+      "sources": [
+        "Live API: segments.conversion_action = 7612610100 \u2192 3 conv; UI 'All conversions' adds secondary GA4 fires"
+      ],
+      "disconfirmed_by": "A second live pull showing 5 on conversion_action_name = 'Canada Descent Lead' specifically",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "The CPA drift story ($48 \u2192 $64) was a measurement artifact \u2014 last 7 days (Jul 15\u201321) are running at $46.83, below the Jun 21\u2013Jul 4 baseline; the campaign has recovered",
+      "severity": "medium",
+      "confidence": 0.85,
+      "sources": [
+        "14-day daily table in context: Jul 7\u201314 = $87 CPA (anomalous); Jul 15\u201321 = $983.45 / 21 conv = $46.83"
+      ],
+      "disconfirmed_by": "Google restating Jul 15\u201320 conversions downward in the next 48-72h",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Today's $5.45 CPC is a campaign high on a non-holiday Tuesday \u2014 warrants a 1-day watch before any action",
+      "severity": "low",
+      "confidence": 0.75,
+      "sources": [
+        "Live API avg_cpc: $5,452,860 micros; prior campaign highs: $4.90 Jul 10, $4.64 Jul 14"
+      ],
+      "disconfirmed_by": "Jul 22 CPC returning to $3.80\u2013$4.50 range",
+      "id": "c1-f2"
+    }
+  ]
+}
+
+### 2026-07-21 16:48 — Address the conversion-count framing with NEW first-party evidence: the user has
+
+**Task:** Address the conversion-count framing with NEW first-party evidence: the user has 5 lead emails in Outlook, EACH carrying a Google click ID (GCLID). That means 5 real ad-click form leads landed today (
+**Correction first: my "3 primary + 2 GA4 secondary" explanation was wrong.** Today's live segmented pull (2026-07-21) returns **one row only** — Canada Descent Lead (7612610100): `conversions 3, all_conversions 3`. There is no secondary GA4 fire on this campaign today, so the 5 can't be UI inflation. Your 5 GCLID-stamped Outlook leads are the better evidence; treat **5 real leads, 3 recorded**.
+**Gap diagnosis — three candidates, ranked:**
+- **Click-date attribution (most likely, ~50%).** Live: `click_through_lookback_window_days = 90`. Google books a conversion on the **click's** date, not the submit date. Leads submitted today from Jul 18–20 clicks land on those rows — today only had 28 clicks vs 5 leads.
+- **Restatement lag (~35%).** 24–72h upward restatement is normal for this action.
+- **Real tag-chain gap (~15%).** Can't rule out; no live tag evidence either way this session.
+- Also live: `counting_type = ONE_PER_CLICK` — two leads sharing one GCLID would count once. **Check your 5 GCLIDs are distinct.**
+**Gate:** re-pull Jul 21 + Jul 18–20 rows on **Jul 23**. If the 5 GCLIDs are distinct and campaign-window totals still fall short → escalate to GTM Specialist for a `/lp/` tag-chain check.
+**Structural fix:** GCLID offline click-conversion upload (or Enhanced Conversions for Leads) against a **separate** CRM-confirmed action — never the same action, that double-counts. Makes Outlook the authoritative signal and feeds Maximize Conversions cleaner data. Effort: ~2–3h setup, then a recurring upload.
+— *Analytics Analyst*
+
+### 2026-07-21 16:51 — Orchestrated finding
+
+{
+  "summary": "5 real GCLID leads, 3 recorded \u2014 my GA4-inflation call was wrong (zero secondary fires today); most likely click-date attribution under a 90-day window plus restatement lag, gated for Jul 23 re-verify, with GCLID offline import as the structural fix.",
+  "findings": [
+    {
+      "claim": "Retract the 'GA4 secondary inflation' explanation \u2014 today's campaign has ZERO secondary conversions; the 5 Outlook GCLID leads are real and only 3 are recorded",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "Live GAQL 2026-07-21 segments.conversion_action: single row Canada Descent Lead, conversions=3, all_conversions=3"
+      ],
+      "disconfirmed_by": "A pull showing any non-zero conversion on action 6953214477 for campaign 23847913167 on 2026-07-21",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "The 2-lead gap is most likely click-date attribution, not a broken tag \u2014 the action has a 90-day click-through window so leads from Jul 18-20 clicks book on those dates",
+      "severity": "high",
+      "confidence": 0.6,
+      "sources": [
+        "Live conversion_action pull: click_through_lookback_window_days=90, counting_type=ONE_PER_CLICK",
+        "Only 28 clicks today vs 5 form leads"
+      ],
+      "disconfirmed_by": "All 5 GCLIDs resolving to clicks dated 2026-07-21 with campaign total still at 3 on Jul 23",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Implement GCLID offline click-conversion upload against a SEPARATE CRM-confirmed conversion action (~2-3h) to make Outlook the authoritative lead signal",
+      "severity": "medium",
+      "confidence": 0.85,
+      "sources": [
+        "User holds 5 GCLIDs; MCP has conversion_upload_upload_click_conversions",
+        "Guidelines: each campaign needs its own dedicated action"
+      ],
+      "disconfirmed_by": "Jul 23 re-pull showing primary restated to 5 \u2014 lag only, no measurement gap to close",
+      "id": "c1-f2"
+    },
+    {
+      "claim": "Gate: re-v

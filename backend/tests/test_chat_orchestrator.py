@@ -715,5 +715,169 @@ class ExecuteQueryReadOnlyGuard(unittest.IsolatedAsyncioTestCase):
             self.assertIn("read-only", str(cm.exception))
 
 
+# ── Plan execution-grant contract (2026-07-20 interface-contract bug) ─────────
+class PlanToolContract(_Base):
+    """The Director's plan granted MCP SERVER names ('google-ads') where the tool
+    gate consumes exact TOOL names, so a user-approved write could not land from
+    any seat (5× TOOL_NOT_ALLOWED). The plan stage now injects a real tool
+    catalog, validates every plan `tools` entry against the LIVE registry,
+    re-asks ONCE, then strips + surfaces a prominent event."""
+
+    _BAD = ('```json\n{"specialists":[{"role_id":"search_term_hunter",'
+            '"model":"sonnet","tools":["google-ads"],"task":"add negatives"}]}\n```')
+    _VALID = ('```json\n{"specialists":[{"role_id":"search_term_hunter",'
+              '"model":"sonnet","tools":["campaign_criterion_add_negative_keyword_criteria"],'
+              '"task":"add negatives"}]}\n```')
+    _SPEC = 'ok\n```json\n{"findings":[],"summary":"x"}\n```'
+
+    def _capturing_stream(self, captured):
+        async def _capturing(*args, **kwargs):
+            captured.append(kwargs)
+            events = _SCRIPT.pop(0) if _SCRIPT else [
+                {"type": "text", "content": "ok"}, {"type": "done", "cost": 0.0}]
+            for e in events:
+                yield e
+        return _capturing
+
+    def _plan_calls(self, captured):
+        return [k for k in captured
+                if k.get("active_role") == "director"
+                and "planning a focused" in (k.get("user_message") or "")]
+
+    async def test_server_name_reask_then_valid_grant_reaches_allowlist(self):
+        captured: list[dict] = []
+        agent_mod.stream_agent_response = self._capturing_stream(captured)
+        _SCRIPT.extend([_text_call(self._BAD), _text_call(self._VALID),
+                        _text_call(self._SPEC), _text_call("done")])
+        events = await self._run(
+            force_mode="orchestrate", user_message="add these negatives now")
+        # the corrective re-ask was announced
+        self.assertTrue(any(
+            e["type"] == "director_thought"
+            and "Re-asking the Director" in (e["payload"].get("text") or "")
+            for e in events), "the corrective re-ask must be announced")
+        # after the VALID re-ask the mutate reaches the specialist's allowlist
+        spec_calls = [k for k in captured
+                      if k.get("active_role") == "search_term_hunter"]
+        self.assertTrue(spec_calls, "specialist must have been dispatched")
+        allow = spec_calls[0].get("tool_allowlist") or []
+        self.assertIn("campaign_criterion_add_negative_keyword_criteria", allow)
+        # a valid re-ask leaves NO blocking plan_tools failure event
+        self.assertFalse(any(
+            e["type"] == "verification" and e["payload"].get("kind") == "plan_tools"
+            for e in events))
+
+    async def test_server_name_still_bad_strips_and_surfaces_prominent_event(self):
+        captured: list[dict] = []
+        agent_mod.stream_agent_response = self._capturing_stream(captured)
+        _SCRIPT.extend([_text_call(self._BAD), _text_call(self._BAD),
+                        _text_call(self._SPEC), _text_call("done")])
+        events = await self._run(
+            force_mode="orchestrate", user_message="add these negatives now")
+        # PROMINENT, machine-detectable failure event
+        vev = [e for e in events if e["type"] == "verification"
+               and e["payload"].get("kind") == "plan_tools"]
+        self.assertTrue(vev, "a prominent plan_tools failure event must surface")
+        self.assertEqual(vev[0]["payload"].get("status"), "failed")
+        self.assertIn("google-ads", vev[0]["payload"].get("detail", ""))
+        # a prominent director_thought says execution is blocked
+        self.assertTrue(any(
+            e["type"] == "director_thought"
+            and "execution will be BLOCKED" in (e["payload"].get("text") or "")
+            for e in events))
+        # the server name NEVER expands into the specialist's allowlist; reads stay
+        spec_calls = [k for k in captured
+                      if k.get("active_role") == "search_term_hunter"]
+        self.assertTrue(spec_calls)
+        allow = spec_calls[0].get("tool_allowlist") or []
+        self.assertNotIn("google-ads", allow)
+        self.assertFalse(any("negative_keyword_criteria" in a for a in allow),
+                         "no mutate was granted — read-only whitelist only")
+        self.assertIn("search_execute_query", allow)
+
+    async def test_valid_plan_names_pass_without_reask(self):
+        captured: list[dict] = []
+        agent_mod.stream_agent_response = self._capturing_stream(captured)
+        _SCRIPT.extend([_text_call(self._VALID), _text_call(self._SPEC),
+                        _text_call("done")])
+        events = await self._run(
+            force_mode="orchestrate", user_message="add these negatives now")
+        # NO re-ask, NO plan_tools failure, exactly ONE plan call
+        self.assertFalse(any(
+            e["type"] == "director_thought"
+            and "Re-asking the Director" in (e["payload"].get("text") or "")
+            for e in events))
+        self.assertFalse(any(
+            e["type"] == "verification" and e["payload"].get("kind") == "plan_tools"
+            for e in events))
+        self.assertEqual(len(self._plan_calls(captured)), 1)
+        # the mutate reaches the allowlist unchanged
+        spec_calls = [k for k in captured
+                      if k.get("active_role") == "search_term_hunter"]
+        allow = spec_calls[0].get("tool_allowlist") or []
+        self.assertIn("campaign_criterion_add_negative_keyword_criteria", allow)
+
+    async def test_plan_prompt_injects_real_tool_catalog(self):
+        captured: list[dict] = []
+        agent_mod.stream_agent_response = self._capturing_stream(captured)
+        _SCRIPT.extend([_text_call(self._VALID), _text_call(self._SPEC),
+                        _text_call("done")])
+        await self._run(force_mode="orchestrate",
+                        user_message="add these negatives now")
+        prompt = self._plan_calls(captured)[0]["user_message"]
+        self.assertIn("TOOL CATALOG", prompt)
+        self.assertIn("campaign_criterion_add_negative_keyword_criteria", prompt)
+        self.assertIn("search_execute_query", prompt)
+        self.assertIn("CONTRACT", prompt)
+        self.assertIn("google-ads", prompt)   # named as INVALID
+
+    async def test_validate_plan_tools_unit(self):
+        invalid = await chat_orchestrator._validate_plan_tools(
+            [{"tools": ["google-ads", "campaign_update_campaign", "ghost_tool"]}])
+        self.assertIn("google-ads", invalid)          # server name
+        self.assertIn("ghost_tool", invalid)          # unknown
+        self.assertNotIn("campaign_update_campaign", invalid)  # real tool
+        ok = await chat_orchestrator._validate_plan_tools(
+            [{"tools": ["campaign_update_campaign", "budget_update_campaign_budget"]}])
+        self.assertEqual(ok, [])
+
+    async def test_format_tool_catalog_nonempty(self):
+        block = await chat_orchestrator._format_tool_catalog()
+        self.assertIn("TOOL CATALOG", block)
+        self.assertIn("budget_update_campaign_budget", block)
+        self.assertIn("CONTRACT", block)
+
+
+# ── Export labeling (2026-07-20): orchestrated replies keep the persona ───────
+class OrchestratedExportLabeling(_Base):
+    """Orchestrated turns emit no `routing` event, so the live bubble had no
+    persona and an in-session export labeled the reply bare '## Assistant'.
+    final_done now carries the persona (matching the persisted row) so the export
+    uses the display name."""
+
+    async def test_orchestrated_final_done_carries_persona(self):
+        plan = _text_call(
+            '```json\n{"specialists":['
+            '{"role_id":"ppc_strategist","model":"sonnet","tools":[],"task":"a"}]}\n```')
+        spec = _text_call('ok\n```json\n{"findings":[],"summary":"x"}\n```')
+        _SCRIPT.extend([plan, spec, _text_call("done")])
+        events = await self._run(
+            force_mode="orchestrate", user_message="audit my account in depth")
+        fd = [e for e in events if e["type"] == "final_done"]
+        self.assertTrue(fd)
+        self.assertEqual(fd[0]["payload"].get("agent_role_name"), "Marketing Director")
+        self.assertEqual(fd[0]["payload"].get("agent_role"), "director")
+
+    async def test_degrade_direct_final_done_carries_persona(self):
+        plan = _text_call("prose only, no json here")
+        direct = _text_call("a real direct answer")
+        _SCRIPT.extend([plan, direct])
+        events = await self._run(
+            force_mode="orchestrate", user_message="audit my account in depth")
+        fd = [e for e in events if e["type"] == "final_done"]
+        self.assertTrue(fd)
+        self.assertEqual(fd[0]["payload"].get("agent_role_name"), "Marketing Director")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1528,7 +1528,13 @@ async def stream_agent_response(
         "ID (GTM-…), Google Ads conversion ID (AW-…), GA4 measurement ID (G-…), or "
         "conversion label unless it came from a live query/tag pull THIS session — "
         "and LABEL it with its source. If an ID isn't confirmed live, say "
-        "'ID not verified — pull it before relying on it' rather than reciting from memory."
+        "'ID not verified — pull it before relying on it' rather than reciting from memory.\n"
+        "MECHANISM CLAIMS NEED THE PULL: any explanation of a metric DISCREPANCY "
+        "(X in the UI vs Y in the API/CRM — e.g. 'the 5 = 3 primary + 2 GA4 "
+        "secondary fires') MUST cite a live SEGMENTED conversion pull run THIS "
+        "session (by conversion_action / source). Without that pull, phrase it as "
+        "an UNVERIFIED HYPOTHESIS with the segmented pull as the next step — never "
+        "'almost certainly' about the breakdown before you have queried it."
     )
 
     # Assemble the base system prompt (P0 — always included)

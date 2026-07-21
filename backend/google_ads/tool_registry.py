@@ -103,3 +103,60 @@ def unmatched_allowlist_entries(entries: list[str], names: frozenset[str]) -> li
     ``names`` (under canonicalization). A non-empty result means convention drift
     has severed tooling — the caller should surface it, not swallow it."""
     return [e for e in entries if e and not any(matches(e, n) for n in names)]
+
+
+# ── Execution catalog (grounded in the live registry) ─────────────────────────
+# Curated "common ops" the chat orchestrator surfaces to the Director so a PLAN
+# authorizes execution BY EXACT TOOL NAME — never by an MCP SERVER name like
+# 'google-ads', which authorizes NO tool BY NAME and once stranded a user-approved
+# write (the 2026-07-20 interface-contract bug: plan carried tools=['google-ads']
+# → 5× TOOL_NOT_ALLOWED, no seat could execute). Each candidate is INTERSECTED
+# with the live registry below, so the catalog can never advertise a tool that
+# isn't actually mounted (a mistyped/renamed candidate simply drops out).
+_CATALOG_READ_CANDIDATES = [
+    "search_execute_query",
+    "search_search_campaigns",
+    "search_search_ad_groups",
+    "search_search_keywords",
+    "search_generate_keyword_ideas",
+    "search_list_accessible_customers",
+]
+
+_CATALOG_WRITE_CANDIDATES = [
+    # negative keywords (the classic waste-cut execution)
+    "campaign_criterion_add_negative_keyword_criteria",
+    "customer_negative_criterion_add_negative_keywords",
+    "shared_criterion_add_keywords_to_shared_set",
+    # keywords
+    "ad_group_criterion_add_keywords",
+    "ad_group_criterion_remove_ad_group_criterion",
+    "ad_group_criterion_update_ad_group_criterion_status",
+    "ad_group_criterion_update_criterion_bid",
+    # budgets
+    "budget_update_campaign_budget",
+    "budget_create_campaign_budget",
+    # campaign / ad group / ad structure + status
+    "campaign_update_campaign",
+    "ad_group_update_ad_group",
+    "ad_group_ad_create_ad_group_ad",
+    "ad_group_ad_update_ad_group_ad_status",
+    "ad_group_ad_remove_ad_group_ad",
+    "ad_update_ad_status",
+    # bid modifiers
+    "campaign_bid_modifier_update_bid_modifier",
+    "ad_group_bid_modifier_update_ad_group_bid_modifier",
+]
+
+
+def execution_catalog(*, refresh: bool = False) -> dict[str, list[str]]:
+    """Grouped, registry-grounded catalog of the common read + write tool names
+    the Director should reference when planning an execution. Each curated
+    candidate is kept ONLY if it is a real registered tool (exact-name
+    membership), so the catalog is always both *real* and *bounded*. Order-stable
+    within each group. Heavy on first call (enumerates the live surface); memoized
+    thereafter — call OFF the event loop (``asyncio.to_thread``) from async code."""
+    names = registered_tool_names(refresh=refresh)
+    return {
+        "read": [t for t in _CATALOG_READ_CANDIDATES if t in names],
+        "write": [t for t in _CATALOG_WRITE_CANDIDATES if t in names],
+    }

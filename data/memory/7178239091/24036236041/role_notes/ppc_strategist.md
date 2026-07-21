@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-07-16 17:52
+**Last updated:** 2026-07-21 13:33
 
 **Task:** Write the campaign performance report for Panama QIP — US — Search — v2 (ID 24036236041) strictly from the in-context data. Cover: (1) day-by-day 2026-07-14→16 (73→748→634 impr; 8→49→38 clicks; $33.37
 
@@ -92,3 +92,73 @@ The feature you were looking for exists, it's just hidden under a different name
 **Don't:** create any new conversion action, ever, for a Panama campaign pointing at a page the existing action can cover. Extend the URL rules (or the GTM trigger) instead.
 Nothing here executes without your word — the deprecated-action flip and the custom goal are both changes I'd want you to explicitly approve. Say "do the custom goal tomorrow" and it goes on the log for Jul 17.
 *— PPC Strategist*
+
+### 2026-07-21 13:28 — FRESH LIVE PULL + WEEK-1 CPA VERDICT for campaign 24036236041 (customer 71782390
+
+**Task:** FRESH LIVE PULL + WEEK-1 CPA VERDICT for campaign 24036236041 (customer 7178239091) ONLY. Use search_execute_query (NOT google_ads_search_google_ads — it is broken with PAGE_SIZE_NOT_SUPPORTED per GTM
+Running the three GAQL reads now — daily, lifetime, and per-ad-group — using `search_execute_query` as specified.Running all three GAQL reads in parallel now.All three reads returned clean. Here's the full week-1 analysis.
+## Panama QIP US v2 — Week-1 Verdict | LIVE pull this turn
+**LIVE** = fetched this turn. **Cached** = prior session (noted where used).
+### Day-by-Day (LIVE)
+| Date | Impr | Clicks | Cost | Conv | CPC | Imp Share | Lost-Rank | Lost-Budget |
+|---|---|---|---|---|---|---|---|---|
+*Jul 21 is a partial day — 13 clicks at time of pull.*
+**Second conversion confirmed LIVE: landed Jul 19** (Cached context showed 2 total on Property Investors — now pinned to date).
+### Lifetime (LIVE)
+- Spend: **$1,499.65** | Clicks: **265** | Conversions: **2**
+- **Lifetime CPA: $749.82** — **UNDER the $800 bar** (directional read only; n=2, pinned-fact caveat applies)
+### Ad Group Breakdown (LIVE, Jul 14–21)
+| Ad Group | Clicks | Cost | Conv | CPA | % Spend |
+|---|---|---|---|---|---|
+**(a) Week-1 CPA verdict:** $749.82 — directionally **UNDER $800**, driven by 2 conversions both from Property Investors / `[PHRASE] buy property in panama`. Campaign is 7 days old, n=2: this is a directional signal, not a baseline.
+**(b) Latitude position gap — the rank bridge:** Latitude sits at avg pos 1.9 vs our 2.8. The cause is explicit in the live data: **47.2% of eligible impressions lost to Ad Rank** (lifetime average). Budget loss (24.5%) is secondary. Ad Rank = bid × QS × context. Our QS profile is weak: `residency visa panama` QS:1, `panama investment visa` QS:1, `panama golden visa` QS:1, `buy property in panama`
+**(c) Ranked next moves — all sequenced as "on Jul 23 pull, if X then Y":**
+1. **[HIGH] QS repair on low-scoring keywords.** On Jul 23, if rank-lost IS is still ≥45%: rewrite RSA headlines for `residency visa panama`, `panama investment visa`, `panama golden visa` to match keyword intent exactly. Move them to a dedicated tight ad group if current copy doesn't contain those exact phrases. Expected impact: +5–10pp impression share, position closes toward 2.2–2.5 range vs La
+2. **[HIGH] Add sitelinks to close the Latitude visibility gap.** Spy report shows Latitude at 1.9 with heavy sitelinks; our 51 ads show none in the spy data. Sitelinks boost Ad Rank via expected CTR. On Jul 23: add 4 sitelinks (e.g., "How the $300K Program Works", "30-Day Processing Timeline", "Book a Free Consultation", "Panama vs Greece — Compare Programs"). This costs nothing in bid terms and 
+3. **[MEDIUM] Budget decision on Jul 23.** Jul 17 lost 64.9% of impressions to budget; Jul 16 lost 46.1%. If Jul 23 search-terms pull shows clean traffic and CPA holds directionally under $800: raise daily budget from ~$220 to $300–350. Don't execute before the clean read — the negatives and goal change landed Jul 16, and the first honest read is Jul 23.
+4. **[MEDIUM] Property Investors keyword strategy review.** Both conversions came here, but it's 58% of spend on a structurally residential keyword set. On Jul 23: pull search terms for the Jul 16–23 post-negative window. If listing-browse queries still dominate (≥60% of terms): move `[PHRASE] buy property in panama` to exact match only and replace with `[EXACT] buy property panama investment` and
+5. **[LOW] Activate `[EXACT] panama qualified investor program` support.** 0 clicks in 7 days on this keyword — it likely exists in the Investor Program (High Intent) group ($12.39, 3 clicks) but the exact query gets no impressions, suggesting QS:2 is killing it in auction. On Jul 23: check impression share for this ad group specifically. If rank-lost >80%: dedicated ad copy containing the exact p
+**(d) What the spy data changes about copy strategy given Henley's $100K undercut:**
+Don't fight the price. Henley at "$100,000 minimum" is a different product (Citizenship by Investment programs like Dominica/St. Kitts, which Henley also sells — they're misleadingly applying $100K language to a Panama CBI frame). Our $300K is Panama's *official QIP floor*, not a weakness. The counter-frame:
+- **Don't**: lower-price messaging or any attempt to match the $100K anchor.
+- **Do**: lean into program legitimacy and speed. "Official $300K Panama QIP — Residency in ~30 Days" positions the price as a qualifier, not a cost. The landing page already uses the 30-day hook in H1 (LIVE fetch confirmed: *"Secure Panama Residency Through a $300,000 Investment, in About 30 Days"*) — match this in RSA headlines.
+- **Counter Orience**: They're claiming "EU Residency Rights" for Panama (false — Panama is not EU). Don't reference them in ads, but use truth as differentiation: "Panama Residency — No EU Requirement" or "Live, Work, and Travel in Panama — Not Just EU."
+- **Latitude at pos 1.9**: They're anchoring $300K and leading with US-investor targeting across all 5 states. The competitive opening is speed and certainty ("~30 Days") which Latitude doesn't appear to lead with in the spy data — make that H1.
+*— PPC Strategist*
+
+### 2026-07-21 13:33 — Orchestrated finding
+
+{
+  "summary": "Week-1 CPA $749.82 is directionally under the $800 bar on n=2; 47.2% rank-lost IS (low QS) is the primary Latitude gap \u2014 fix is QS repair + sitelinks on Jul 23, not bid increases.",
+  "findings": [
+    {
+      "claim": "Lifetime CPA of $749.82 is directionally under the $800 bar but rests on n=2 conversions \u2014 insufficient to confirm cost efficiency",
+      "severity": "medium",
+      "confidence": 0.55,
+      "sources": [
+        "LIVE GAQL: 2 conv / $1,499.65 lifetime, both from Property Investors / [PHRASE] buy property in panama"
+      ],
+      "disconfirmed_by": "Jul 23 pull shows CPA restating above $800 as more spend accumulates without additional conversions",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "47.2% of impressions lost to Ad Rank (LIVE, lifetime) is the primary driver of our 2.8 avg position vs Latitude's 1.9 \u2014 low QS keywords (QS 1\u20133 on residency visa panama, panama investment visa, panama golden visa) are the root cause",
+      "severity": "high",
+      "confidence": 0.88,
+      "sources": [
+        "LIVE GAQL: search_rank_lost_impression_share = 0.472 lifetime",
+        "keyword QS data: 8 of 25 keywords at QS 1\u20133",
+        "PPC Reveal: Latitude 37.5% visibility / pos 1.9 / 119 ads"
+      ],
+      "disconfirmed_by": "Jul 23 pull shows rank-lost IS dropped below 30% without QS changes \u2014 indicating bid algorithm self-corrected",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "Budget exhaustion is a secondary blocker \u2014 Jul 17 lost 64.9% of impressions to budget, Jul 16 lost 46.1% \u2014 a $300\u2013350/day budget is warranted if Jul 23 CPA holds under $800",
+      "severity": "medium",
+      "confidence": 0.78,
+      "sources": [
+        "LIVE GAQL: Jul 17 search_budget_lost_impression_share = 0.649, Jul 16 = 0.461",
+        "lifetime budget-lost avg = 24.5%"
+      ],
+      "disconfirmed_by": "Jul 23 pull shows budget-lost IS below 5% on most days \u2014 negatives reducing spend sufficiently t

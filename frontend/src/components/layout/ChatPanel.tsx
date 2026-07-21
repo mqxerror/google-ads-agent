@@ -686,11 +686,20 @@ export default function ChatPanel() {
                 break;
               }
               case 'final_done': {
-                const p = ev.payload as { message_id?: string } | undefined;
+                const p = ev.payload as { message_id?: string; agent_role?: string; agent_role_name?: string } | undefined;
                 // Adopt the persisted message id so a later history reload lines
-                // the ledger up with the same bubble.
-                if (p?.message_id) {
-                  guardedSetMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, id: p.message_id! } : m));
+                // the ledger up with the same bubble, AND stamp the persona so an
+                // in-session export labels the reply by name (e.g. "Marketing
+                // Director") — orchestrated turns emit no `routing` event, so
+                // without this the live bubble kept no agentRoleName and exported
+                // as bare "## Assistant" (2026-07-20 export-labeling bug).
+                if (p?.message_id || p?.agent_role_name) {
+                  guardedSetMessages((prev) => prev.map((m) => m.id === assistantMsgId ? {
+                    ...m,
+                    ...(p?.message_id ? { id: p.message_id } : {}),
+                    ...(p?.agent_role ? { agentRole: p.agent_role } : {}),
+                    ...(p?.agent_role_name ? { agentRoleName: p.agent_role_name } : {}),
+                  } : m));
                 }
                 break;
               }
