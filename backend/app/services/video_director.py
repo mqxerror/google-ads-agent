@@ -304,6 +304,15 @@ async def _run_consult(
         logger.info("video_director consult degraded: %s", e)
         if not task.done():
             task.cancel()
+        # DEGRADE (chat-hardening item 2): the consult degrading used to surface
+        # only as a soft thought. Emit a prominent `degrade` ledger event too so
+        # the dock renders (amber) that the draft is proceeding WITHOUT Director
+        # guidance — a silent degrade is a future incident.
+        _timed_out = isinstance(e, asyncio.TimeoutError)
+        yield {"type": "degrade", "payload": {
+            "stage": "consult", "what": "Campaign Director consult",
+            "impact": "drafting from pinned facts only — no Director guidance this turn",
+            "detail": ("timed out" if _timed_out else str(e)[:200])}}
         yield {"type": "director_thought", "payload": {
             "text": "Campaign Director unavailable — drafting from pinned facts only",
             "stage": "consult",

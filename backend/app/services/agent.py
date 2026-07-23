@@ -1965,6 +1965,17 @@ async def stream_agent_response(
     # Yield context metadata BEFORE starting the CLI
     yield context_meta
 
+    # Global CLI concurrency gate (chat-hardening item 1): acquire ONE shared
+    # slot right before spawning the Claude subprocess so total concurrent CLI
+    # runs across chat / orchestrator / audit / scheduler / video-director stay
+    # bounded (settings.LLM_GLOBAL_MAX_CONCURRENCY). Held only for the CLI's
+    # lifetime — released in the `finally` before post-processing — and released
+    # on cancellation / generator-close too. See app/services/llm_gate.py.
+    from app.services.llm_gate import get_gate
+    _cli_gate = get_gate()
+    await _cli_gate.acquire()
+    _cli_gate_released = False
+
     thread = threading.Thread(target=_run_cli, daemon=True)
     thread.start()
 
@@ -1999,6 +2010,13 @@ async def stream_agent_response(
                 break
     except Exception as e:
         yield {"type": "error", "message": str(e)}
+    finally:
+        # Release the global CLI slot the moment the subprocess stream ends (or
+        # the generator is cancelled/closed mid-stream). Post-processing below
+        # is pure DB/summary work and must NOT hold a scarce CLI slot.
+        if not _cli_gate_released:
+            _cli_gate.release()
+            _cli_gate_released = True
 
     # ── Record detected actions as recommendations for outcome tracking ──
     if detected_actions and account_id and campaign_id:

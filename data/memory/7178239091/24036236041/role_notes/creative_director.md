@@ -1,6 +1,6 @@
 # Creative Director Notes
 
-**Last updated:** 2026-07-21 13:33
+**Last updated:** 2026-07-23 12:24
 
 **Task:** AD COPY COUNTER-STRATEGY from context — no tool calls. Competitive inputs: Latitude anchors $300K + heavy sitelinks at pos 1.9; Henley hammers 'Minimum Investment USD 100,000' (an undercut our $300K Q
 ## Creative Director — Ad Copy Counter-Strategy | Freeze-locked for Jul 23
@@ -61,3 +61,28 @@
       "confidence": 0.75,
       "sources": [
         "Competitor Intel: Latitude sitelink battery anch
+
+### 2026-07-23 12:24 — check the recent rsa ad changes are they good
+
+**Task:** check the recent rsa ad changes are they good
+The new RSAs' actual headline/description content isn't in the context data (only ad IDs and URLs are), so I'll pull the live copy for the 4 new ads plus their approval status and ad strength, then review them against the creative rulebook.**Verdict: yes — the 4 new RSAs are solid and fully live. All four cleared Google's policy review (APPROVED — the "UNKNOWN" status from creation time has resolv
+## Ad-by-ad readout (live)
+| Ad group | Ad ID | Lead (keyword-mirror) headlines | Ad strength | Approval |
+|---|---|---|---|---|
+All four share a 12-headline rotation bank ($300,000 Investment Program · Residency in About 30 Days · 1 Visit Every 2 Years · Trusted for Over 37 Years · Government-Approved Program · Include Your Whole Family · Real Estate-Backed Residency · Licensed Immigration Advisors · Secure Your Plan B Residency · Request a Free Consultation · Speak With a Licensed Advisor) and the same 4 descriptions, wit
+## Rulebook check — clean across the board
+- **No eligibility/quiz language** ✓ — CTAs are "Request a Free Consultation" and "Speak With a Licensed Advisor", exactly per spec. (Notably, goldenvisas.com runs "Do You Qualify?" — we correctly don't.)
+- **Panama stay fact** ✓ — "1 Visit Every 2 Years" throughout; zero "no minimum stay" language (the claim competitors are running falsely).
+- **No competitor names, no affordability cues, no EU language** ✓.
+- **Character limits** ✓ — longest headline is exactly 30 ("Panama Residency for Americans"); all descriptions ≤85 chars.
+- **Pattern coverage** ✓ — roughly 10 of the 15 pattern-bank angles per ad (keyword mirror, number+authority, trust credential, time-to-outcome, family/legacy, Plan B, program-specific, CTA ×2). Each description uses a different formula. This is the asset-depth answer to Latitude's battery.
+## The one real creative risk: unpinned rotation in Property Investors
+The MCP tool couldn't set pins, so nothing anchors the qualifier headlines. In three ad groups that's harmless — every headline is residency-framed. In **Property Investors** it matters: Google could serve a combination like "Buy Property in Panama | Panama Property Investment | Invest in Panama Real Estate" — three pure real-estate headlines with no $300K or residency qualifier visible. That comb
+**Cheap fix (2 minutes in the UI, not urgent):** pin "$300,000 Investment Program" or "Panama Residency by Investment" to position 2 on ad 818022513810 only. That guarantees every impression carries the investor qualifier. Trade-off: pinning typically drops the ad-strength rating a notch — I'd take that trade in this one group, because here the rating matters less than filtering clicks at $5+ CPC.
+## Why two ads rate AVERAGE, and whether to care
+Ad strength dings the Property Investors and RBI ads mostly for headline similarity — the shared 12-block plus a "residency by investment" stem repeated across several slots. It's a directional Google hint, not a QS input, so I would **not** touch them this week. If the Jul 26–28 read shows those two groups still lagging on ad relevance, the next ad-side slot can swap 2–3 shared-bank headlines per
+## What's still pending
+- **Asset performance labels are all PENDING** — the ads are hours old; no served-combination data exists yet. First honest creative read: with the Jul 26–28 rank-lost check.
+- The old proven RSAs (including the top-visibility "Qualified Investor Program | $300K Investment Program" ad) are still running alongside, as designed — Google will arbitrate.
+Bottom line: the package landed as specced, passed policy review, and respects every account rule. The only change I'd actively recommend is the single pin in Property Investors — your call whether to do it in the UI today (it's ad-side, same change type as this morning's work) or leave rotation fully free for a week and let the data speak.
+*— Creative Director*

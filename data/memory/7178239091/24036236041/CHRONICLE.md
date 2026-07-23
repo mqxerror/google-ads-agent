@@ -1,9 +1,33 @@
 # Campaign Chronicle: Panama QIP — US — Search — v2
-Last updated: 2026-07-21
+Last updated: 2026-07-23
 
 ## Timeline
 
 ### July 2026
+- **Jul 23** — [Creative Director] User asked: check the recent rsa ad changes are they good
+- **Jul 23** — [Search Term Hunter] User asked: enable the [PHRASE] buy property in panama (351567246136). isaid we do it tomorrow but keep both als
+- **Jul 23** — [Search Term Hunter] User asked: for today execute the sitelinks and callouts and make the add better and bigger , today we change th. Now pausing the two phrase keywords:All 12 assets created
+- **Jul 23** — [Search Term Hunter] User asked: since panama home for sale brought a conversion why we dont add it as exact match ? also why not cut. Both CSVs read — new spy window (started Jul 22, so it's a post-negative snapshot) across 5 tracked
+- **Jul 23** — [Agency Director] User asked: You are the Marketing Director. Reconcile the specialists' findings into ONE answer, in a single voi. Lifetime CPA dropped from $844. ## Panama QIP — US — Search — v2 · Jul 23 Status + Today's Plan
+
+Both desks ran fresh live pulls thi
+- **Jul 23** — [Search Term Hunter] User asked: POST-BATCH EARLY READ for campaign 24036236041 (customer 7178239091) ONLY. Use search_execute_query. However `buy property in panama` (phrase) is generating variants the negatives don't cover — all NON
+- **Jul 23** — [PPC Strategist] User asked: SINCE-YESTERDAY LIVE VERDICT for campaign 24036236041 (customer 7178239091) ONLY. Use search_execute. 07 / 296 clicks / 2 conv / CPA $844. Pulling the three live reads now — daily Jul 21–23 with IS metrics, lifetime totals, and budget
+- **Jul 23** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Pull live: (1) daily metrics Jul 21–23 — impressions, clicks, cost_micros, conversions, search_impre. Pull live: (1) daily metrics Jul 21–23 — impressions, clicks, cost_micros, conversions, search_impre
+- **Jul 22** — [Agency Director] Executed and verified a 24-negative batch on the Panama campaign — re-pushed the 15 phrase negatives that failed to land on Jul 16 plus 9 new ones from today's waste verdict (`[real estate panama city panama]` $34.95, `[eb5an]` $22.64, `[real estate in panama city panama]` $15.72, `casa solution(s)` $12.91, `land for sale` $8.94) — all confirmed ENABLED via post-write read-back; `viviun` was landed as PHRASE rather than the spec'd EXACT since the live query was "viviun panama". Decided against pulling the July 23 work into today.
+- **Jul 22** — [Search Term Hunter] User asked: before the go for today negatives, what about if we switch all keywords to exact match and double bu
+- **Jul 22** — [Search Term Hunter] Ran keyword-level GAQL pull (Jul 14–22) to get true per-keyword impressions across the 33-keyword set; confirmed the locked improvement plan (79.2% impressions lost to Ad Rank, ~86% of spend on house-shoppers, CPA $844.53) with day-by-day sequencing — Day 1 negatives batch (re-push failed Jul 16 phrase negatives + 8 new: [eb5an], "$5000", casa solution(s), [viviun], panama home realty, "land for sale", [real estate panama city panama], [real estate in panama city panama]) to stop ~$186/week of listing-browse waste, then Jul 23 RSA keyword-mirrored rewrites + 6 sitelinks. Awaiting Wassim's "go".
+- **Jul 22** — [PPC Strategist] User asked: explain more and the 27% impression share is not a budget problem — it's a Quality Score collapse, w
+- **Jul 22** — [PPC Strategist] User asked: i said ai have an increase in budget i can go to 400. ** Deploying it today buys almost nothing — here's the math from this session's live pull:
+
+- **Jul
+- **Jul 22** — [Agency Director] Panama QIP (US Search v2): reviewed live perf since Jul 21 — lifetime $1,689.07 / 296 clicks / 2 conv → CPA $844.53 (up from $749.82, now over the $800 bar), zero conversions since Jul 19 (~$450 spent dry).
+Corrected two user premises: budget is $200/day not $400 (amount_micros=200,000,000), and the 27% impression share is an Ad Rank/Quality Score collapse (79.2% IS lost to rank on Jul 22) — not a budget constraint (<1% lost to budget).
+- **Jul 22** — [Search Term Hunter] Post-negative verdict on Panama QIP search terms (Jul 22, last-7-days): waste rate still ~86% of active spend (~$186/$217) — only 4 EXACT negatives landed ($14.59 blocked), and the `houses for sale` phrase negative never took, so listing-browse regrew with new variants (`real estate panama city panama` $34.95, `real estate in panama city panama` $15.72, `casa solution real estate panama` $10.86). Decision: escalate `buy property in panama` from PHRASE to EXACT with two replacement terms, plus a new campaign-level negative batch (eb5an, $5000, casa solution(s), viviun, panama home realty) pending Wassim's approval.
+- **Jul 22** — [PPC Strategist] Panama QIP v2 (24036236041) live pull: lifetime CPA crossed the $800 bar to $844.53 ($1,689.07 / 296 clicks / 2 conv); last conversion Jul 19, zero on Jul 20–21; budget read confirms $200/day (200M micros), not $400.
+
+Impression share decaying Jul 19→22 (36.4% → 20.2%) with rank-lost spiking to 79.2% on Jul 22 — rank, not budget, is now the binding constraint (budget-lost only 0.6%).
+- **Jul 22** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Pull live: (1) daily metrics Jul 19–22 — impressions, clicks, cost_micros, conversions, search_impre. Pull live: (1) daily metrics Jul 19–22 — impressions, clicks, cost_micros, conversions, search_impre
 - **Jul 21** — [Agency Director] Panama QIP US Search v2 week-1 audit (LIVE): $1,499.65 spend / 265 clicks / 2 conversions → CPA $749.82 (under $800 bar), but both conversions came from one keyword (`[PHRASE] buy property in panama`) in Property Investors ($870.14 = 58% of spend); the four higher-intent ad groups spent $629.51 with zero conversions. IS 28.3%, lost-to-rank 47.2%, lost-to-budget 24.5% — Director verdict: "pass on the number, fail on the structure."
 - **Jul 21** — [Creative Director] Creative Director produced a Panama QIP ad-copy counter-strategy: hold $300K (no price-match vs Henley's $100K tier), counter Orience's false EU claim with "Government-Approved Program"/"Real Panama Residency", and close Latitude's Ad Rank gap (119 ads, pos 1.9) with six sitelinks at zero CPC risk.
 Delivered a 15-headline bank with "Licensed Immigration Advisors" pinned at H2 across all ad groups, H1 differentiated per group, freeze-locked for the Jul 23 launch.

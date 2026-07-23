@@ -129,6 +129,30 @@ export interface ClaimGatePayload {
   /** Claims the gate surfaced but did NOT rewrite (unmatched material numbers;
    *  page-state claims when no fetch ran this turn). */
   flagged?: { claim: string; reason: string }[];
+  /** IDs traceable to a MEMORY / account-records source (not re-verified live
+   *  this turn): SOFT-labeled in place rather than hard-rewritten (item 3). */
+  soft_labeled?: { claim: string; reason: string }[];
+}
+
+/** A "degrades, never blocks" input was unavailable this turn (item 2). Recall,
+ *  landing-page fetch, live conversion registry, plan tool-grant, video-director
+ *  consult — each emits one of these so the ledger names what was missing
+ *  (amber, survives collapse) and the Director's answer says so too. */
+export interface DegradePayload {
+  stage: 'recall' | 'landing_page' | 'conversion_registry' | 'plan_reask' | 'consult' | string;
+  /** Short label for the missing capability (e.g. "Prior-work recall"). */
+  what: string;
+  /** One line: what the answer is missing as a result. */
+  impact: string;
+  detail?: string;
+}
+
+/** A non-identical message arrived while a turn was still running on this
+ *  conversation, so it was QUEUED to start after the running turn finishes
+ *  (item 4 — never two live turns on one conversation). */
+export interface TurnQueuedPayload {
+  message?: string;
+  behind_turn_id?: string;
 }
 
 /** A budget threshold was crossed mid-turn. Two flavors, keyed by `kind`:
@@ -161,6 +185,8 @@ export interface TurnStoppedPayload {
   stopped_by?: 'user' | string;
   calls_killed?: string[];
   partial_persisted?: boolean;
+  /** Best-effort spend before the kill (a NOTE, not billing). Add-on §5. */
+  cost_on_kill?: number;
   /** Specialists whose task involved a write. `stopped_before_write` means an
    *  approved write may not have executed — the user MUST be warned. Empty array
    *  is the common safe case (no write was in flight). */
@@ -193,6 +219,8 @@ export type OrchestrationEventType =
   | 'final_done'
   | 'claim_gate'
   | 'budget_notice'
+  | 'degrade'
+  | 'turn_queued'
   | 'turn_done'
   | 'turn_error'
   | 'turn_stopped';
@@ -228,6 +256,8 @@ export const V2_EVENT_TYPES: ReadonlySet<string> = new Set<OrchestrationEventTyp
   'final_done',
   'claim_gate',
   'budget_notice',
+  'degrade',
+  'turn_queued',
   'turn_done',
   'turn_error',
   'turn_stopped',

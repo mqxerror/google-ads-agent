@@ -25,7 +25,7 @@ from app.services.provenance import (
     TAG_PAGE_FETCH,
     extract_ids,
 )
-from app.services.claim_gate import run_claim_gate, _ID_UNVERIFIED
+from app.services.claim_gate import run_claim_gate, _ID_UNVERIFIED, _ID_SOFT_SUFFIX
 
 _TS = "2026-07-14T12:00:00+00:00"
 
@@ -100,6 +100,20 @@ class ProvenanceManifestUnit(unittest.TestCase):
         v = m.verified_ids()
         self.assertIn("22996208317", v)
         self.assertNotIn("11111111111", v)
+
+    def test_memory_ids_collects_memory_and_stale_local(self):
+        # item 3 — memory_ids() = "known from records but not re-verified live":
+        # MEMORY ids + STALE LOCAL_STORE ids; excludes LIVE / fresh-local.
+        m = ProvenanceManifest()
+        m.add_memory("container GTM-K6864NBH per guidelines", "2026-04-13")
+        m.add_local_store(["11111111111"], _TS, stale=True)
+        m.add_local_store(["22996208317"], _TS, stale=False)   # fresh → excluded
+        m.add_live_api("AW-826329520 live", _TS, tool_name="search")  # excluded
+        mem = m.memory_ids()
+        self.assertIn("GTM-K6864NBH", mem)
+        self.assertIn("11111111111", mem)
+        self.assertNotIn("22996208317", mem)   # fresh local is verified, not memory
+        self.assertNotIn("AW-826329520", mem)  # live is verified, not memory
 
     def test_add_from_findings_source_routing(self):
         m = ProvenanceManifest()
@@ -200,6 +214,65 @@ class ClaimGate(unittest.TestCase):
         self.assertIn("AW-826329520", res["text"])       # verified → stays
         self.assertNotIn("GTM-FAKE9999", res["text"])    # fabricated → rewritten
         self.assertEqual(len(res["event"]["rewritten"]), 1)
+
+    # ── item 3 — memory-sourced IDs get a SOFT label, not a hard rewrite ──
+    def test_memory_sourced_id_soft_labeled_not_rewritten(self):
+        # A TRUE stored fact (in account records via MEMORY) that isn't re-pulled
+        # live must NOT get the false-positive "[not verified]" hard rewrite —
+        # it's SOFT-labeled in place (id kept + caveat appended).
+        m = ProvenanceManifest()
+        m.add_memory("we use container GTM-K6864NBH", "2026-04-13", stale=True)
+        text = "The container GTM-K6864NBH handles conversion tracking."
+        res = run_claim_gate(text, m, page_verified=None)
+        self.assertIn("GTM-K6864NBH", res["text"])            # id KEPT
+        self.assertNotIn(_ID_UNVERIFIED, res["text"])         # NOT hard-rewritten
+        self.assertIn(_ID_SOFT_SUFFIX, res["text"])           # soft caveat appended
+        self.assertEqual(res["event"]["rewritten"], [])
+        soft = [s["claim"] for s in res["event"]["soft_labeled"]]
+        self.assertIn("GTM-K6864NBH", soft)
+
+    def test_gtm_from_guidelines_soft_labeled(self):
+        # The canonical case: GTM-K6864NBH injected from guidelines (account
+        # records) → soft-labeled, never hard-rewritten.
+        m = ProvenanceManifest()
+        m.add_memory(
+            "GTM container GTM-K6864NBH; GV Lead label fc6FCO3YnI4cELCTg4oD",
+            "2026-04-13", role="guidelines", stale=False)
+        text = "Tracking runs through GTM-K6864NBH with the GV Lead label."
+        res = run_claim_gate(text, m, page_verified=None)
+        self.assertIn("GTM-K6864NBH", res["text"])
+        self.assertNotIn(_ID_UNVERIFIED, res["text"])
+        self.assertTrue(res["event"]["soft_labeled"])
+
+    def test_no_source_anywhere_still_hard_rewritten(self):
+        # The hard rewrite is RESERVED for an id with NO source at all.
+        m = ProvenanceManifest()
+        m.add_memory("we use GTM-K6864NBH", "2026-04-13")  # a DIFFERENT id known
+        text = "You are on container GTM-TOTALLYFAKE right now."
+        res = run_claim_gate(text, m, page_verified=None)
+        self.assertNotIn("GTM-TOTALLYFAKE", res["text"])
+        self.assertIn(_ID_UNVERIFIED, res["text"])
+        rew = [r["claim"] for r in res["event"]["rewritten"]]
+        self.assertIn("GTM-TOTALLYFAKE", rew)
+
+    def test_soft_label_accounting_and_event_shape(self):
+        # passed = checked − rewritten − flagged − soft_labeled; soft_labeled key
+        # present and a list. One live id (pass) + one memory id (soft).
+        m = ProvenanceManifest()
+        m.add_live_api("AW-826329520 active", _TS, tool_name="search")
+        m.add_memory("container GTM-K6864NBH", "2026-04-13")
+        text = "Account AW-826329520 uses container GTM-K6864NBH."
+        res = run_claim_gate(text, m, page_verified=None)
+        ev = res["event"]
+        self.assertIn("soft_labeled", ev)
+        self.assertIsInstance(ev["soft_labeled"], list)
+        self.assertEqual(len(ev["soft_labeled"]), 1)
+        self.assertEqual(ev["rewritten"], [])
+        # AW passed, GTM soft-labeled → passed counts only the live one.
+        self.assertEqual(
+            ev["passed"],
+            ev["checked"] - len(ev["rewritten"]) - len(ev["flagged"])
+            - len(ev["soft_labeled"]))
 
 
 # ──────────────── integration: run_turn emits claim_gate ────────────────

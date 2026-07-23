@@ -244,28 +244,34 @@ async def _claude_one_shot(
     Times out at `timeout_s` (default _STAGE_TIMEOUT_S — image drafting
     keeps its tight budget; video drafting passes a longer one); raises
     with a structured message on failure."""
-    proc = await asyncio.create_subprocess_exec(
-        "claude", "--print", "--model", model,
-        "--system-prompt", system,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        out_b, err_b = await asyncio.wait_for(
-            proc.communicate(input=user.encode("utf-8")),
-            timeout=timeout_s,
+    # Global CLI concurrency gate (chat-hardening item 1): this is the SECOND
+    # Claude-CLI spawn site (besides agent.stream_agent_response). Hold one
+    # shared slot for the subprocess lifetime so a video-director decompose can't
+    # stampede alongside chat/audit CLI runs. See app/services/llm_gate.py.
+    from app.services.llm_gate import llm_slot
+    async with llm_slot():
+        proc = await asyncio.create_subprocess_exec(
+            "claude", "--print", "--model", model,
+            "--system-prompt", system,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-    except asyncio.TimeoutError as e:
-        proc.kill()
-        await proc.wait()
-        raise PromptDrafterError(
-            f"claude timed out after {timeout_s}s",
-        ) from e
-    if proc.returncode != 0:
-        err = err_b.decode("utf-8", errors="replace").strip()
-        raise PromptDrafterError(err[:500] or "claude CLI exited non-zero")
-    return out_b.decode("utf-8", errors="replace").strip()
+        try:
+            out_b, err_b = await asyncio.wait_for(
+                proc.communicate(input=user.encode("utf-8")),
+                timeout=timeout_s,
+            )
+        except asyncio.TimeoutError as e:
+            proc.kill()
+            await proc.wait()
+            raise PromptDrafterError(
+                f"claude timed out after {timeout_s}s",
+            ) from e
+        if proc.returncode != 0:
+            err = err_b.decode("utf-8", errors="replace").strip()
+            raise PromptDrafterError(err[:500] or "claude CLI exited non-zero")
+        return out_b.decode("utf-8", errors="replace").strip()
 
 
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)

@@ -239,6 +239,26 @@ class ProvenanceManifest:
                 out.update(e.get("ids", []))
         return out
 
+    def memory_ids(self) -> set[str]:
+        """IDs that trace to a RECORDED source but were NOT re-verified live this
+        turn: everything under MEMORY (recalled role notes / reports / session
+        summaries / injected guidelines) plus STALE LOCAL_STORE.
+
+        The claim gate (item 3) SOFT-labels these ("from account records — not
+        re-verified this turn") instead of hard-rewriting them: they came from
+        somewhere real, so a hard "[not verified]" rewrite is a false positive
+        that trains the user to ignore the gate. IDs in this set but NOT in
+        verified_ids() get the soft label; IDs in NEITHER set get the hard
+        rewrite (no source anywhere)."""
+        out: set[str] = set()
+        for e in self.entries:
+            tag = e.get("tag")
+            if tag == TAG_MEMORY:
+                out.update(e.get("ids", []))
+            elif tag == TAG_LOCAL_STORE and e.get("stale"):
+                out.update(e.get("ids", []))
+        return out
+
     def page_fetch_entries(self) -> list[dict]:
         """PAGE_FETCH entries where the fetch actually succeeded."""
         return [e for e in self.entries

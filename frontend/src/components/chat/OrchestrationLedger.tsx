@@ -28,6 +28,8 @@ import type {
   FinalDonePayload,
   TurnStoppedPayload,
   BudgetNoticePayload,
+  DegradePayload,
+  TurnQueuedPayload,
   Finding,
 } from '@/types/orchestration';
 
@@ -151,6 +153,30 @@ interface ClaimGateRow {
   passed: number;
   rewritten: { claim: string; reason: string }[];
   flagged: { claim: string; reason: string }[];
+  /** IDs traced to account records but not re-verified live (item 3). */
+  softLabeled: { claim: string; reason: string }[];
+}
+
+/** A "degrades, never blocks" input was missing this turn (item 2). Amber and
+ *  survives the post-completion collapse (like stop warnings) — a silent
+ *  degrade is a future incident. */
+interface DegradeRow {
+  kind: 'degrade';
+  order: number;
+  key: string;
+  stage: string;
+  what: string;
+  impact: string;
+  detail?: string;
+}
+
+/** This turn was queued behind another still-running turn on the same
+ *  conversation (item 4 — never two live turns at once). */
+interface QueuedRow {
+  kind: 'queued';
+  order: number;
+  key: string;
+  message?: string;
 }
 
 /** P0 safety — a user pressed stop while an approved write was mid-dispatch, so
@@ -188,7 +214,9 @@ type LedgerRow =
   | DecisionRow
   | ClaimGateRow
   | StopWarningRow
-  | BudgetNoticeRow;
+  | BudgetNoticeRow
+  | DegradeRow
+  | QueuedRow;
 
 interface LedgerModel {
   rows: LedgerRow[];
@@ -430,6 +458,32 @@ function buildModel(events: OrchestrationEvent[]): LedgerModel {
           passed: p.passed,
           rewritten: p.rewritten ?? [],
           flagged: p.flagged ?? [],
+          softLabeled: p.soft_labeled ?? [],
+        });
+        break;
+      }
+
+      case 'degrade': {
+        const p = payloadOf<DegradePayload>(ev);
+        rows.push({
+          kind: 'degrade',
+          order: idx,
+          key: `dg-${idx}`,
+          stage: p.stage,
+          what: p.what,
+          impact: p.impact,
+          detail: p.detail,
+        });
+        break;
+      }
+
+      case 'turn_queued': {
+        const p = payloadOf<TurnQueuedPayload>(ev);
+        rows.push({
+          kind: 'queued',
+          order: idx,
+          key: `qd-${idx}`,
+          message: p.message,
         });
         break;
       }
@@ -785,7 +839,10 @@ function ClaimGateLedgerRow({ row }: { row: ClaimGateRow }) {
   const issues = [
     ...row.rewritten.map((r) => ({ ...r, mode: 'rewritten' as const })),
     ...row.flagged.map((r) => ({ ...r, mode: 'flagged' as const })),
+    // item 3 — memory-sourced IDs SOFT-labeled in place (kept, not rewritten).
+    ...row.softLabeled.map((r) => ({ ...r, mode: 'soft' as const })),
   ];
+  const correctedCount = row.rewritten.length + row.flagged.length;
   const hasIssues = issues.length > 0;
   // Verified = quiet (neutral). Issues = calm warning, never danger-red — the
   // gate correcting itself is expected work, not a hard failure (DESIGN.md:99-104).
@@ -797,9 +854,14 @@ function ClaimGateLedgerRow({ row }: { row: ClaimGateRow }) {
       <span className="text-subtle">
         {row.passed}/{row.checked} claims verified
       </span>
-      {hasIssues && (
+      {correctedCount > 0 && (
         <span className="ml-1 shrink-0 rounded-full bg-warning-soft px-1.5 py-0 text-[10px] text-warning">
-          {issues.length} corrected
+          {correctedCount} corrected
+        </span>
+      )}
+      {row.softLabeled.length > 0 && (
+        <span className="ml-1 shrink-0 rounded-full bg-surface-3 px-1.5 py-0 text-[10px] text-subtle">
+          {row.softLabeled.length} from records
         </span>
       )}
     </>
@@ -829,10 +891,16 @@ function ClaimGateLedgerRow({ row }: { row: ClaimGateRow }) {
                 <span
                   className={cn(
                     'mt-0.5 shrink-0 rounded-full px-1.5 py-0 text-[10px]',
-                    'bg-warning-soft text-warning'
+                    it.mode === 'soft'
+                      ? 'bg-surface-3 text-subtle'
+                      : 'bg-warning-soft text-warning'
                   )}
                 >
-                  {it.mode === 'rewritten' ? 'rewritten' : 'flagged'}
+                  {it.mode === 'rewritten'
+                    ? 'rewritten'
+                    : it.mode === 'flagged'
+                      ? 'flagged'
+                      : 'from records'}
                 </span>
                 <span className="min-w-0 shrink-0 truncate font-mono text-text">
                   {it.claim}
@@ -993,6 +1061,43 @@ function BudgetNoticeLedgerRow({ row }: { row: BudgetNoticeRow }) {
   );
 }
 
+// ---- degrade row (item 2) --------------------------------------------------
+
+// A "degrades, never blocks" input was unavailable this turn. Amber (a real
+// gap the user should know about), never danger-red (the turn still answered).
+// Survives the post-completion collapse — a silent degrade is a future incident.
+function DegradeLedgerRow({ row }: { row: DegradeRow }) {
+  return (
+    <div className="-mx-2 rounded-md border border-warning/40 bg-warning-soft px-2 py-1.5">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[12px] font-medium text-warning">
+            Degraded: {row.what}
+          </p>
+          <p className="text-[11px] leading-snug text-warning/90">{row.impact}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- queued row (item 4) ---------------------------------------------------
+
+// This turn was queued behind another still-running turn on the same
+// conversation. Quiet amber one-liner; it runs automatically when the turn
+// ahead of it finishes.
+function QueuedLedgerRow() {
+  return (
+    <Row>
+      <Hourglass className="h-3 w-3 shrink-0 text-warning" aria-hidden="true" />
+      <span className="min-w-0 truncate text-warning/90">
+        Queued behind the running turn — starts when it finishes
+      </span>
+    </Row>
+  );
+}
+
 // ---- one row dispatcher ----------------------------------------------------
 
 // FIX 2b — a stable content signature for one row, so React.memo can skip the
@@ -1025,11 +1130,15 @@ function rowSignature(row: LedgerRow): string {
     case 'decision':
       return `dc${row.key}${row.ruling}${row.rationale ?? ''}${row.resolvesTopic ?? ''}`;
     case 'claim_gate':
-      return `cg${row.key}${row.checked}${row.passed}${row.rewritten.length}${row.flagged.length}`;
+      return `cg${row.key}${row.checked}${row.passed}${row.rewritten.length}${row.flagged.length}${row.softLabeled.length}`;
     case 'stop_warning':
       return `sw${row.key}${row.affected.map((a) => a.name).join('|')}`;
     case 'budget_notice':
       return `bn${row.key}${row.variant}${row.reason}${row.cost}${row.capUsd}${row.elapsedS}${row.done}${row.total}`;
+    case 'degrade':
+      return `dg`+row.key+row.stage+row.what+row.impact;
+    case 'queued':
+      return `qd`+row.key;
     default:
       return JSON.stringify(row);
   }
@@ -1077,6 +1186,10 @@ function LedgerRowViewImpl({
       return <StopWarningLedgerRow row={row} />;
     case 'budget_notice':
       return <BudgetNoticeLedgerRow row={row} />;
+    case 'degrade':
+      return <DegradeLedgerRow row={row} />;
+    case 'queued':
+      return <QueuedLedgerRow />;
     default:
       return null;
   }
@@ -1134,12 +1247,18 @@ export default function OrchestrationLedger({
   const budgetNotices = model.rows.filter(
     (r): r is BudgetNoticeRow => r.kind === 'budget_notice' && r.variant !== 'notice'
   );
+  // item 2 — degrade rows survive the collapse (like stop warnings): a missing
+  // input the user should know about must not vanish when the turn folds up.
+  const degradeRows = model.rows.filter((r): r is DegradeRow => r.kind === 'degrade');
 
   if (isComplete && collapsed) {
     return (
       <div className="mt-1 space-y-0.5 text-xs">
         {stopWarnings.map((row) => (
           <StopWarningLedgerRow key={row.key} row={row} />
+        ))}
+        {degradeRows.map((row) => (
+          <DegradeLedgerRow key={row.key} row={row} />
         ))}
         {budgetNotices.map((row) => (
           <BudgetNoticeLedgerRow key={row.key} row={row} />

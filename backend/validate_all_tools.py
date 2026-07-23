@@ -912,6 +912,21 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         "customer_id": CUSTOMER_ID,
         "youtube_video_id": _req(ids["youtube_video_id"], "no youtube_video_id"),
     },
+    # Edit-in-place: rename a real SITELINK asset (name is editable for any
+    # type) under forced validate_only — fail-closed, no live mutation.
+    "asset_update_asset": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "asset_id": _req(ids["sitelink_asset_id"], "no sitelink_asset_id"),
+        "asset_type": "SITELINK",
+        "link_text": "Book a Call",
+    },
+    # Detach (force) a real asset from every live link under validate_only.
+    # No linkages => no_op; with linkages => detach mutates forced validate_only.
+    "asset_remove_asset": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "asset_id": _req(ids["sitelink_asset_id"], "no sitelink_asset_id"),
+        "force": True,
+    },
     # ── asset_group (needs a PMax campaign) ───────────────────────────────
     "asset_group_create_asset_group": lambda ids: {
         "customer_id": CUSTOMER_ID,
@@ -1060,6 +1075,13 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         "campaign_id": _req(ids["campaign_id"], "no campaign_id"),
         "asset_id": _req(ids["sitelink_asset_id"], "no sitelink_asset_id"),
         "field_type": "SITELINK",
+    },
+    "campaign_asset_update_campaign_asset_status": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "campaign_id": _req(ids["campaign_id"], "no campaign_id"),
+        "asset_id": _req(ids["sitelink_asset_id"], "no sitelink_asset_id"),
+        "field_type": "SITELINK",
+        "status": "PAUSED",
     },
     # ── campaign_bid_modifier ─────────────────────────────────────────────
     "campaign_bid_modifier_create_interaction_type_bid_modifier": lambda ids: {

@@ -267,6 +267,16 @@ async def send_message(
                 conv["campaign_name"],
             )
 
+        # Item 4 — duplicate-submit guard (v2 path only): an IDENTICAL message
+        # arriving while a turn is still LIVE (running OR queued) on this
+        # conversation is a double-click / retry, not a new turn. Reuse the live
+        # turn — no second user message, no second turn. A non-identical message
+        # falls through and is QUEUED by chat_runner.start (never two live turns).
+        if not stream:
+            dup = chat_runner.find_duplicate_active_turn(conversation_id, body.content)
+            if dup:
+                return {"turn_id": dup, "deduplicated": True}
+
         # Tag the user message with the conversation's authoritative campaign so
         # the thread (and _get_recent_messages) stays internally consistent.
         message_campaign_id = conv["campaign_id"]
@@ -349,6 +359,7 @@ async def send_message(
                 conversation_id=conversation_id,
                 campaign_id=campaign_id,
                 mode="orchestrated",
+                origin_message=body.content,
             )
             return {"turn_id": turn_id}
 
@@ -414,6 +425,7 @@ async def send_message(
             conversation_id=conversation_id,
             campaign_id=campaign_id,
             mode="direct",
+            origin_message=body.content,
         )
         return {"turn_id": turn_id}
 

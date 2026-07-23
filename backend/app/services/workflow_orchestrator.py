@@ -628,6 +628,11 @@ async def _run_group(
     A spec may carry its own campaign_id/campaign_name (account mode fans out
     per campaign); absent, the group-level binding applies — the existing
     per-campaign behaviour, byte-for-byte."""
+    # Per-group fan-out PACING only. The cross-component ceiling on concurrent
+    # Claude CLI subprocesses is enforced at the spawn chokepoint by
+    # app/services/llm_gate.py (each _run_agent → stream_agent_response acquires
+    # the ONE shared global gate), so a Team Audit can't stampede alongside a
+    # live chat turn + a scheduled run.
     sem = asyncio.Semaphore(_MAX_PARALLEL)
 
     async def _guarded(spec: dict, seq: int) -> dict:

@@ -336,7 +336,7 @@ def _budget_snapshot(
 
 def _compose_budget_wrapup(
     specs: list[dict], findings_by_call: dict, summary_by_call: dict,
-    conflicts: list[dict],
+    conflicts: list[dict], degradations: Optional[list[str]] = None,
 ) -> str:
     """Deterministic final Director line, built from state, for when the turn
     budget is hit (Fix 1). A COMPLETE wrap-up — never a mid-sentence cut — that
@@ -366,6 +366,11 @@ def _compose_budget_wrapup(
         lines.append(
             f"Note: {len(conflicts)} specialist conflict(s) were left unreconciled "
             "when the cap was reached.")
+    # DEGRADE caveat (item 2): even a budget wrap-up must name what was missing.
+    if degradations:
+        lines.append("")
+        lines.append("Degraded this turn (not checked):")
+        lines.extend(f"- {d}" for d in degradations)
     return "\n".join(lines)
 
 
@@ -765,6 +770,28 @@ async def run_turn(
         manifest = ProvenanceManifest()
         now_iso = _now_iso()
         page_verified: Optional[bool] = None  # None = no page check ran this turn
+        # Chat-hardening item 2 — degrade visibility. Every "degrades, never
+        # blocks" path (recall / landing-page / conversion-registry / plan
+        # re-ask) records a one-line caveat here AND emits a prominent `degrade`
+        # ledger event. The caveats are folded into the Director's PLAN + SYNTH
+        # context so the final answer NAMES what was missing (a silent degrade is
+        # a future incident). `degradations` holds "<what>: <impact>" lines.
+        degradations: list[str] = []
+
+        # item 3 — harvest IDs from the INJECTED guidelines (base + campaign) into
+        # the manifest as an account-records (MEMORY) source. The GTM container,
+        # AW/conversion ids etc. in the guidelines are REAL stored facts, so when
+        # the Director cites one the claim gate SOFT-labels it ("from account
+        # records — not re-verified this turn") instead of a false-positive hard
+        # rewrite. IDs with no source anywhere still get the hard rewrite.
+        _guideline_text = "\n".join(
+            t for t in (base_guidelines, campaign_guidelines) if t)
+        if _guideline_text:
+            try:
+                manifest.add_memory(_guideline_text, now_iso,
+                                    role="guidelines", stale=False)
+            except Exception as _e:  # manifest must never break the turn
+                logger.debug("manifest guideline add skipped: %s", _e)
 
         yield {"type": "turn_start", "payload": {
             "mode": "orchestrated", "campaign_id": campaign_id,
@@ -781,6 +808,16 @@ async def run_turn(
                 account_id, campaign_id, needs, user_message or "", limit=8)
         except Exception as e:
             logger.warning("recall failed: %s", e)
+            # DEGRADE (item 2): recall failing used to be silent. Announce it as
+            # a prominent ledger event + a caveat so the answer says it isn't
+            # drawing on remembered prior work.
+            degradations.append(
+                "prior-work recall: this answer does NOT draw on remembered "
+                "prior work (recall failed this turn)")
+            yield {"type": "degrade", "payload": {
+                "stage": "recall", "what": "Prior-work recall",
+                "impact": "answer not grounded in remembered prior work",
+                "detail": str(e)[:200]}}
         for e in entries:
             # Record into the provenance manifest (Epic 4). A recalled entry is
             # prior work, not this-session data: metrics that are still fresh
@@ -841,6 +878,14 @@ async def run_turn(
             else:
                 premise_block = ("\n\nUNVERIFIED: landing-page state could NOT be "
                                  "fetched this turn — do NOT assert page facts.\n")
+                # DEGRADE (item 2): a wanted page check that could not fetch.
+                degradations.append(
+                    "landing-page check: could NOT fetch the live page this turn "
+                    "— do not assert page facts (form/tracking/pixel state)")
+                yield {"type": "degrade", "payload": {
+                    "stage": "landing_page", "what": "Landing-page verification",
+                    "impact": "live page state could not be fetched — page facts unverified",
+                    "detail": "could not fetch"}}
         else:
             yield {"type": "verification", "payload": {
                 "kind": "landing_page", "status": "skipped", "detail": ""}}
@@ -871,6 +916,16 @@ async def run_turn(
             yield {"type": "verification", "payload": {
                 "kind": "conversion_actions", "status": "failed",
                 "detail": "could not fetch"}}
+            # DEGRADE (item 2): no live conversion-action registry this turn, so
+            # the answer must not assert specific conversion IDs/labels as live.
+            degradations.append(
+                "conversion-action registry: live registry unavailable this turn "
+                "— do NOT assert specific conversion IDs/labels as current")
+            yield {"type": "degrade", "payload": {
+                "stage": "conversion_registry",
+                "what": "Live conversion-action registry",
+                "impact": "could not confirm conversion IDs/labels against the live account",
+                "detail": "could not fetch"}}
 
         # ══ S3 PLAN ════════════════════════════════════════════════════
         roster = [
@@ -884,6 +939,16 @@ async def run_turn(
                 f"{(e.get('summary') or '')[:140]}")
         prior_block = ("\n\nPRIOR WORK (reuse = cite it, do NOT redo; reverify = "
                        "may re-run):\n" + "\n".join(prior_lines)) if prior_lines else ""
+        # DEGRADE caveat (item 2) — fold any degraded inputs into the Director's
+        # planning + synthesis context so the final answer names what was
+        # missing. Rebuilt from the CURRENT list at each use (it can grow during
+        # the plan re-ask below).
+        def _degrade_block() -> str:
+            if not degradations:
+                return ""
+            return ("\n\nDEGRADED THIS TURN — these inputs were UNAVAILABLE; tell "
+                    "the user plainly and do NOT assert what they would have "
+                    "provided:\n" + "\n".join(f"- {d}" for d in degradations) + "\n")
         max_spec = int(settings.CHAT_ORCH_MAX_SPECIALISTS)
         # Registry-grounded catalog of REAL tool names — reused for the plan
         # prompt AND (if needed) the corrective re-ask. A plan must name execution
@@ -895,6 +960,7 @@ async def run_turn(
             f"USER QUESTION: {user_message}\n\n"
             "Available specialists (pick only the ones that fit; tailor each "
             "task):\n" + "\n".join(roster) + prior_block + premise_block +
+            _degrade_block() +
             catalog_block +
             "\n\nDo NOT dispatch a specialist to redo work marked reuse — cite it "
             f"instead. Use at most {max_spec} specialists. Prefer tools=[] "
@@ -1018,6 +1084,14 @@ async def run_turn(
                 for s in specs:
                     s["tools"] = [t for t in (s.get("tools") or []) if str(t) not in _bad]
                 _bad_list = ", ".join(sorted(_bad))
+                # DEGRADE caveat (item 2): a stripped write can't land this turn.
+                degradations.append(
+                    f"execution tools: {_bad_list} were not real tool names — any "
+                    "approved WRITE will NOT execute this turn (read-only proceeded)")
+                yield {"type": "degrade", "payload": {
+                    "stage": "plan_reask", "what": "Execution tool grant",
+                    "impact": f"approved write blocked — unknown tools {_bad_list}",
+                    "detail": "plan named non-existent tool names"}}
                 yield {"type": "director_thought", "payload": {
                     "text": (f"⚠️ Plan authorized unknown tools {_bad_list} — "
                              "execution will be BLOCKED for those. Proceeding with "
@@ -1077,6 +1151,10 @@ async def run_turn(
         reserve_secs = float(getattr(settings, "CHAT_ORCH_SYNTH_RESERVE_SEC", 0) or 0.0)
         dispatch_cost_cap = max(0.0, budget_cost - reserve_usd)
         dispatch_secs_cap = max(0.0, budget_secs - reserve_secs)
+        # Per-turn fan-out PACING (how many specialists THIS turn runs at once).
+        # The cross-component stampede ceiling is enforced separately at the CLI
+        # spawn chokepoint by app/services/llm_gate.py (every dispatched
+        # specialist's stream_agent_response acquires the ONE global gate).
         sem = asyncio.Semaphore(_MAX_PARALLEL)
         out: asyncio.Queue = asyncio.Queue()
         findings_by_call: dict[str, list[dict]] = {}
@@ -1237,7 +1315,7 @@ async def run_turn(
                     specialists_done=len(findings_by_call),
                     specialists_total=len(specs))}
             wrap = _compose_budget_wrapup(
-                specs, findings_by_call, summary_by_call, conflicts)
+                specs, findings_by_call, summary_by_call, conflicts, degradations)
             final_parts.append(wrap)
             yield {"type": "final_chunk", "payload": {"content": wrap}}
         else:
@@ -1250,10 +1328,14 @@ async def run_turn(
                 "findings into ONE answer, in a single voice, for the user's "
                 "question.\n\n"
                 f"USER QUESTION: {user_message}\n" + prior_block + premise_block +
+                _degrade_block() +
                 "\n\nSPECIALIST FINDINGS (JSON):\n" + findings_json +
                 "\n\nCONFLICTS the team flagged (JSON):\n" + conflicts_json +
                 "\n\nWrite the reconciled answer in prose. Cite prior work marked "
                 "reuse instead of re-deriving it."
+                + ("\n\nIMPORTANT: name the DEGRADED inputs above in your answer "
+                   "so the user knows what was NOT checked this turn."
+                   if degradations else "")
             )
             if conflicts:
                 synth_prompt += (
@@ -1293,7 +1375,8 @@ async def run_turn(
         # Runs on the Director's final BEFORE persistence: unverified IDs and
         # unbacked page-state assertions are rewritten in place; the PERSISTED
         # message is the GATED text. A gate failure must never abort the turn.
-        gate_event = {"checked": 0, "passed": 0, "rewritten": [], "flagged": []}
+        gate_event = {"checked": 0, "passed": 0, "rewritten": [], "flagged": [],
+                      "soft_labeled": []}
         try:
             gate = run_claim_gate(final_text, manifest, page_verified)
             final_text = gate["text"]

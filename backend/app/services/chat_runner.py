@@ -103,6 +103,31 @@ class _ChatHub:
 _chat_hubs: dict[str, _ChatHub] = {}
 _chat_tasks: dict[str, asyncio.Task] = {}
 
+# ── Same-conversation turn serialization (chat-hardening item 4) ──────────
+# A conversation must NEVER have two turns EXECUTING at once — two live turns
+# interleave their write-backs (role notes / resumable session / messages) and
+# corrupt the thread (the deferred-since-Epic-0 second-send seam). So a NEW
+# non-identical message that arrives while a turn is still running is QUEUED:
+# its turn is created immediately (with a visible "queued behind the running
+# turn" notice) but its run_fn does not start until the turn ahead of it
+# finishes. Stop kills the running turn; the queued one then starts (and can be
+# stopped too). An IDENTICAL re-send while a turn runs is a duplicate submit and
+# reuses the running turn instead of queuing a second one.
+#
+#   _conversation_chain: conversation_id → the TAIL turn_id (what a new turn must
+#                        wait behind). Updated on every start; cleared when the
+#                        tail finishes with nothing queued after it.
+#   _turn_gate:          turn_id → the Event a QUEUED turn's _drive awaits before
+#                        running its run_fn (absent for a turn that ran at once).
+#   _turn_next_gate:     predecessor turn_id → its direct successor's gate, set
+#                        (released) when the predecessor's _drive finishes/stops.
+#   _turn_origin:        turn_id → the originating user message (dedup + notice).
+_conversation_chain: dict[str, str] = {}
+_turn_gate: dict[str, asyncio.Event] = {}
+_turn_next_gate: dict[str, asyncio.Event] = {}
+_turn_origin: dict[str, str] = {}
+_turn_conversation: dict[str, str] = {}  # turn_id → conversation_id (dedup scope)
+
 
 # ── Config helpers ────────────────────────────────────────────────────
 
@@ -144,15 +169,30 @@ def _flush_ms() -> int:
 
 async def _insert_turn(
     turn_id: str, conversation_id: str, campaign_id: Optional[str],
-    mode: str, parent_turn_id: Optional[str],
+    mode: str, parent_turn_id: Optional[str], status: str = "running",
 ) -> None:
     db = await get_db()
     try:
         await db.execute(
             "INSERT INTO chat_turns "
             "(turn_id, conversation_id, campaign_id, parent_turn_id, mode, status) "
-            "VALUES (?, ?, ?, ?, ?, 'running')",
-            (turn_id, conversation_id, campaign_id, parent_turn_id, mode),
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (turn_id, conversation_id, campaign_id, parent_turn_id, mode, status),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def _mark_running(turn_id: str) -> None:
+    """Flip a QUEUED turn to 'running' the moment its gate opens (item 4). Guarded
+    so a concurrent stop that already moved it to a terminal state wins."""
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE chat_turns SET status = 'running' "
+            "WHERE turn_id = ? AND status = 'queued'",
+            (turn_id,),
         )
         await db.commit()
     finally:
@@ -179,9 +219,11 @@ async def _mark_turn(
     params.append(turn_id)
     db = await get_db()
     try:
+        # Also flips a still-'queued' turn (item 4): a stop can land BEFORE the
+        # gate opens, so a queued turn must be markable terminal directly.
         await db.execute(
             f"UPDATE chat_turns SET {', '.join(sets)} "
-            "WHERE turn_id = ? AND status = 'running'",
+            "WHERE turn_id = ? AND status IN ('running', 'queued')",
             params,
         )
         await db.commit()
@@ -233,11 +275,19 @@ def _stamp(conversation_id: str, turn_id: str, seq: int, raw: dict) -> dict:
 
 async def _drive(
     turn_id: str, conversation_id: str, run_fn: RunFn, params: dict,
+    gate: Optional[asyncio.Event] = None,
 ) -> None:
     """Background task body: iterate run_fn to completion, stamping each yielded
     event with a monotonic seq + envelope, publishing to the hub, and flushing
     to chat_turn_events in batches. Survives client disconnects; on cancellation
-    (a stop request) marks the row stopped and emits a terminal turn_stopped."""
+    (a stop request) marks the row stopped and emits a terminal turn_stopped.
+
+    Item 4: when `gate` is set this turn was QUEUED behind a still-running turn
+    on the same conversation. It emits a visible "queued behind the running
+    turn" notice immediately, then WAITS on the gate before running run_fn — so
+    two turns on one conversation never execute at once. The gate opens when the
+    turn ahead finishes/stops (see the finally). A stop while still waiting is a
+    normal CancelledError (handled below)."""
     hub = _chat_hubs[turn_id]
     seq = 0
     pending: list[dict] = []              # buffered-for-DB stamped envelopes
@@ -251,6 +301,10 @@ async def _drive(
     # observing agent_called(+write_intent) / agent_result as they flow through
     # _emit (the runner OWNS the terminal turn_stopped, so it needs this locally).
     dispatched_writes: dict[str, dict] = {}
+    # Add-on (chat-hardening §5): best-effort running cost so a stopped turn can
+    # report roughly what it spent before the kill (a NOTE, not billing). Summed
+    # from per-call cost signals as they flow through _emit.
+    _cost_box = [0.0]
 
     async def _flush() -> None:
         nonlocal pending, last_flush
@@ -275,6 +329,13 @@ async def _drive(
             cid = payload.get("call_id")
             if cid in dispatched_writes:
                 dispatched_writes[cid]["completed"] = True
+        # Accumulate a best-effort running cost from per-call cost signals
+        # (agent_result.cost / direct done.cost). final_done.cost_total is the
+        # authoritative total on a NORMAL finish; on a KILL we report this sum.
+        if rtype in ("agent_result", "done"):
+            _c = payload.get("cost")
+            if isinstance(_c, (int, float)):
+                _cost_box[0] += float(_c)
 
     def _stop_specialists() -> list[dict]:
         """Build the per-specialist disposition list for turn_stopped (Fix 1).
@@ -304,6 +365,17 @@ async def _drive(
         return env
 
     try:
+        # Item 4: a QUEUED turn announces itself, then waits its turn. The notice
+        # is seq 1 so an immediate subscriber sees it; run_fn events follow once
+        # the turn ahead finishes and opens the gate.
+        if gate is not None:
+            _emit({"type": "turn_queued", "payload": {
+                "message": _turn_origin.get(turn_id),
+                "behind_turn_id": _conversation_chain.get(conversation_id)}})
+            await _flush()
+            await gate.wait()
+            # The turn ahead finished — promote queued → running before we start.
+            await _mark_running(turn_id)
         async for raw in run_fn(turn_id=turn_id, **params):
             _emit(raw)
             # Time/size-based batched flush so history survives a crash without
@@ -325,7 +397,9 @@ async def _drive(
                            # Fix 1: per-specialist write disposition so the UI can
                            # warn about an approved-but-not-executed mutation.
                            # Empty list = the common safe case (no write in flight).
-                           "specialists": _stop_specialists()}})
+                           "specialists": _stop_specialists(),
+                           # Add-on: best-effort spend before the kill (a NOTE).
+                           "cost_on_kill": round(_cost_box[0], 4)}})
         await _mark_turn(turn_id, "stopped", stop_reason="stopped by user")
         raise
     except Exception as e:  # pragma: no cover — run_fn has its own guards
@@ -340,6 +414,19 @@ async def _drive(
             logger.warning("chat turn %s final flush failed", turn_id)
         hub.close()
         _chat_tasks.pop(turn_id, None)
+        # Item 4: release the NEXT queued turn on this conversation (if any), so a
+        # normal finish OR a stop both hand off to the waiting turn. Then clean up
+        # this turn's serialization bookkeeping. If this turn is still the chain
+        # tail (nothing queued after it), clear the chain so the next fresh
+        # message runs immediately.
+        nxt = _turn_next_gate.pop(turn_id, None)
+        if nxt is not None:
+            nxt.set()
+        _turn_gate.pop(turn_id, None)
+        _turn_origin.pop(turn_id, None)
+        _turn_conversation.pop(turn_id, None)
+        if _conversation_chain.get(conversation_id) == turn_id:
+            _conversation_chain.pop(conversation_id, None)
 
 
 # ── Public API ─────────────────────────────────────────────────────────
@@ -352,6 +439,7 @@ async def start(
     campaign_id: str | None = None,
     mode: str = "direct",
     parent_turn_id: str | None = None,
+    origin_message: str | None = None,
     **params: Any,
 ) -> str:
     """Mint a turn_id, insert the chat_turns row, launch a DETACHED task driving
@@ -359,15 +447,60 @@ async def start(
 
     run_fn is an async generator called as run_fn(turn_id=..., **params) that
     yields bare {type, payload} dicts; the runner stamps envelopes + persists.
+
+    Item 4 — same-conversation serialization: if a turn is already LIVE (running
+    OR queued) on this conversation, this new turn is QUEUED behind the tail of
+    the chain (status 'queued', a visible notice, run_fn deferred until the turn
+    ahead finishes) so two turns never execute at once. `origin_message` is
+    recorded for the duplicate-submit check (find_duplicate_active_turn).
     """
     turn_id = str(uuid.uuid4())
     # Register the hub BEFORE the row/task so a very-fast subscriber that races
     # in on the returned turn_id always finds a hub to attach to.
     _chat_hubs[turn_id] = _ChatHub()
-    await _insert_turn(turn_id, conversation_id, campaign_id, mode, parent_turn_id)
-    task = asyncio.create_task(_drive(turn_id, conversation_id, run_fn, params))
+
+    # Serialize behind any still-live turn on this conversation (item 4). The
+    # chain tail is what we wait behind; if it has already finished there is no
+    # gate and we run immediately.
+    gate: asyncio.Event | None = None
+    predecessor = _conversation_chain.get(conversation_id)
+    if predecessor and predecessor != turn_id:
+        pred_task = _chat_tasks.get(predecessor)
+        if pred_task is not None and not pred_task.done():
+            gate = asyncio.Event()
+            _turn_gate[turn_id] = gate
+            _turn_next_gate[predecessor] = gate
+    # This turn becomes the new tail of the conversation's chain.
+    _conversation_chain[conversation_id] = turn_id
+    _turn_conversation[turn_id] = conversation_id
+    if origin_message is not None:
+        _turn_origin[turn_id] = origin_message
+
+    status = "queued" if gate is not None else "running"
+    await _insert_turn(turn_id, conversation_id, campaign_id, mode,
+                       parent_turn_id, status=status)
+    task = asyncio.create_task(
+        _drive(turn_id, conversation_id, run_fn, params, gate=gate))
     _chat_tasks[turn_id] = task
     return turn_id
+
+
+def find_duplicate_active_turn(conversation_id: str, content: str) -> str | None:
+    """A live (running OR queued) turn on THIS conversation whose originating
+    message is IDENTICAL to `content` — a duplicate submit (double-click / retry)
+    that should reuse the existing turn instead of queuing a second one (item 4).
+    Returns its turn_id, or None. A non-identical message returns None → it will
+    be queued normally by start()."""
+    if not content:
+        return None
+    for tid, task in list(_chat_tasks.items()):
+        if task.done():
+            continue
+        if _turn_conversation.get(tid) != conversation_id:
+            continue
+        if _turn_origin.get(tid) == content:
+            return tid
+    return None
 
 
 async def subscribe(turn_id: str, cursor: int = 0) -> AsyncIterator[dict]:
@@ -532,21 +665,25 @@ async def sweep_chat_zombies() -> int:
     )
     db = await get_db()
     try:
+        # Include 'queued' turns (item 4): a turn parked behind a predecessor that
+        # died across a restart would otherwise linger forever.
         cur = await db.execute(
-            "SELECT turn_id FROM chat_turns WHERE status = 'running' AND started_at < ?",
+            "SELECT turn_id FROM chat_turns "
+            "WHERE status IN ('running', 'queued') AND started_at < ?",
             (cutoff,),
         )
         stale_ids = [r["turn_id"] for r in await cur.fetchall()]
         # Never sweep a turn whose task is still live in THIS process — a
-        # long-but-legitimate orchestrated turn. started_at is fixed at launch,
-        # so a genuinely slow turn could cross the threshold while healthy.
+        # long-but-legitimate orchestrated turn (or one still queued behind it).
+        # started_at is fixed at launch, so a genuinely slow turn could cross the
+        # threshold while healthy.
         stale_ids = [t for t in stale_ids
                      if t not in _chat_tasks or _chat_tasks[t].done()]
         if stale_ids:
             await db.executemany(
                 "UPDATE chat_turns SET status = 'stale', stop_reason = 'stale', "
                 "finished_at = datetime('now') "
-                "WHERE turn_id = ? AND status = 'running'",
+                "WHERE turn_id = ? AND status IN ('running', 'queued')",
                 [(t,) for t in stale_ids],
             )
             await db.commit()
@@ -555,6 +692,42 @@ async def sweep_chat_zombies() -> int:
     finally:
         await db.close()
     return len(stale_ids)
+
+
+async def prune_old_turn_events(retention_days: Optional[int] = None) -> int:
+    """Add-on (chat-hardening §5): prune chat_turn_events older than the
+    retention window so the event log can't grow without bound. Piggybacks the
+    zombie sweeper (called from _sweep_loop). Only prunes events of turns that
+    already reached a terminal state (never a live/running/queued turn's log).
+    Returns rows deleted. retention_days<=0 disables pruning."""
+    if retention_days is None:
+        try:
+            retention_days = int(getattr(settings, "CHAT_TURN_EVENT_RETENTION_DAYS", 0) or 90)
+        except (TypeError, ValueError):
+            retention_days = 90
+    if retention_days <= 0:
+        return 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "DELETE FROM chat_turn_events WHERE turn_id IN ("
+            "  SELECT turn_id FROM chat_turns "
+            "  WHERE status NOT IN ('running', 'queued') AND finished_at IS NOT NULL "
+            "    AND finished_at < ?"
+            ")",
+            (cutoff,),
+        )
+        deleted = cur.rowcount if cur.rowcount is not None else 0
+        await db.commit()
+        if deleted:
+            logger.info("chat_turn_events retention prune: deleted %d row(s) "
+                        "older than %dd", deleted, retention_days)
+    finally:
+        await db.close()
+    return deleted
 
 
 # ── Periodic sweeper lifecycle (mirrors workflow_runner) ───────────────
@@ -573,6 +746,10 @@ async def _sweep_loop() -> None:
             await sweep_chat_zombies()
         except Exception as e:
             logger.warning("chat zombie sweep error: %s", e)
+        try:
+            await prune_old_turn_events()
+        except Exception as e:  # retention prune must never break the sweeper
+            logger.warning("chat_turn_events retention prune error: %s", e)
         await asyncio.sleep(interval_min * 60)
 
 

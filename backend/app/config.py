@@ -98,7 +98,19 @@ class Settings(BaseSettings):
     CHAT_ORCH_SWEEP_INTERVAL_MINUTES: float = 5.0  # periodic chat-turn zombie sweep cadence
     CHAT_TURN_EVENT_FLUSH_COUNT: int = 20      # batch flush to chat_turn_events every N events
     CHAT_TURN_EVENT_FLUSH_MS: int = 500        # …or every this many ms, whichever first
+    CHAT_TURN_EVENT_RETENTION_DAYS: int = 90   # prune chat_turn_events older than this (piggybacks the zombie sweeper). 0 disables.
     AGENT_STREAM_PARTIAL_MESSAGES: bool = False  # token-level streaming previews (story 1.4); requires a CLI that supports --include-partial-messages
+
+    # Global Claude-CLI concurrency gate (chat-hardening item 1). ONE shared
+    # cross-component ceiling on how many `claude` CLI subprocesses may run at
+    # once — chat direct turns, orchestrated specialists, Team Audit agents,
+    # scheduled runs, the video-director consult + decompose all funnel through
+    # the SINGLE spawn chokepoint (agent.stream_agent_response / prompt_drafter)
+    # and acquire this gate, so concurrent load can't stampede 8+ CLIs (each
+    # ~256 MB + its own API pressure). Sized for ONE orchestrated turn (≤2
+    # parallel specialists) PLUS one background audit without contention; excess
+    # simply QUEUES on the gate (bounded wait, never a deadlock — see llm_gate).
+    LLM_GLOBAL_MAX_CONCURRENCY: int = 4
 
     # Account report staleness (Story 13.2). The homepage shows "audited Nh ago"
     # and flags the report stale past this age so the operator knows to re-run.

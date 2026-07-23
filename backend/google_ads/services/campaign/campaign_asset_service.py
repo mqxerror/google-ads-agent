@@ -5,6 +5,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 from fastmcp import Context, FastMCP
 from google.ads.googleads.errors import GoogleAdsException
 from google.ads.googleads.v23.enums.types.asset_field_type import AssetFieldTypeEnum
+from google.ads.googleads.v23.enums.types.asset_link_status import AssetLinkStatusEnum
 from google.ads.googleads.v23.resources.types.campaign_asset import CampaignAsset
 from google.ads.googleads.v23.services.services.campaign_asset_service import (
     CampaignAssetServiceClient,
@@ -17,6 +18,7 @@ from google.ads.googleads.v23.services.types.campaign_asset_service import (
     MutateCampaignAssetsRequest,
     MutateCampaignAssetsResponse,
 )
+from google.protobuf import field_mask_pb2
 
 from google_ads.sdk_client import get_sdk_client
 from google_ads.utils import format_customer_id, get_logger, serialize_proto_message
@@ -337,6 +339,75 @@ class CampaignAssetService:
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
+    async def update_campaign_asset_status(
+        self,
+        ctx: Context,
+        customer_id: str,
+        campaign_id: str,
+        asset_id: str,
+        field_type: AssetFieldTypeEnum.AssetFieldType,
+        status: str,
+    ) -> Dict[str, Any]:
+        """Update the status of a campaign asset link (ENABLED/PAUSED/REMOVED).
+
+        Mirrors update_ad_group_asset_status — a field-mask update over the
+        link's ``status`` only, so pausing/enabling a campaign-level extension
+        no longer requires a detach-and-relink.
+
+        Args:
+            ctx: FastMCP context
+            customer_id: The customer ID
+            campaign_id: The campaign ID
+            asset_id: The asset ID
+            field_type: The field type of the link
+            status: New status (ENABLED, PAUSED, REMOVED)
+
+        Returns:
+            Updated campaign asset details
+        """
+        try:
+            customer_id = format_customer_id(customer_id)
+            # Campaign asset resource names use ~ as separator and the field
+            # type ENUM NAME (e.g. "SITELINK"), NOT its numeric value.
+            field_type_name = getattr(field_type, "name", str(field_type))
+            resource_name = f"customers/{customer_id}/campaignAssets/{campaign_id}~{asset_id}~{field_type_name}"
+
+            # Create campaign asset with updated status
+            campaign_asset = CampaignAsset()
+            campaign_asset.resource_name = resource_name
+            campaign_asset.status = getattr(
+                AssetLinkStatusEnum.AssetLinkStatus, status
+            )
+
+            # Create operation
+            operation = CampaignAssetOperation()
+            operation.update = campaign_asset
+            operation.update_mask.CopyFrom(field_mask_pb2.FieldMask(paths=["status"]))
+
+            # Create request
+            request = MutateCampaignAssetsRequest()
+            request.customer_id = customer_id
+            request.operations = [operation]
+
+            # Make the API call
+            response = self.client.mutate_campaign_assets(request=request)
+
+            await ctx.log(
+                level="info",
+                message=f"Updated campaign asset status to {status}",
+            )
+
+            return serialize_proto_message(response)
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to update campaign asset status: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
 
 def create_campaign_asset_tools(
     service: CampaignAssetService,
@@ -475,12 +546,48 @@ def create_campaign_asset_tools(
             field_type=field_type_enum,
         )
 
+    async def update_campaign_asset_status(
+        ctx: Context,
+        customer_id: str,
+        campaign_id: str,
+        asset_id: str,
+        field_type: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        """Update the status of a campaign asset link.
+
+        Pause, enable, or remove a campaign-level asset link (e.g. a sitelink or
+        callout) in place, without detaching and relinking it.
+
+        Args:
+            customer_id: The customer ID
+            campaign_id: The campaign ID
+            asset_id: The asset ID
+            field_type: The field type of the link (e.g. SITELINK, CALLOUT)
+            status: New status - ENABLED, PAUSED, or REMOVED
+
+        Returns:
+            Updated campaign asset details
+        """
+        # Convert string enum to proper enum type
+        field_type_enum = getattr(AssetFieldTypeEnum.AssetFieldType, field_type)
+
+        return await service.update_campaign_asset_status(
+            ctx=ctx,
+            customer_id=customer_id,
+            campaign_id=campaign_id,
+            asset_id=asset_id,
+            field_type=field_type_enum,
+            status=status,
+        )
+
     tools.extend(
         [
             link_asset_to_campaign,
             link_multiple_assets_to_campaign,
             list_campaign_assets,
             remove_asset_from_campaign,
+            update_campaign_asset_status,
         ]
     )
     return tools

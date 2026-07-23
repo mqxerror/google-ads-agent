@@ -145,6 +145,10 @@ _CATALOG_WRITE_CANDIDATES = [
     # bid modifiers
     "campaign_bid_modifier_update_bid_modifier",
     "ad_group_bid_modifier_update_ad_group_bid_modifier",
+    # assets — edit-in-place + detach (extension CRUD completion)
+    "asset_update_asset",
+    "asset_remove_asset",
+    "campaign_asset_update_campaign_asset_status",
 ]
 
 

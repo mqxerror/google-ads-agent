@@ -21,9 +21,14 @@ Counting contract (asserted by the tests):
   * `flagged`   = claims the gate surfaced but did NOT rewrite (unmatched
                   material numbers; page-state claims when NO page check ran
                   this turn — conservative, we didn't try to verify).
-  * `passed`    = checked − len(rewritten) − len(flagged)  (claims that traced
-                  clean). Always 0 ≤ passed ≤ checked, so the frontend chip's
-                  {passed}/{checked} ratio reads as verified/examined.
+  * `soft_labeled` = IDs that trace to a RECORDED source (memory / recalled work
+                  / injected guidelines) but were not re-pulled live this turn.
+                  The id is KEPT and annotated "(from account records — not
+                  re-verified this turn)" instead of hard-rewritten (item 3) —
+                  a true stored fact is not a fabrication.
+  * `passed`    = checked − len(rewritten) − len(flagged) − len(soft_labeled)
+                  (claims that traced clean, live). Always 0 ≤ passed ≤ checked,
+                  so the frontend chip's {passed}/{checked} reads verified/examined.
 
 Pure function: `run_claim_gate(final_text, manifest, page_verified) -> {...}`.
 """
@@ -36,8 +41,16 @@ from typing import Optional
 from app.services.provenance import ID_PATTERNS, ProvenanceManifest, extract_ids
 
 # The inline replacement for an unverified ID token (§7.2.3). We rewrite the
-# TOKEN, keeping the surrounding sentence intact.
+# TOKEN, keeping the surrounding sentence intact. Reserved for IDs with NO
+# source ANYWHERE (not live, not page, not memory/records) — a true fabrication.
 _ID_UNVERIFIED = "[ID not verified this session — pull it before relying on it]"
+# item 3 — the SOFT label for an ID that traces to a RECORDED source (memory /
+# recalled work / injected guidelines) but was not re-pulled live this turn. The
+# id STAYS (it came from somewhere real); we only annotate that it wasn't
+# re-verified — so a true stored fact (e.g. the GTM container from guidelines)
+# no longer gets a false-positive hard rewrite that trains the user to ignore
+# the gate.
+_ID_SOFT_SUFFIX = " (from account records — not re-verified this turn)"
 _PAGE_UNVERIFIED = (
     "page state UNVERIFIED this session — recommend re-fetch before relying on it."
 )
@@ -135,10 +148,12 @@ def run_claim_gate(
     """
     text = final_text or ""
     verified = manifest.verified_ids()
+    memory_sourced = manifest.memory_ids()  # item 3 — recorded but not live
     has_page_evidence = manifest.has_page_evidence()
 
     rewritten: list[dict] = []
     flagged: list[dict] = []
+    soft_labeled: list[dict] = []
     checked = 0
 
     # ── (a) ID-shaped claims ──────────────────────────────────────────
@@ -189,11 +204,24 @@ def run_claim_gate(
         sentence = _sentence_at(start)
         if _self_labels_memory(sentence):
             continue  # reader was told it's from memory → allowed to stand
-        # Unverified, unlabeled ID → rewrite the token in place.
+        if tok in memory_sourced:
+            # item 3 — traces to a RECORDED source (memory / recalled work /
+            # guidelines) but not re-pulled live. SOFT-label in place: the id
+            # stays, we only append the "not re-verified" caveat once (skip if
+            # the caveat is already right after the token — idempotent).
+            already = out[end:end + len(_ID_SOFT_SUFFIX)] == _ID_SOFT_SUFFIX
+            if not already:
+                out = out[:end] + _ID_SOFT_SUFFIX + out[end:]
+            soft_labeled.append({
+                "claim": tok,
+                "reason": "from account records (memory/guidelines) — not re-verified live this turn",
+            })
+            continue
+        # Unverified, unlabeled, NO source anywhere → hard rewrite in place.
         out = out[:start] + _ID_UNVERIFIED + out[end:]
         rewritten.append({
             "claim": tok,
-            "reason": "ID not present in this session's live pulls / page fetch and the sentence does not self-label a memory source",
+            "reason": "ID not present in this session's live pulls / page fetch, not in account records, and the sentence does not self-label a memory source",
         })
 
     text = out  # continue page-state work on the id-rewritten text
@@ -256,7 +284,7 @@ def run_claim_gate(
             "reason": "material number not traced to a manifest-sourced value (flag only — not rewritten)",
         })
 
-    passed = checked - len(rewritten) - len(flagged)
+    passed = checked - len(rewritten) - len(flagged) - len(soft_labeled)
     if passed < 0:
         passed = 0
 
@@ -267,5 +295,8 @@ def run_claim_gate(
             "passed": passed,
             "rewritten": rewritten,
             "flagged": flagged,
+            # item 3 — IDs kept but annotated "from account records"; distinct
+            # from `rewritten` (hard) so the frontend can render them quietly.
+            "soft_labeled": soft_labeled,
         },
     }
