@@ -771,11 +771,32 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         "description2": "Trusted immigration advisors ready to help you now.",
         "final_urls": ["https://goldenvisas.mercan.com"],
     },
+    # RSA create exercises the pin path: a pinned headline + description that
+    # both appear verbatim in the supplied lists (validated pre-mutate).
+    "ad_create_responsive_search_ad": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "ad_group_id": _req(ids["ad_group_id"], "no ad_group_id"),
+        "headlines": ["Immigration Help", "Free Consultation", "Apply Today"],
+        "descriptions": [
+            "Expert guidance for your visa and residency journey.",
+            "Trusted immigration advisors ready to help you now.",
+        ],
+        "final_urls": ["https://goldenvisas.mercan.com"],
+        "pinned_headline_1": "Immigration Help",
+        "pinned_description_1": "Expert guidance for your visa and residency journey.",
+    },
     "ad_update_ad_final_urls": lambda ids: {
         "customer_id": CUSTOMER_ID,
         "ad_group_id": _req(ids["ad_group_id"], "no ad_group_id"),
         "ad_id": _req(ids["ad_id"], "no ad_id"),
         "final_urls": ["https://goldenvisas.mercan.com/lp/"],
+    },
+    # RSA pin edit — reads the live ad then strips pins under forced
+    # validate_only (clear_pins needs no text matching, so any RSA ad_id works).
+    "ad_update_rsa_pins": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "ad_id": _req(ids["ad_id"], "no ad_id"),
+        "clear_pins": True,
     },
     # ── ad_group_ad (needs a real ad RN to add; account has ad_group_ad but
     #    the create tool takes an ad_resource_name of an *unused* ad — not

@@ -142,6 +142,9 @@ _CATALOG_WRITE_CANDIDATES = [
     "ad_group_ad_update_ad_group_ad_status",
     "ad_group_ad_remove_ad_group_ad",
     "ad_update_ad_status",
+    # responsive search ads — create (optionally pinned) + in-place pin edit
+    "ad_create_responsive_search_ad",
+    "ad_update_rsa_pins",
     # bid modifiers
     "campaign_bid_modifier_update_bid_modifier",
     "ad_group_bid_modifier_update_ad_group_bid_modifier",

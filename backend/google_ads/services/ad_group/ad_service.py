@@ -12,10 +12,16 @@ from google.ads.googleads.v23.common.types.ad_type_infos import (
 from google.ads.googleads.v23.enums.types.ad_group_ad_status import (
     AdGroupAdStatusEnum,
 )
+from google.ads.googleads.v23.enums.types.served_asset_field_type import (
+    ServedAssetFieldTypeEnum,
+)
 from google.ads.googleads.v23.resources.types.ad import Ad
 from google.ads.googleads.v23.resources.types.ad_group_ad import AdGroupAd
 from google.ads.googleads.v23.services.services.ad_group_ad_service import (
     AdGroupAdServiceClient,
+)
+from google.ads.googleads.v23.services.services.google_ads_service import (
+    GoogleAdsServiceClient,
 )
 from google.ads.googleads.v23.services.types.ad_group_ad_service import (
     AdGroupAdOperation,
@@ -32,6 +38,55 @@ from google_ads.sdk_client import get_sdk_client
 from google_ads.utils import format_customer_id, get_logger, serialize_proto_message
 
 logger = get_logger(__name__)
+
+_PIN_FIELD = ServedAssetFieldTypeEnum.ServedAssetFieldType
+
+
+def _apply_named_pins(
+    headlines: List[AdTextAsset],
+    descriptions: List[AdTextAsset],
+    *,
+    pinned_headline_1: Optional[str] = None,
+    pinned_headline_2: Optional[str] = None,
+    pinned_headline_3: Optional[str] = None,
+    pinned_description_1: Optional[str] = None,
+    pinned_description_2: Optional[str] = None,
+) -> None:
+    """Set ``pinned_field`` on the RSA asset whose text EXACTLY matches (after
+    trim) the named text, for each pin argument that is provided.
+
+    Shared by ``create_responsive_search_ad`` and ``update_rsa_pins`` so the
+    text-to-pin contract is identical on both paths. Each ``pinned_*`` argument
+    names the exact text of an asset already in the corresponding list; that
+    asset receives the matching :class:`ServedAssetFieldType`. A named text that
+    is missing from (or ambiguous within) the list raises ``ValueError`` whose
+    message lists the ad's actual assets — never a silent no-op. ``None`` (the
+    default for every pin) leaves that position untouched.
+    """
+    specs = [
+        (pinned_headline_1, _PIN_FIELD.HEADLINE_1, headlines, "headline"),
+        (pinned_headline_2, _PIN_FIELD.HEADLINE_2, headlines, "headline"),
+        (pinned_headline_3, _PIN_FIELD.HEADLINE_3, headlines, "headline"),
+        (pinned_description_1, _PIN_FIELD.DESCRIPTION_1, descriptions, "description"),
+        (pinned_description_2, _PIN_FIELD.DESCRIPTION_2, descriptions, "description"),
+    ]
+    for text, field, assets, kind in specs:
+        if text is None:
+            continue
+        target = text.strip()
+        available = [a.text for a in assets]
+        matches = [a for a in assets if a.text.strip() == target]
+        if not matches:
+            raise ValueError(
+                f"Cannot pin {kind} {text!r}: no {kind} in the ad has that exact "
+                f"text. Available {kind}s: {available}"
+            )
+        if len(matches) > 1:
+            raise ValueError(
+                f"Cannot pin {kind} {text!r}: {len(matches)} {kind}s share that "
+                f"exact text (ambiguous). Available {kind}s: {available}"
+            )
+        matches[0].pinned_field = field
 
 
 class AdService:
@@ -61,6 +116,11 @@ class AdService:
         path1: Optional[str] = None,
         path2: Optional[str] = None,
         status: AdGroupAdStatusEnum.AdGroupAdStatus = AdGroupAdStatusEnum.AdGroupAdStatus.PAUSED,
+        pinned_headline_1: Optional[str] = None,
+        pinned_headline_2: Optional[str] = None,
+        pinned_headline_3: Optional[str] = None,
+        pinned_description_1: Optional[str] = None,
+        pinned_description_2: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a responsive search ad.
 
@@ -74,6 +134,11 @@ class AdService:
             path1: First path component for display URL
             path2: Second path component for display URL
             status: Ad status enum value
+            pinned_headline_1: Exact text of a headline to pin to position 1
+            pinned_headline_2: Exact text of a headline to pin to position 2
+            pinned_headline_3: Exact text of a headline to pin to position 3
+            pinned_description_1: Exact text of a description to pin to position 1
+            pinned_description_2: Exact text of a description to pin to position 2
 
         Returns:
             Created ad details
@@ -95,17 +160,34 @@ class AdService:
             if path2:
                 responsive_search_ad.path2 = path2
 
-            # Add headlines
+            # Build headline / description assets as a plain list first so pins
+            # can be applied before the assets are copied into the proto.
+            headline_assets: List[AdTextAsset] = []
             for headline_text in headlines:
                 headline = AdTextAsset()
                 headline.text = headline_text
-                responsive_search_ad.headlines.append(headline)
+                headline_assets.append(headline)
 
-            # Add descriptions
+            description_assets: List[AdTextAsset] = []
             for description_text in descriptions:
                 description = AdTextAsset()
                 description.text = description_text
-                responsive_search_ad.descriptions.append(description)
+                description_assets.append(description)
+
+            # Apply any requested pins (validates each named text exists in the
+            # corresponding list; omitted pins leave assets unpinned = back-compat)
+            _apply_named_pins(
+                headline_assets,
+                description_assets,
+                pinned_headline_1=pinned_headline_1,
+                pinned_headline_2=pinned_headline_2,
+                pinned_headline_3=pinned_headline_3,
+                pinned_description_1=pinned_description_1,
+                pinned_description_2=pinned_description_2,
+            )
+
+            responsive_search_ad.headlines.extend(headline_assets)
+            responsive_search_ad.descriptions.extend(description_assets)
 
             ad.responsive_search_ad = responsive_search_ad
 
@@ -401,6 +483,158 @@ class AdService:
             await ctx.log(level="error", message=error_msg)
             raise Exception(error_msg) from e
 
+    async def update_rsa_pins(
+        self,
+        ctx: Context,
+        customer_id: str,
+        ad_id: Optional[str] = None,
+        ad_resource_name: Optional[str] = None,
+        pinned_headline_1: Optional[str] = None,
+        pinned_headline_2: Optional[str] = None,
+        pinned_headline_3: Optional[str] = None,
+        pinned_description_1: Optional[str] = None,
+        pinned_description_2: Optional[str] = None,
+        clear_pins: bool = False,
+    ) -> Dict[str, Any]:
+        """Update the headline/description pins of an existing RSA IN PLACE.
+
+        Reads the live responsive search ad, then rebuilds its headline and
+        description asset lists PRESERVING every text and every existing pin,
+        except: ``clear_pins=True`` strips all pins first, and each provided
+        ``pinned_*`` argument re-pins the named (exact-text) asset. The Ad is
+        mutated in place via an ``AdOperation`` update with an update_mask over
+        ``responsive_search_ad.headlines`` / ``responsive_search_ad.descriptions``
+        — the same ad id is kept, never a delete-and-recreate. Because the full
+        asset lists are rewritten, all texts survive; only pins change.
+
+        Args:
+            ctx: FastMCP context
+            customer_id: The customer ID
+            ad_id: The ad ID (used when ``ad_resource_name`` is not supplied)
+            ad_resource_name: Full ad resource name
+                (``customers/{cid}/ads/{ad_id}``); overrides ``ad_id``
+            pinned_headline_1: Exact text of a headline to pin to position 1
+            pinned_headline_2: Exact text of a headline to pin to position 2
+            pinned_headline_3: Exact text of a headline to pin to position 3
+            pinned_description_1: Exact text of a description to pin to position 1
+            pinned_description_2: Exact text of a description to pin to position 2
+            clear_pins: When True, drop ALL existing pins before applying any
+                named pins above (so an ad can be fully un-pinned)
+
+        Returns:
+            Updated ad details
+        """
+        try:
+            customer_id = format_customer_id(customer_id)
+
+            # ── Resolve the ad resource name + numeric id ────────────
+            if ad_resource_name:
+                resource_name = ad_resource_name
+                resolved_ad_id = ad_resource_name.rstrip("/").rsplit("/", 1)[-1]
+            elif ad_id:
+                resolved_ad_id = str(ad_id)
+                resource_name = f"customers/{customer_id}/ads/{resolved_ad_id}"
+            else:
+                raise ValueError("Provide either ad_resource_name or ad_id")
+
+            # ── Read the live RSA (text + current pins) ──────────────
+            google_ads_service: GoogleAdsServiceClient = (
+                get_sdk_client().client.get_service("GoogleAdsService")
+            )
+            query = (
+                "SELECT ad_group_ad.ad.id, ad_group_ad.ad.type, "
+                "ad_group_ad.ad.responsive_search_ad.headlines, "
+                "ad_group_ad.ad.responsive_search_ad.descriptions "
+                "FROM ad_group_ad "
+                f"WHERE ad_group_ad.ad.id = {resolved_ad_id} LIMIT 1"
+            )
+            rows = list(
+                google_ads_service.search(customer_id=customer_id, query=query)
+            )
+            if not rows:
+                raise ValueError(
+                    f"No ad found with id {resolved_ad_id} in customer "
+                    f"{customer_id}"
+                )
+            live_rsa = rows[0].ad_group_ad.ad.responsive_search_ad
+            if not live_rsa.headlines:
+                raise ValueError(
+                    f"Ad {resolved_ad_id} is not a responsive search ad "
+                    "(no RSA headlines found) — cannot update RSA pins"
+                )
+
+            # ── Rebuild asset lists, preserving text + existing pins ─
+            headline_assets: List[AdTextAsset] = []
+            for asset in live_rsa.headlines:
+                rebuilt = AdTextAsset()
+                rebuilt.text = asset.text
+                if not clear_pins and asset.pinned_field != _PIN_FIELD.UNSPECIFIED:
+                    rebuilt.pinned_field = asset.pinned_field
+                headline_assets.append(rebuilt)
+
+            description_assets: List[AdTextAsset] = []
+            for asset in live_rsa.descriptions:
+                rebuilt = AdTextAsset()
+                rebuilt.text = asset.text
+                if not clear_pins and asset.pinned_field != _PIN_FIELD.UNSPECIFIED:
+                    rebuilt.pinned_field = asset.pinned_field
+                description_assets.append(rebuilt)
+
+            # Apply the requested pins (validates exact text; ambiguous/missing
+            # text raises listing the ad's actual assets)
+            _apply_named_pins(
+                headline_assets,
+                description_assets,
+                pinned_headline_1=pinned_headline_1,
+                pinned_headline_2=pinned_headline_2,
+                pinned_headline_3=pinned_headline_3,
+                pinned_description_1=pinned_description_1,
+                pinned_description_2=pinned_description_2,
+            )
+
+            # ── In-place update on the Ad resource ───────────────────
+            responsive_search_ad = ResponsiveSearchAdInfo()
+            responsive_search_ad.headlines.extend(headline_assets)
+            responsive_search_ad.descriptions.extend(description_assets)
+
+            ad = Ad()
+            ad.resource_name = resource_name
+            ad.responsive_search_ad = responsive_search_ad
+
+            operation = AdOperation()
+            operation.update = ad
+            operation.update_mask.CopyFrom(
+                field_mask_pb2.FieldMask(
+                    paths=[
+                        "responsive_search_ad.headlines",
+                        "responsive_search_ad.descriptions",
+                    ]
+                )
+            )
+
+            ad_service_client = get_sdk_client().client.get_service("AdService")
+            request = MutateAdsRequest()
+            request.customer_id = customer_id
+            request.operations = [operation]
+
+            response = ad_service_client.mutate_ads(request=request)
+
+            await ctx.log(
+                level="info",
+                message=f"Updated RSA pins for ad {resource_name}",
+            )
+
+            return serialize_proto_message(response)
+
+        except GoogleAdsException as e:
+            error_msg = f"Google Ads API error: {e.failure}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to update RSA pins: {str(e)}"
+            await ctx.log(level="error", message=error_msg)
+            raise Exception(error_msg) from e
+
 
 def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
     """Create tool functions for the ad service.
@@ -420,6 +654,11 @@ def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
         path1: Optional[str] = None,
         path2: Optional[str] = None,
         status: str = "PAUSED",
+        pinned_headline_1: Optional[str] = None,
+        pinned_headline_2: Optional[str] = None,
+        pinned_headline_3: Optional[str] = None,
+        pinned_description_1: Optional[str] = None,
+        pinned_description_2: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a responsive search ad.
 
@@ -432,6 +671,13 @@ def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
             path1: First path component for display URL (max 15 chars)
             path2: Second path component for display URL (max 15 chars)
             status: Ad status (ENABLED, PAUSED, REMOVED)
+            pinned_headline_1: Exact text of a headline (from ``headlines``) to
+                pin to position 1. Omit to leave it unpinned (Google rotates it).
+            pinned_headline_2: Exact text of a headline to pin to position 2
+            pinned_headline_3: Exact text of a headline to pin to position 3
+            pinned_description_1: Exact text of a description (from
+                ``descriptions``) to pin to position 1
+            pinned_description_2: Exact text of a description to pin to position 2
 
         Returns:
             Created ad details
@@ -449,6 +695,11 @@ def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
             path1=path1,
             path2=path2,
             status=status_enum,
+            pinned_headline_1=pinned_headline_1,
+            pinned_headline_2=pinned_headline_2,
+            pinned_headline_3=pinned_headline_3,
+            pinned_description_1=pinned_description_1,
+            pinned_description_2=pinned_description_2,
         )
 
     async def create_expanded_text_ad(
@@ -566,12 +817,63 @@ def create_ad_tools(service: AdService) -> List[Callable[..., Awaitable[Any]]]:
             ad_resource_name=ad_resource_name,
         )
 
+    async def update_rsa_pins(
+        ctx: Context,
+        customer_id: str,
+        ad_id: Optional[str] = None,
+        ad_resource_name: Optional[str] = None,
+        pinned_headline_1: Optional[str] = None,
+        pinned_headline_2: Optional[str] = None,
+        pinned_headline_3: Optional[str] = None,
+        pinned_description_1: Optional[str] = None,
+        pinned_description_2: Optional[str] = None,
+        clear_pins: bool = False,
+    ) -> Dict[str, Any]:
+        """Update an existing responsive search ad's headline/description PINS
+        in place (same ad id — never delete-and-recreate).
+
+        Reads the live RSA and rewrites its asset lists preserving every text
+        and every existing pin, except each ``pinned_*`` argument re-pins the
+        asset whose text EXACTLY matches (after trim), and ``clear_pins=True``
+        removes all pins first. A named text that is missing or ambiguous raises
+        an error listing the ad's actual assets. Provide either
+        ``ad_resource_name`` OR ``ad_id``.
+
+        Args:
+            customer_id: The customer ID
+            ad_id: The ad ID (used when ad_resource_name is not supplied)
+            ad_resource_name: Full ad resource name
+                (customers/{cid}/ads/{ad_id}); overrides ad_id
+            pinned_headline_1: Exact text of a headline to pin to position 1
+            pinned_headline_2: Exact text of a headline to pin to position 2
+            pinned_headline_3: Exact text of a headline to pin to position 3
+            pinned_description_1: Exact text of a description to pin to position 1
+            pinned_description_2: Exact text of a description to pin to position 2
+            clear_pins: Drop ALL existing pins before applying any named pins
+
+        Returns:
+            Updated ad details
+        """
+        return await service.update_rsa_pins(
+            ctx=ctx,
+            customer_id=customer_id,
+            ad_id=ad_id,
+            ad_resource_name=ad_resource_name,
+            pinned_headline_1=pinned_headline_1,
+            pinned_headline_2=pinned_headline_2,
+            pinned_headline_3=pinned_headline_3,
+            pinned_description_1=pinned_description_1,
+            pinned_description_2=pinned_description_2,
+            clear_pins=clear_pins,
+        )
+
     tools.extend(
         [
             create_responsive_search_ad,
             create_expanded_text_ad,
             update_ad_status,
             update_ad_final_urls,
+            update_rsa_pins,
         ]
     )
     return tools
