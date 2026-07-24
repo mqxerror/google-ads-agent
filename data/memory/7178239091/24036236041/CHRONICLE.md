@@ -1,9 +1,21 @@
 # Campaign Chronicle: Panama QIP — US — Search — v2
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 ## Timeline
 
 ### July 2026
+- **Jul 24** — [Agency Director] User asked: before the go we are still excluding daily like many real estate negative the pausing that keyword y
+- **Jul 24** — [Agency Director] Panama QIP US Search v2 report reversed this morning's recommendation: segmented pull proved the one converting query "panama home for sale" ($2.89, 1 conv) came through the PHRASE keyword (351567246136) — not the exact — so DO NOT pause the phrase (all 3 conversions ran through it); exact keyword (296729676904) has $6.75/0 conv. Kept the 8 surgical EXACT negatives.
+- **Jul 24** — [Analytics Analyst] User asked: TRUTH LAYER for campaign 24036236041 (customer 7178239091) ONLY. Run ONE live segmented conversion p. ---
+
+**TRUTH LAYER — Segmented conversion pull, live this turn**
+
+All 3 conversions are confirmed ag
+- **Jul 24** — [PPC Strategist] User asked: TRUTH AUDIT of the Jul 24 morning report for campaign 24036236041 (customer 7178239091) ONLY — the u. Pulling three live reads now — daily Jul 14–24, lifetime totals, and budget
+- **Jul 24** — [Search Term Hunter] User asked: TRUTH AUDIT of the Jul 24 search-terms claims for campaign 24036236041 (customer 7178239091) ONLY —
+- **Jul 24** — [Agency Director] User asked: You are the Marketing Director planning a focused multi-specialist response to ONE user question abo. Re-pull LIVE via search_execute_query (google_ads_search_google_ads is broken — PAGE_SIZE_NOT_SUPPOR
+- **Jul 24** — [Creative Director] User asked: today is 24
+- **Jul 23** — [Creative Director] User asked: i have add a pin tool pin the necessary ads for the eligibility we can do that
 - **Jul 23** — [Creative Director] User asked: check the recent rsa ad changes are they good
 - **Jul 23** — [Search Term Hunter] User asked: enable the [PHRASE] buy property in panama (351567246136). isaid we do it tomorrow but keep both als
 - **Jul 23** — [Search Term Hunter] User asked: for today execute the sitelinks and callouts and make the add better and bigger , today we change th. Now pausing the two phrase keywords:All 12 assets created

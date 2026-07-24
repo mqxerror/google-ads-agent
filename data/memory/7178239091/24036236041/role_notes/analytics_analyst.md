@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-07-16 16:54
+**Last updated:** 2026-07-24 11:50
 
 **Task:** Assess the 0-conversions reading using ONLY in-context evidence. Critical flag: the LIVE landing page fetch this session for https://www.mercan.com/lp/panama-qualified-investor-program returned HTTP 2
 
@@ -251,3 +251,54 @@ The conversion-recording gap remains open:
       "claim": "Keep the 20-negative batch in place; make zero bid/budget changes this cycle",
       "severity": "low",
       "confi
+
+### 2026-07-24 11:48 — TRUTH LAYER for campaign 24036236041 (customer 7178239091) ONLY. Run ONE live se
+
+**Task:** TRUTH LAYER for campaign 24036236041 (customer 7178239091) ONLY. Run ONE live segmented conversion pull via search_execute_query: conversions by segments.conversion_action (+ name), by date, Jul 14–24
+Running the segmented conversion pull now.Live pull complete. Here is the honest truth layer.
+**TRUTH LAYER — Segmented conversion pull, live this turn**
+All 3 conversions are confirmed against **Panama QIV Lead (7607343274, PRIMARY)** — dates Jul 16, Jul 19, Jul 23, one per date, no restatement up or down. The mechanism claim is verified: no secondary action noise, no double-counting, no gap.
+**What the numbers honestly say (citing prior desk reports, not redoing them):**
+- Every conversion came through **Property Investors / listing-browse queries** (Search Term Hunter confirmed: "panama home for sale" served via the PHRASE keyword). The campaign's stated thesis — capturing QIP investor intent — has been tested with roughly **$800 combined spend** across Investor Program, Residency Core, and RBI Category, and has produced **zero conversions** in those three groups
+- **CPA $661.91 is n=3 and not a baseline** (pinned fact). Three conversions from a listing-browse keyword is not evidence the campaign is working as designed; it's evidence that a subset of home-sale searchers convert on this offer. That may be fine, but it is not the thesis.
+- **Rank-lost ~72%** (Jul 23 full-day close, per Creative Director). The RSA rewrites and pins landed Jul 23, but no QS movement is visible yet — the QS repair is **unproven** at this checkpoint.
+- **Ad strength POOR on all 8 RSAs** is a real trade-off we chose (double-pinning to guarantee investor-qualifier on every impression), not noise. We own that decision.
+**What you cannot honestly tell a CEO this week:** "Our campaign is reaching qualified QIP investors." You can honestly say: "We have 3 confirmed leads at $662 CPA, all from listing-adjacent traffic; our investor-intent ad groups are live but untested at meaningful volume; we shipped the QS fix (new RSAs + sitelinks) Jul 23 and the first honest read is Jul 26–28."
+**UNVERIFIED:** whether the listing-browse converters are genuine $300K QIP prospects or mis-matched inquiries — that requires CRM quality data, which sits outside this pull.
+*— Analytics Analyst*
+
+### 2026-07-24 11:50 — Orchestrated finding
+
+{
+  "summary": "All 3 conversions confirmed PRIMARY (Panama QIV Lead), but every one came from listing-browse traffic in Property Investors \u2014 the investor-intent thesis is untested at ~$800 spend with zero conversions; CPA $661.91 and the rank-lost trend are both too early to claim.",
+  "findings": [
+    {
+      "claim": "All 3 conversions are recorded against Panama QIV Lead (7607343274, PRIMARY) \u2014 no secondary action contamination, no double-counting",
+      "severity": "high",
+      "confidence": 0.99,
+      "sources": [
+        "Live GAQL segmented pull this turn: Jul 16 / Jul 19 / Jul 23, action_name = Panama QIV Lead, conversions = 1 each"
+      ],
+      "disconfirmed_by": "A future pull showing a fourth row with a different conversion_action_name \u2014 none exists in this window",
+      "id": "c3-f0"
+    },
+    {
+      "claim": "The campaign's investor-intent thesis (Investor Program + Residency Core + RBI = ~$800 spend) is unproven \u2014 zero conversions in those three groups, all 3 conversions from Property Investors listing-browse traffic",
+      "severity": "high",
+      "confidence": 0.95,
+      "sources": [
+        "In-context ad group data: Property Investors 3 conv / $1,181.61; Investor Program 0 / $12.39; Residency Core 0 / $551.25; RBI 0 / $240.49",
+        "Search Term Hunter: all converting queries were listing-browse / home-sale language"
+      ],
+      "disconfirmed_by": "Jul 26\u201328 pull showing a conversion in Investor Program or Residency Core after the RSA rewrites accumulate serving history",
+      "id": "c3-f1"
+    },
+    {
+      "claim": "CPA $661.91 is not a baseline \u2014 it rests on n=3 from a single ad group via off-thesis traffic",
+      "severity": "medium",
+      "confidence": 0.99,
+      "sources": [
+        "Pinned fact: no CPA baselines until 7 days + meaningful volume",
+        "Live conversion segmentation: 3 conversions, all Property Investors, all listing-browse keyword"
+      ],
+      "disconfirmed_by": "Not

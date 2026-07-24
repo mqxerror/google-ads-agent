@@ -1,6 +1,6 @@
 # Ppc Strategist Notes
 
-**Last updated:** 2026-07-23 11:05
+**Last updated:** 2026-07-24 11:50
 
 **Task:** Write the campaign performance report for Panama QIP — US — Search — v2 (ID 24036236041) strictly from the in-context data. Cover: (1) day-by-day 2026-07-14→16 (73→748→634 impr; 8→49→38 clicks; $33.37
 
@@ -350,3 +350,56 @@ Today is also the **7-day mark since the Jul 16 negatives + custom-goal change**
     }
   ]
 }
+
+### 2026-07-24 11:48 — TRUTH AUDIT of the Jul 24 morning report for campaign 24036236041 (customer 7178
+
+**Task:** TRUTH AUDIT of the Jul 24 morning report for campaign 24036236041 (customer 7178239091) ONLY — the user suspects the plan/report was too rosy and wants it revised to the plain truth. Re-pull LIVE via 
+Pulling three live reads now — daily Jul 14–24, lifetime totals, and budget.Running all three live reads in parallel now.Live data back. Verifying every number now.
+**Computed from GAQL:**
+| Date | Impr | Clicks | Cost | Conv | IS | Rank-Lost | Budget-Lost |
+|---|---|---|---|---|---|---|---|
+**Lifetime (live):** 374 clicks / $1,985.73 / 3 conv → CPA **$661.91** | Budget: **$200/day** ✓
+**Truth audit — corrections and what the morning report understated:**
+**Numbers: all verified.** Jul 23 = 523 / 61 / $224.10 / 1 conv / $3.67 CPC / 72.1% rank-lost ✓. Lifetime $1,985.73 / 374 clicks / 3 conv / CPA $661.91 ✓. Jul 24 partial: 128 impr (report said 127 — rounding error, immaterial) / 3 clicks / 2.4% CTR ✓. Budget $200 ✓.
+**What the "best composite day" framing undersells:**
+1. **Rank-lost on Jul 23 = 72.1%. That is not materially better than Jul 22's 77.0%.** A 5-point improvement on a partial-day read that has already deteriorated back to 76.0% on Jul 24 is noise, not a trend. The QS-repair thesis requires rank-lost to move toward 50%. It has not moved toward 50%. The RSAs went live Jul 23 — Google needs 7–14 days minimum to rescore ad relevance. One day of data pro
+2. **The $400 trigger is far from met.** Trigger = rank-lost sustainably below 50%. Current reading: 72–77%. The gap is 22–27 percentage points. Not close.
+3. **Investor Program (High Intent) = 3 lifetime clicks, 0 conversions** — the highest-intent ad group in the campaign is effectively invisible. Unchanged by yesterday's changes.
+4. **The Jul 23 conversion is not attributable to the new RSAs.** The old proven RSA was still running alongside the new ones. The conversion arrived through the same `[PHRASE] buy property in panama` / Property Investors channel as all prior conversions — before any serving data for the new ads existed. The new ads built no QS history on Jul 23.
+5. **CPC $3.67 — cheapest ever, but the reason is ambiguous.** Jul 22 spent only $98.77 because the negatives cut the junk auction pool. Jul 23 rebounded into a smaller, marginally cleaner pool. Lower CPC in a smaller pool is expected; it doesn't confirm QS improvement.
+6. **Jul 24 CTR 2.4% vs Jul 23's 11.7%** is a real flag, not noise. On 128 impressions, 3 clicks. The morning report named it but softened it as "partial-day." The double-pin theory as a cause is plausible; so is variance. No conclusion yet — but flagging it plainly is required.
+**The honest summary of campaign state as of Jul 24:** Three conversions in 11 days, CPA $661.91 (n=3, restatement window open). Rank-lost still 72–77% — the QS repair has not yet registered in Google's auction scoring. New RSAs are live but too fresh to have moved anything. The $400 budget increase is not warranted and the trigger remains unmet.
+*— PPC Strategist*
+
+### 2026-07-24 11:50 — Orchestrated finding
+
+{
+  "summary": "All morning report numbers are accurate; the 'best day' framing is misleading \u2014 rank-lost is 72-76% (unchanged in substance), the QS-repair thesis is unproven after one day, and the Jul 23 conversion cannot be attributed to the new RSAs.",
+  "findings": [
+    {
+      "claim": "Rank-lost has NOT materially improved \u2014 72.1% (Jul 23) vs 77.0% (Jul 22), already back to 76.0% (Jul 24 partial); the QS-repair thesis is unproven after one day",
+      "severity": "high",
+      "confidence": 0.92,
+      "sources": [
+        "LIVE GAQL: Jul 23 search_rank_lost_impression_share = 0.721, Jul 24 = 0.760",
+        "QS changes require 7-14 days for Google to rescore ad relevance \u2014 one day of new RSAs cannot move this metric"
+      ],
+      "disconfirmed_by": "Jul 26-28 pull showing rank-lost trending below 60% with new RSAs accumulating Above Average ad relevance ratings",
+      "id": "c1-f0"
+    },
+    {
+      "claim": "Jul 23 'best day' narrative is directional but overstated \u2014 most clicks and cheapest CPC are real, but both are at least partly explained by a smaller, cleaner auction pool post-negatives, not by QS improvement",
+      "severity": "medium",
+      "confidence": 0.8,
+      "sources": [
+        "LIVE GAQL: Jul 23 523 impr / 61 clicks / $224.10 / rank-lost still 72.1%",
+        "Jul 22 underpaced at $98.77 due to junk auction removal \u2014 Jul 23 rebounding into that smaller pool produces cheaper CPC by arithmetic, not by quality gain"
+      ],
+      "disconfirmed_by": "Post-Jul-26 QS pull showing ad relevance moving to Above Average on the core keywords \u2014 would confirm the RSAs are the cause, not pool-size effect",
+      "id": "c1-f1"
+    },
+    {
+      "claim": "The Jul 23 conversion is not attributable to the new RSAs \u2014 it came through the same channel (Property Investors / buy property in panama phrase) as all prior conversions, before new ads had serving history",
+      "severity": "medium",
+      "confidence": 0.85,
+

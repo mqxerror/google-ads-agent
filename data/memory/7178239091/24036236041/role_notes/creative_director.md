@@ -1,6 +1,6 @@
 # Creative Director Notes
 
-**Last updated:** 2026-07-23 12:24
+**Last updated:** 2026-07-24 11:43
 
 **Task:** AD COPY COUNTER-STRATEGY from context — no tool calls. Competitive inputs: Latitude anchors $300K + heavy sitelinks at pos 1.9; Henley hammers 'Minimum Investment USD 100,000' (an undercut our $300K Q
 ## Creative Director — Ad Copy Counter-Strategy | Freeze-locked for Jul 23
@@ -85,4 +85,45 @@ Ad strength dings the Property Investors and RBI ads mostly for headline similar
 - **Asset performance labels are all PENDING** — the ads are hours old; no served-combination data exists yet. First honest creative read: with the Jul 26–28 rank-lost check.
 - The old proven RSAs (including the top-visibility "Qualified Investor Program | $300K Investment Program" ad) are still running alongside, as designed — Google will arbitrate.
 Bottom line: the package landed as specced, passed policy review, and respects every account rule. The only change I'd actively recommend is the single pin in Property Investors — your call whether to do it in the UI today (it's ad-side, same change type as this morning's work) or leave rotation fully free for a week and let the data speak.
+*— Creative Director*
+
+### 2026-07-23 13:33 — i have add a pin tool pin the necessary ads for the eligibility we can do that
+
+**Task:** i have add a pin tool pin the necessary ads for the eligibility we can do that
+Wassim's added the pin tool — executing the Creative Director's recommended pin now: the investor-qualifier headline into position 2 on the Property Investors ad (818022513810), the one ad group where unpinned rotation risks serving pure real-estate combinations. Loading the pin tool first.Pulling the live headline texts for the Property Investors ad so the pin call matches exactly:One more verifi
+## Live pin state (all 8 active RSAs, pulled this turn)
+|---|---|---|---|
+This is exactly the Creative spec — and it covers more than the minimum I asked for (I only insisted on Property Investors; you got the qualifier onto every ad). The combination I was worried about — three pure real-estate headlines with no $300K signal — is now **impossible to serve**. Every impression in Property Investors, on both ads, carries the investor qualifier. That's our last intent filt
+## The trade-off that came with it: ad strength → POOR on all 4 new ads
+Pre-pin this morning: GOOD / GOOD / AVERAGE / AVERAGE. Post-pin live read: **POOR on all four** (all still APPROVED and ENABLED — policy is unaffected). This is Google's standard reaction to double-pinning: with H1 and H2 locked, its rotation math loses most of its combinations and the rating collapses.
+**My recommendation: don't touch it — here's why I'd hold this position at least through the Jul 26–28 read:**
+1. **Ad strength is advisory, not an auction input.** It doesn't feed Ad Rank or Quality Score directly. What feeds QS is ad relevance and expected CTR from actual serving — and a guaranteed keyword-mirrored H1 on every impression is the strongest ad-relevance play available. We deliberately traded a cosmetic rating for a structural guarantee.
+2. **The pins ARE the QS repair.** The whole week's thesis is that keyword-mirrored copy fixes the rank-lost collapse. Pinning makes the mirror show 100% of the time instead of when Google feels like it.
+3. **One caveat I'll watch honestly:** if the Jul 26–28 read shows impressions being throttled *and* ad relevance not moving, the fallback is surgical — keep Property Investors fully pinned (non-negotiable, it's the intent filter), and release the H2 pin on Residency Core / RBI / Investor Program, where every headline is residency-framed anyway and rotation freedom is harmless. That recovers ad st
+No writes were needed from me this turn — the state already matched spec, so I verified rather than re-wrote (read-back discipline, per the Jul 16 lesson). Nothing else is pending on the ad side: 4 new RSAs approved and pinned, 10 sitelinks + 6 callouts live, old proven ads still serving alongside. Next checkpoint is the Jul 26–28 rank-lost read — that's where the pins, the mirrors, and the assets
+One small language note for the record: in our reporting I'm calling this the **investor-qualifier pin**, not an "eligibility" pin — this account never runs eligibility framing in ads, and I want the terminology in the log to stay clean.
+*— Creative Director*
+
+### 2026-07-24 11:43 — today is 24
+
+**Task:** today is 24
+Day-24 read coming up. Yesterday's promise was the phrase-keyword call made on evidence — so I'm pulling live: (1) Jul 23 full-day + Jul 24 partial performance, (2) the phrase-only search-terms read, and (3) first serving data on the four pinned RSAs. Loading the working query tool first.The search-terms pull came back too large to display inline — it was saved to a file. Summarizing it with jq no
+## 1. What happened since yesterday (live daily pull)
+| Date | Impr | Clicks | Cost | Conv | CTR | CPC | IS | Rank-Lost | Budget-Lost |
+|---|---|---|---|---|---|---|---|---|---|
+- **Jul 23 full-day is the first day with the new ads + pins + cleaned traffic — and it's the best composite day on record**: most clicks ever, cheapest CPC ever, strong CTR, and a conversion. No *new* conversion since yesterday's read (the Jul 23 conv is the same one that landed yesterday morning). Lifetime: $1,985.73 / 374 clicks / 3 conv → **CPA $661.91**.
+- **Rank-lost settled at 72.1%** for the full day — better than Jul 22's 77.0%, but yesterday's mid-day 65.8% was optimistic; the day closed higher. Direction is right, magnitude is small. The $400 budget trigger (sustainably <50%) is **not met** — first honest read stays Jul 26–28.
+- Jul 24 so far is very quiet (3 clicks by mid-day) — partial-day noise, but I'll flag it honestly: 127 impressions at 2.4% CTR is worth one look tomorrow. If the full day closes with CTR collapsed, the double-pin is suspect #1 and the surgical fallback I described (release H2 pins outside Property Investors) moves up the list.
+## 2. Creative lane — the new ads' first serving data (Jul 23–24, live)
+| Ad group | Old ad | New pinned ad | Read |
+|---|---|---|---|
+All 8 active RSAs: APPROVED, ENABLED, ad strength POOR across the board (the known pin trade-off — old ads got pinned too). Position unchanged from yesterday: **hold through Jul 26–28**; the rating is cosmetic, the guaranteed investor-qualifier on every impression is structural.
+## 3. The promised phrase-keyword read — verdict: pause it again
+Jul 23–24 search terms, ~$94 visible spend. The `[PHRASE] buy property in panama` lane specifically: ~$50 across 13 queries — **one conversion ($2.89, "panama home for sale") and roughly $33 of pure listing-browse** (land in panama for sale $7.67 again, boca del toro $4.84, playa escondida $3.78, realty panama $3.20, el cangrejo $1.94, gesti 66 $1.68…). The biggest single term, "buying property in
+The decisive fact: **the converting query now has its own `[EXACT] panama home for sale` keyword — so pausing the phrase no longer closes the proven lane.** That was the only argument for keeping it. My recommendation: execute the pause today (keyword slot, per plan).
+**The honest surprise — exact match leaks too.** ~$24 of listing queries came through the *new exact keywords* via Google's same-meaning close variants: `[EXACT] buy property in panama` served "property for sale in panama" ($6.49), "real estate for sale in panama" ($3.86) and four similar variants; `[EXACT] panama home for sale` served "homes in panama for sale" ($6.75). So the Jul 22 premise "exa
+## 4. On the table for your "go" (one keyword-side slot, today)
+1. **Re-pause `[PHRASE] buy property in panama` (351567246136)** — the exacts keep the proven lane open.
+2. **Add 8 surgical EXACT negatives** for the leaked queries: [land in panama for sale] · [property for sale in panama] · [real estate for sale in panama] · [properties for sale in panama] · [homes in panama for sale] · [real estate for sale panama city panama] · [properties for sale panama city panama] · [real estate for sale in panama central america], plus phrase negs for the geo/agency tail (b
+Both are keyword-side — one change type, one day, clean CEO attribution. Budget stays $200 until rank-lost proves <50%. Say **"go"** and it executes with read-back verification; say "keep the phrase" and only the negatives go in.
 *— Creative Director*

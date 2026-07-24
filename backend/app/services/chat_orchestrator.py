@@ -73,6 +73,11 @@ _VERB_PAIRS = [
     ("keep", "pause"),
     ("expand", "shrink"),
     ("enable", "disable"),
+    # additional opposing pairs so anti-sycophancy reversal detection (piece 2)
+    # covers the directional verbs task_ledger surfaces as prior positions.
+    ("hold", "pause"),
+    ("start", "stop"),
+    ("grow", "shrink"),
 ]
 _STOPWORDS = {
     "the", "a", "an", "and", "or", "to", "of", "in", "on", "for", "with", "is",
@@ -408,6 +413,125 @@ def _opposing(stance_a: Optional[str], stance_b: Optional[str]) -> bool:
         return False
     for pos, neg in _VERB_PAIRS:
         if {stance_a, stance_b} == {pos, neg}:
+            return True
+    return False
+
+
+# ── Anti-sycophancy: PRIOR POSITIONS + the reversal contract (pieces 1-2) ─────
+# The position system is a SIBLING of the claim gate — it operates on the
+# RHETORIC of a recommendation (did today's answer silently flip a prior
+# directional stance?), not on individual FACT provenance. It never touches
+# claim_gate/provenance internals.
+
+def _positions_block(positions: list[dict]) -> str:
+    """Render the recalled prior directional positions into a PRIOR POSITIONS
+    context block for the PLAN + SYNTH prompts: `position · when · flip-condition`
+    (piece 1). Low-confidence (prose-extracted) positions are marked as such."""
+    if not positions:
+        return ""
+    lines = [
+        "\n\nPRIOR POSITIONS (directional recommendations already ON RECORD for "
+        "this campaign). If your answer today REVERSES one of these, you MUST "
+        "declare it per the reversal contract — never flip silently:"]
+    for p in positions:
+        flip = (f" · flips if: {p['flip_condition']}"
+                if p.get("flip_condition") else " · no stated flip-condition")
+        lc = " (low-confidence extraction)" if p.get("low_confidence") else ""
+        lines.append(f"- {p.get('position', '')} · {p.get('when', 'earlier')}{flip}{lc}")
+    return "\n".join(lines) + "\n"
+
+
+def _reversal_contract_block() -> str:
+    """The SYNTHESIZE contract addition (piece 2): a reversal MUST be declared as
+    an `evidence` change (naming a genuinely NEW fact + when it became known) OR a
+    labeled `deference` (the mandatory sentence). Emitted as its OWN fenced block
+    so it parses independently of the conflict-decisions block."""
+    return (
+        "\n\nREVERSAL CONTRACT (anti-sycophancy — binding): if your recommendation "
+        "today CONTRADICTS a PRIOR POSITION above, you MUST include a "
+        "`position_change` declaration as a SEPARATE fenced json block, AFTER the "
+        "prose:\n```json\n"
+        '{"position_change": {"prior": "<the prior position you are reversing>", '
+        '"new": "<your recommendation today>", "reason": "evidence" | "deference", '
+        '"evidence": "<if reason=evidence: the SPECIFIC new fact that was NOT '
+        'available at the prior position, and WHEN it became known — a fact equally '
+        'known at the prior position does NOT qualify>", '
+        '"stands_as": "<if reason=deference: the exact sentence — \\"No new evidence '
+        '— deferring to your judgment; my recommendation remains X.\\">"}}\n```\n'
+        "Use reason:\"deference\" whenever there is no genuinely new fact. Do NOT "
+        "manufacture an 'evidence' reason out of a fact that was already on the "
+        "table at the prior position — that is the exact sycophancy this guards "
+        "against."
+    )
+
+
+def _extract_all_fenced_json(text: str) -> list[dict]:
+    """Every parseable fenced ```json object in `text`, in order. Lets the
+    position_change block and the conflict-decisions block coexist without one
+    shadowing the other (the old single `_extract_json` grabbed only the first)."""
+    out: list[dict] = []
+    for m in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", text or "", re.DOTALL):
+        try:
+            obj = json.loads(m.group(1))
+        except Exception:
+            continue
+        if isinstance(obj, dict):
+            out.append(obj)
+    return out
+
+
+def _parse_position_changes(text: str) -> list[dict]:
+    """Pull every declared `position_change` object out of the synthesis text.
+    Accepts a single object or a list under the key. Never raises."""
+    out: list[dict] = []
+    for obj in _extract_all_fenced_json(text):
+        pc = obj.get("position_change")
+        if isinstance(pc, dict):
+            out.append(pc)
+        elif isinstance(pc, list):
+            out.extend(x for x in pc if isinstance(x, dict))
+    return out
+
+
+def _split_final_sentences(text: str) -> list[str]:
+    """Coarse sentence/line split of the synthesized answer for stance scanning."""
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text or "") if s.strip()]
+
+
+def _detect_reversals(prior_positions: list[dict], final_text: str) -> list[dict]:
+    """Deterministically find prior positions the synthesized answer REVERSES: a
+    sentence in `final_text` that carries the OPPOSING directional verb on an
+    overlapping object (≥2 shared content tokens). Returns
+    [{prior, prior_position, new}] — the raw signal the enforcement path checks
+    against the declared position_change blocks."""
+    out: list[dict] = []
+    sents = _split_final_sentences(final_text)
+    for pp in prior_positions:
+        ptext = pp.get("position", "")
+        pa = _stance(ptext)
+        if not pa:
+            continue
+        ptok = _claim_tokens(ptext)
+        for sent in sents:
+            sb = _stance(sent)
+            if not sb:
+                continue
+            if len(ptok & _claim_tokens(sent)) >= 2 and _opposing(pa, sb):
+                out.append({"prior": pp, "prior_position": ptext,
+                            "new": sent[:200]})
+                break
+    return out
+
+
+def _reversal_declared(prior_position: str, declared: list[dict]) -> bool:
+    """True when one of the declared position_change blocks plausibly COVERS this
+    prior position — ≥2 shared content tokens between the prior text and the
+    declaration's prior/new fields. Cheap topical match; the point is that the
+    model OWNED the reversal, not that it phrased it identically."""
+    ptok = _claim_tokens(prior_position)
+    for pc in declared:
+        dtok = _claim_tokens(f"{pc.get('prior', '')} {pc.get('new', '')}")
+        if len(ptok & dtok) >= 2:
             return True
     return False
 
@@ -849,6 +973,21 @@ async def run_turn(
             "text": f"Recalled {len(entries)} prior items ({n_stale} to reverify).",
             "stage": "recall"}}
 
+        # ── Anti-sycophancy piece 1: extract DIRECTIONAL prior positions from the
+        # recalled findings → a PRIOR POSITIONS block injected into PLAN + SYNTH.
+        # A silent flip against one of these is the failure this guards.
+        prior_positions: list[dict] = []
+        try:
+            prior_positions = task_ledger.extract_positions(entries)
+        except Exception as e:  # extraction must never break the turn
+            logger.debug("position extraction skipped: %s", e)
+        positions_block = _positions_block(prior_positions)
+        if prior_positions:
+            yield {"type": "director_thought", "payload": {
+                "text": (f"{len(prior_positions)} prior position(s) on record — a "
+                         "reversal today must be declared, not slipped in."),
+                "stage": "recall"}}
+
         # ══ S2 VERIFY ══════════════════════════════════════════════════
         premise_block = ""
         want_verify = ("page_check" in (needs or [])) or any(
@@ -959,7 +1098,8 @@ async def run_turn(
             "response to ONE user question about this campaign.\n\n"
             f"USER QUESTION: {user_message}\n\n"
             "Available specialists (pick only the ones that fit; tailor each "
-            "task):\n" + "\n".join(roster) + prior_block + premise_block +
+            "task):\n" + "\n".join(roster) + prior_block + positions_block +
+            premise_block +
             _degrade_block() +
             catalog_block +
             "\n\nDo NOT dispatch a specialist to redo work marked reuse — cite it "
@@ -1327,7 +1467,8 @@ async def run_turn(
                 "You are the Marketing Director. Reconcile the specialists' "
                 "findings into ONE answer, in a single voice, for the user's "
                 "question.\n\n"
-                f"USER QUESTION: {user_message}\n" + prior_block + premise_block +
+                f"USER QUESTION: {user_message}\n" + prior_block +
+                positions_block + premise_block +
                 _degrade_block() +
                 "\n\nSPECIALIST FINDINGS (JSON):\n" + findings_json +
                 "\n\nCONFLICTS the team flagged (JSON):\n" + conflicts_json +
@@ -1336,6 +1477,7 @@ async def run_turn(
                 + ("\n\nIMPORTANT: name the DEGRADED inputs above in your answer "
                    "so the user knows what was NOT checked this turn."
                    if degradations else "")
+                + (_reversal_contract_block() if prior_positions else "")
             )
             if conflicts:
                 synth_prompt += (
@@ -1359,10 +1501,14 @@ async def run_turn(
         final_text = "".join(final_parts)
 
         # Parse + emit conflict rulings (only the LLM synthesis emits the JSON).
+        # Scan ALL fenced blocks for the one carrying `decisions` so a preceding
+        # position_change block (added below) can't shadow it.
         if conflicts and did_llm_synth:
-            dparsed = _extract_json(final_text)
-            if dparsed and isinstance(dparsed.get("decisions"), list):
-                for d in dparsed["decisions"]:
+            dobj = next(
+                (o for o in _extract_all_fenced_json(final_text)
+                 if isinstance(o.get("decisions"), list)), None)
+            if dobj:
+                for d in dobj["decisions"]:
                     if not isinstance(d, dict):
                         continue
                     yield {"type": "decision", "payload": {
@@ -1370,6 +1516,30 @@ async def run_turn(
                         "ruling": d.get("ruling", ""),
                         "rationale": d.get("rationale", ""),
                         "decided_by": "director"}}
+
+        # ── Anti-sycophancy piece 2: reversal contract ENFORCEMENT ─────────
+        # Only meaningful when there were prior positions AND the LLM actually
+        # synthesized (the deterministic budget wrap-up reverses nothing — it is
+        # built from state, not a fresh recommendation). First surface every
+        # DECLARED position_change as an additive event; then deterministically
+        # detect any prior position the answer reversed WITHOUT a declaration and
+        # emit a visible warning — deference dressed as data no longer slips by.
+        if did_llm_synth and prior_positions:
+            declared = _parse_position_changes(final_text)
+            for pc in declared:
+                reason = str(pc.get("reason", "")).strip().lower()
+                yield {"type": "position_change", "payload": {
+                    "prior": str(pc.get("prior", ""))[:300],
+                    "new": str(pc.get("new", ""))[:300],
+                    "reason": reason,
+                    "evidence": str(pc.get("evidence", ""))[:400],
+                    "stands_as": str(pc.get("stands_as", ""))[:400]}}
+            for rev in _detect_reversals(prior_positions, final_text):
+                if not _reversal_declared(rev["prior_position"], declared):
+                    yield {"type": "position_reversal_warning", "payload": {
+                        "prior": rev["prior_position"][:300],
+                        "new": rev["new"][:300],
+                        "detail": "recommendation reversed without declaration"}}
 
         # ══ S7 GATE — deterministic claim gate (Epic 4) ════════════════
         # Runs on the Director's final BEFORE persistence: unverified IDs and

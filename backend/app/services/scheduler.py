@@ -265,6 +265,7 @@ async def _run_agent(plan: dict, *, instruction: str, analysis_only: bool, model
         model=model,
         active_role=role,
         tool_allowlist=[] if analysis_only else None,
+        actor=("scheduler-plan", f"Scheduled: {plan.get('title') or plan.get('id')}"),
     ):
         t = ev.get("type")
         if t in ("text", "text_delta"):  # text_delta = token-level (story 1.4)

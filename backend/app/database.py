@@ -1160,7 +1160,59 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V24 migration complete (studio_video_projects.brief_source).")
 
-        if version >= 24:
-            logger.info("Database schema is V24 (up to date).")
+        # V25: `change_log` — the campaign Changelog with 1-click revert. Every
+        # write the app can attribute (app-user button, chat-specialist MCP tool,
+        # scheduler plan, API) is captured here with before→after state and, when
+        # the inverse is safe, a `revert_spec` describing how to undo it via the
+        # existing service layer. External (out-of-app) changes surface from the
+        # `external_change` table (revertible=0). See app/services/change_log.py
+        # + change_capture.py + change_revert.py.
+        if version < 25:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS change_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts TEXT NOT NULL DEFAULT (datetime('now')),
+                    actor_type TEXT NOT NULL DEFAULT 'api',
+                    actor_detail TEXT,
+                    account_id TEXT,
+                    campaign_id TEXT,
+                    resource TEXT NOT NULL DEFAULT 'unknown',
+                    resource_name TEXT,
+                    action TEXT NOT NULL DEFAULT 'update',
+                    field TEXT,
+                    before_value TEXT,
+                    after_value TEXT,
+                    summary TEXT,
+                    tool_name TEXT,
+                    batch_id TEXT,
+                    batch_count INTEGER DEFAULT 1,
+                    revertible INTEGER NOT NULL DEFAULT 0,
+                    revert_reason TEXT,
+                    revert_spec TEXT,
+                    reverts INTEGER,
+                    reverted_by INTEGER,
+                    reverted_at TEXT
+                )
+                """
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_change_log_account_ts "
+                "ON change_log(account_id, ts)"
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_change_log_campaign_ts "
+                "ON change_log(campaign_id, ts)"
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_change_log_batch "
+                "ON change_log(batch_id)"
+            )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (25)")
+            await db.commit()
+            logger.info("V25 migration complete (change_log — Changelog + revert).")
+
+        if version >= 25:
+            logger.info("Database schema is V25 (up to date).")
     finally:
         await db.close()

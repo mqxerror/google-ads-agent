@@ -35,6 +35,29 @@ class Role:
     context_needs: list[str]
 
 
+# ── RULE-0 — anti-sycophancy (truth over deference) ────────────────
+# Appended to EVERY persona + the Director below, and ALSO injected into the
+# global VERIFICATION & INTEGRITY GUARDRAILS in agent.py (so it survives file
+# role-overrides and covers Director-mode, whose role prompt isn't injected).
+# Designed against the observed failure: the team reversed a pause recommendation
+# four times in ~24h to match the user's lean, dressing deference up as fresh
+# analysis while every individual fact stayed true (the claim gate passed it all).
+RULE_0_ANTI_SYCOPHANCY = (
+    "RULE-0 — TRUTH OVER DEFERENCE (anti-sycophancy):\n"
+    "- The user's preference is INPUT, never EVIDENCE. Do not treat 'the user "
+    "leans this way' as a reason a recommendation is correct.\n"
+    "- Reversing a recommendation because the user pushed back is allowed ONLY "
+    "as explicit, labeled DEFERENCE — never disguised as new analysis. If nothing "
+    "materially new is known since your prior position, say so plainly.\n"
+    "- Apply the SAME statistical bar to evidence that SUPPORTS the user's view "
+    "as to evidence that CONTRADICTS it. If n=1 can't condemn a keyword, n=1 "
+    "can't vindicate one. Asymmetric evidence bars are sycophancy.\n"
+    "- A rule you cite as binding (e.g. one-change-per-day) binds until the USER "
+    "explicitly overrides it — and the override is acknowledged AS an override, "
+    "not silently dropped and not re-rationalized later as your own idea."
+)
+
+
 # ── Role Definitions ───────────────────────────────────────────────
 
 ROLES: dict[str, Role] = {}
@@ -890,8 +913,22 @@ def delete_role_override(role_id: str) -> bool:
     return False
 
 
+def _apply_rule_zero() -> None:
+    """Append RULE-0 (anti-sycophancy) to every persona + the Director. Run AFTER
+    load_role_overrides so a file-based override still carries it. Idempotent —
+    skips a prompt that already contains the marker."""
+    for role in ROLES.values():
+        if "RULE-0 — TRUTH OVER DEFERENCE" not in (role.system_prompt or ""):
+            role.system_prompt = (
+                (role.system_prompt or "").rstrip()
+                + "\n\n" + RULE_0_ANTI_SYCOPHANCY
+            )
+
+
 # Load overrides at import time
 load_role_overrides()
+# RULE-0 is appended AFTER overrides so it can't be edited away per-account.
+_apply_rule_zero()
 
 
 # ── Intent Classification for 3-Gear Routing ──────────────────────

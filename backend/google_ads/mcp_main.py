@@ -529,9 +529,14 @@ class CampaignScopeMiddleware(Middleware):
                     f"allowed set ({allowed}). Use only your assigned tools, or "
                     f"answer from the context already provided."
                 )
+        # Arguments for both the scope check and the additive change-capture hook.
+        args = (
+            getattr(context.message, "arguments", None)
+            or getattr(getattr(context.message, "params", None), "arguments", None)
+            or {}
+        )
         # Scope check
         if bound:
-            args = getattr(context.message, "arguments", None) or getattr(getattr(context.message, "params", None), "arguments", None) or {}
             found: list[str] = []
             self._collect_campaign_ids(args, found)
             mismatches = {cid for cid in found if cid and cid != bound}
@@ -549,11 +554,20 @@ class CampaignScopeMiddleware(Middleware):
                     f"a different campaign, ask them to switch in the sidebar — "
                     f"do not silently substitute."
                 )
+        # Additive change-capture (Changelog V25): for a tracked WRITE, read the
+        # cheap before-state before mutating so the change is revertible. Entirely
+        # best-effort — a failure here must NEVER affect the tool call.
+        before = None
+        try:
+            before = self._capture_before(tool_name, args)
+        except Exception:
+            before = None
+
         # Run the tool, but capture any exception's full traceback into
         # data/mcp_errors.log before re-raising. This makes the otherwise-
         # invisible MCP stack traces inspectable on the next failure.
         try:
-            return await call_next(context)
+            result = await call_next(context)
         except Exception as exc:
             # Don't pollute the log with our own intentional rejections.
             _intentional = isinstance(exc, ValueError) and str(exc).startswith(
@@ -562,6 +576,70 @@ class CampaignScopeMiddleware(Middleware):
             if not _intentional:
                 _log_mcp_error(tool_name, exc)
             raise
+
+        # Additive change-capture: record the successful write into change_log.
+        try:
+            self._record_change(tool_name, args, result, before)
+        except Exception:
+            pass  # never let logging break a successful tool call
+
+        return result
+
+    # ── Additive change-capture helpers (Changelog V25) ─────────────────────
+    def _capture_before(self, tool_name: str, args: dict):
+        """Run the ONE cheap GAQL that captures an update-class write's prior
+        value, so it can be reverted. Returns the before-value or None."""
+        from app.services import change_capture
+
+        plan = change_capture.plan_before_read(tool_name, args)
+        if not plan:
+            return None
+        from google_ads.sdk_client import get_sdk_client
+
+        ga = get_sdk_client().client.get_service("GoogleAdsService")
+        rows = list(ga.search(customer_id=plan["customer_id"], query=plan["gaql"]))
+        if not rows:
+            return None
+        parse = plan.get("parse")
+        r = rows[0]
+        if parse == "status":
+            for path in ("campaign", "ad_group", "ad_group_criterion", "ad_group_ad"):
+                obj = getattr(r, path, None)
+                st = getattr(obj, "status", None) if obj is not None else None
+                if st is not None and getattr(st, "name", None):
+                    return st.name
+            return None
+        if parse == "cpc_bid_micros":
+            return getattr(r.ad_group_criterion, "cpc_bid_micros", None)
+        if parse == "amount_micros":
+            return getattr(r.campaign_budget, "amount_micros", None)
+        return None
+
+    def _record_change(self, tool_name: str, args: dict, result, before) -> None:
+        """Classify the write, extract created resource names, and INSERT a
+        change_log row attributed to whoever drove this MCP call."""
+        from app.services import change_capture
+
+        spec = change_capture.classify(tool_name)
+        if not spec:
+            return
+        sc = getattr(result, "structured_content", None)
+        if sc is None and isinstance(result, dict):
+            sc = result
+        resource_names = change_capture.extract_resource_names(sc)
+        field = spec.get("field")
+        after = args.get(field) if field else None
+        actor_type = (os.environ.get("LANGAR_ACTOR_TYPE") or "chat-specialist").strip()
+        actor_detail = os.environ.get("LANGAR_ACTOR_DETAIL") or (
+            f'Chat · {os.environ.get("LANGAR_BOUND_CAMPAIGN_NAME", "").strip()}'.strip(" ·")
+            or "Chat specialist")
+        batch_count = len(resource_names) if (spec.get("action") == "add" and resource_names) else 1
+        row = change_capture.build_change_row(
+            tool_name=tool_name, args=args, spec=spec,
+            actor_type=actor_type, actor_detail=actor_detail,
+            before=before, after=after, resource_names=resource_names,
+            batch_count=batch_count)
+        change_capture.record_change_sync(row)
 
 
 mcp.add_middleware(CampaignScopeMiddleware())

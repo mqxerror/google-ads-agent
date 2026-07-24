@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -10,8 +13,35 @@ from google_ads.utils import format_customer_id
 from app.config import settings
 from app.services.cache import CacheService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/operations", tags=["operations"])
 _cache = CacheService()
+
+
+async def _capture(row: dict) -> None:
+    """Record one app-user write into the Changelog (V25). Best-effort: a capture
+    failure must never break the operation the user asked for. actor_type is
+    stamped 'app-user' unless the caller overrides it."""
+    try:
+        row.setdefault("actor_type", "app-user")
+        row.setdefault("actor_detail", "You (in-app)")
+        from app.services import change_log
+
+        await change_log.record(row)
+    except Exception as e:  # pragma: no cover — never surface a logging failure
+        logger.warning("Changelog capture failed: %s", e)
+
+
+def _money(micros) -> str:
+    try:
+        return f"${int(micros) / 1_000_000:,.2f}"
+    except (TypeError, ValueError):
+        return "?"
+
+
+def _acct(cid: str) -> str:
+    return "".join(ch for ch in str(cid) if ch.isdigit())
 
 
 def _ensure_sdk():
@@ -146,6 +176,14 @@ async def update_campaign_status(body: CampaignStatusRequest):
     status_enum = getattr(CampaignStatusEnum.CampaignStatus, body.status)
     campaign_rn = f"customers/{cid}/campaigns/{body.campaign_id}"
 
+    # Read-before-write: capture the prior status so the change is revertible.
+    before_status = None
+    try:
+        from app.services import ads_mutations
+        before_status = ads_mutations.get_campaign_status(client, cid, body.campaign_id)
+    except Exception:
+        before_status = None
+
     operation = CampaignOperation()
     operation.update.resource_name = campaign_rn
     operation.update.status = status_enum
@@ -155,7 +193,20 @@ async def update_campaign_status(body: CampaignStatusRequest):
     try:
         response = service.mutate_campaigns(request=request)
         await _cache.invalidate(cid)  # Clear cached campaign data
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+            "resource": "campaign", "resource_name": rn, "action": "status",
+            "field": "status", "before_value": before_status, "after_value": body.status,
+            "summary": f"Status {before_status or '?'} → {body.status}",
+            "revertible": 1 if before_status else 0,
+            "revert_reason": None if before_status else "Prior status wasn't captured.",
+            "revert_spec": json.dumps({
+                "kind": "restore_status", "customer_id": _acct(cid),
+                "target": "campaign", "campaign_id": str(body.campaign_id),
+                "restore": before_status}) if before_status else None,
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -168,9 +219,10 @@ async def update_campaign_budget(body: BudgetUpdateRequest):
     ga_service = client.get_service("GoogleAdsService")
     cid = format_customer_id(body.customer_id)
 
-    # First get the campaign's budget resource name
+    # First get the campaign's budget resource name + its current amount (so the
+    # change is revertible to the exact prior value).
     query = f"""
-        SELECT campaign.campaign_budget
+        SELECT campaign.campaign_budget, campaign_budget.amount_micros
         FROM campaign
         WHERE campaign.id = {body.campaign_id}
     """
@@ -179,6 +231,7 @@ async def update_campaign_budget(body: BudgetUpdateRequest):
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     budget_rn = rows[0].campaign.campaign_budget
+    before_micros = rows[0].campaign_budget.amount_micros
 
     from google.ads.googleads.v23.services.types.campaign_budget_service import (
         CampaignBudgetOperation, MutateCampaignBudgetsRequest,
@@ -194,7 +247,20 @@ async def update_campaign_budget(body: BudgetUpdateRequest):
     request = MutateCampaignBudgetsRequest(customer_id=cid, operations=[operation])
     try:
         response = budget_service.mutate_campaign_budgets(request=request)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+            "resource": "budget", "resource_name": rn, "action": "update",
+            "field": "amount_micros", "before_value": str(before_micros),
+            "after_value": str(body.budget_micros),
+            "summary": f"Budget {_money(before_micros)} → {_money(body.budget_micros)}",
+            "revertible": 1,
+            "revert_spec": json.dumps({
+                "kind": "restore_budget", "customer_id": _acct(cid),
+                "campaign_id": str(body.campaign_id), "budget_resource_name": budget_rn,
+                "restore_micros": int(before_micros)}),
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -225,7 +291,18 @@ async def add_keyword(body: KeywordAddRequest):
     request = MutateAdGroupCriteriaRequest(customer_id=cid, operations=[operation])
     try:
         response = service.mutate_ad_group_criteria(request=request)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+            "resource": "keyword", "resource_name": rn, "action": "add",
+            "field": None, "after_value": body.keyword_text,
+            "summary": f"Added keyword '{body.keyword_text}' ({body.match_type})",
+            "revertible": 1,
+            "revert_spec": json.dumps({
+                "kind": "remove_criteria", "customer_id": _acct(cid),
+                "criterion_type": "ad_group", "resource_names": [rn]}),
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -246,6 +323,14 @@ async def update_keyword_status(body: KeywordStatusRequest):
     status_enum = getattr(AdGroupCriterionStatusEnum.AdGroupCriterionStatus, body.status)
     criterion_rn = f"customers/{cid}/adGroupCriteria/{body.ad_group_id}~{body.keyword_criterion_id}"
 
+    before_status = None
+    try:
+        from app.services import ads_mutations
+        before_status = ads_mutations.get_keyword_status(
+            client, cid, body.ad_group_id, body.keyword_criterion_id)
+    except Exception:
+        before_status = None
+
     operation = AdGroupCriterionOperation()
     operation.update.resource_name = criterion_rn
     operation.update.status = status_enum
@@ -255,7 +340,21 @@ async def update_keyword_status(body: KeywordStatusRequest):
     request = MutateAdGroupCriteriaRequest(customer_id=cid, operations=[operation])
     try:
         response = service.mutate_ad_group_criteria(request=request)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": None,
+            "resource": "keyword", "resource_name": rn, "action": "status",
+            "field": "status", "before_value": before_status, "after_value": body.status,
+            "summary": f"Keyword status {before_status or '?'} → {body.status}",
+            "revertible": 1 if before_status else 0,
+            "revert_reason": None if before_status else "Prior status wasn't captured.",
+            "revert_spec": json.dumps({
+                "kind": "restore_status", "customer_id": _acct(cid), "target": "keyword",
+                "ad_group_id": str(body.ad_group_id),
+                "criterion_id": str(body.keyword_criterion_id),
+                "restore": before_status}) if before_status else None,
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -285,7 +384,18 @@ async def add_negative_keyword(body: NegativeKeywordRequest):
     request = MutateCampaignCriteriaRequest(customer_id=cid, operations=[operation])
     try:
         response = service.mutate_campaign_criteria(request=request)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+            "resource": "negative_keyword", "resource_name": rn, "action": "add",
+            "after_value": body.keyword_text,
+            "summary": f"Added negative keyword '{body.keyword_text}' ({body.match_type})",
+            "revertible": 1,
+            "revert_spec": json.dumps({
+                "kind": "remove_criteria", "customer_id": _acct(cid),
+                "criterion_type": "campaign", "resource_names": [rn]}),
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -413,13 +523,40 @@ async def update_campaign(body: UpdateCampaignRequest):
     if not paths:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    before_status = None
+    if body.status is not None:
+        try:
+            from app.services import ads_mutations
+            before_status = ads_mutations.get_campaign_status(client, cid, body.campaign_id)
+        except Exception:
+            before_status = None
+
     operation.update_mask = field_mask_pb2.FieldMask(paths=paths)
     try:
         response = client.get_service("CampaignService").mutate_campaigns(
             request=MutateCampaignsRequest(customer_id=cid, operations=[operation])
         )
         await _cache.invalidate(cid)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        if body.status is not None and before_status:
+            await _capture({
+                "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+                "resource": "campaign", "resource_name": rn, "action": "status",
+                "field": "status", "before_value": before_status,
+                "after_value": body.status,
+                "summary": f"Status {before_status} → {body.status}", "revertible": 1,
+                "revert_spec": json.dumps({
+                    "kind": "restore_status", "customer_id": _acct(cid),
+                    "target": "campaign", "campaign_id": str(body.campaign_id),
+                    "restore": before_status})})
+        else:
+            await _capture({
+                "account_id": _acct(cid), "campaign_id": str(body.campaign_id),
+                "resource": "campaign", "resource_name": rn, "action": "update",
+                "field": ",".join(paths), "summary": f"Campaign settings updated ({', '.join(paths)})",
+                "revertible": 0,
+                "revert_reason": "Name/date edits aren't auto-reversible in v1."})
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -514,6 +651,14 @@ async def create_responsive_search_ad(body: CreateRSARequest):
             request=MutateAdGroupAdsRequest(customer_id=cid, operations=[operation])
         )
         ad_rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": None,
+            "resource": "ad", "resource_name": ad_rn, "action": "add",
+            "summary": f"Created responsive search ad ({len(body.headlines)} headlines)",
+            "revertible": 1,
+            "revert_spec": json.dumps({
+                "kind": "remove_ad", "customer_id": _acct(cid),
+                "ad_group_ad_resource_name": ad_rn})})
         return {"status": "ok", "resource_name": ad_rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -562,6 +707,13 @@ async def update_ad_final_urls(body: UpdateAdFinalUrlsRequest):
             detail="Provide either ad_resource_name, or both ad_group_id and ad_id",
         )
 
+    before_urls = []
+    try:
+        from app.services import ads_mutations
+        before_urls = ads_mutations.get_ad_final_urls(client, cid, resource_name)
+    except Exception:
+        before_urls = []
+
     ad = Ad()
     ad.resource_name = resource_name
     ad.final_urls.extend(cleaned_urls)
@@ -576,7 +728,21 @@ async def update_ad_final_urls(body: UpdateAdFinalUrlsRequest):
             request=MutateAdsRequest(customer_id=cid, operations=[operation])
         )
         await _cache.invalidate(cid)
-        return {"status": "ok", "resource_name": response.results[0].resource_name}
+        rn = response.results[0].resource_name
+        await _capture({
+            "account_id": _acct(cid), "campaign_id": None,
+            "resource": "ad", "resource_name": rn, "action": "update",
+            "field": "final_urls",
+            "before_value": json.dumps(list(before_urls)),
+            "after_value": json.dumps(cleaned_urls),
+            "summary": f"Landing page {(before_urls[0] if before_urls else '?')} → {cleaned_urls[0]}",
+            "revertible": 1 if before_urls else 0,
+            "revert_reason": None if before_urls else "Prior landing page URLs weren't captured.",
+            "revert_spec": json.dumps({
+                "kind": "restore_final_urls", "customer_id": _acct(cid),
+                "ad_resource_name": rn, "restore_urls": list(before_urls)}) if before_urls else None,
+        })
+        return {"status": "ok", "resource_name": rn}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -614,11 +780,24 @@ async def bulk_add_keywords(body: BulkKeywordAddRequest):
         response = service.mutate_ad_group_criteria(
             request=MutateAdGroupCriteriaRequest(customer_id=cid, operations=operations)
         )
-        return {
-            "status": "ok",
-            "count": len(response.results),
-            "resource_names": [r.resource_name for r in response.results],
-        }
+        resource_names = [r.resource_name for r in response.results]
+        # One batch_id shared by all members → the feed collapses them into a
+        # single grouped entry whose revert removes every added keyword at once.
+        import uuid
+        batch_id = f"bulkkw-{uuid.uuid4().hex[:12]}"
+        n = len(resource_names)
+        for i, (kw, rn) in enumerate(zip(body.keywords, resource_names)):
+            text = kw.get("text") if isinstance(kw, dict) else str(kw)
+            await _capture({
+                "account_id": _acct(cid), "campaign_id": None,
+                "resource": "keyword", "resource_name": rn, "action": "add",
+                "after_value": text,
+                "summary": f"Added keyword '{text}'" if n == 1 else f"Added {n} keywords",
+                "revertible": 1, "batch_id": batch_id, "batch_count": n,
+                "revert_spec": json.dumps({
+                    "kind": "remove_criteria", "customer_id": _acct(cid),
+                    "criterion_type": "ad_group", "resource_names": [rn]})})
+        return {"status": "ok", "count": n, "resource_names": resource_names}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -1,6 +1,6 @@
 # Search Term Hunter Notes
 
-**Last updated:** 2026-07-23 12:22
+**Last updated:** 2026-07-24 11:50
 
 **Task:** Analyze the NEW search terms report (last 7 days, in context) for campaign 24036236041. Key finding to develop: the [PHRASE] 'buy property in panama' keyword (51 clicks) is pulling generic residential
 **Search Term Hunter — Campaign 24036236041 | Panama QIP**
@@ -344,3 +344,50 @@ Two things worth knowing about running both:
 For tomorrow's keyword slot, the decision is now genuinely yours with a day of data behind it: if the phrase's Jul 23–24 search terms are still listing-browse junk, we pause it again (the original flip, one day later); if you want to keep both longer, we let the terms report arbitrate. Nothing fires without your word — I'll bring the phrase-only search-terms read tomorrow so the call is made on ev
 Everything else from today's package is untouched: 4 new RSAs in review, 10 sitelinks + 6 callouts live, $400 budget trigger still waiting on rank-lost < ~50%.
 *— Search Term Hunter*
+
+### 2026-07-24 11:47 — TRUTH AUDIT of the Jul 24 search-terms claims for campaign 24036236041 (customer
+
+**Task:** TRUTH AUDIT of the Jul 24 search-terms claims for campaign 24036236041 (customer 7178239091) ONLY — user asked to revise the plan and tell the truth. Re-pull Jul 23–24 search terms LIVE via search_exe
+Pulling live search terms segmented by keyword criterion for Jul 23–24 now.Tool found. Running the live search terms pull now, segmented by keyword criterion for Jul 23–24.Live pull complete. Here's the truth audit — every number from the query above.
+**TRUTH AUDIT — Jul 23–24, live segmented by keyword criterion**
+- **(a) PHRASE lane ~$50 / 13 queries / ~$33 listing-browse — CONFIRMED.** $49.65 across 13 terms via criterion 351567246136. "~$33 listing-browse" holds if you classify "buying property in panama as an american" ($13.26) as borderline — reasonable call, consistent with the original.
+- **(b) EXACT close-variant leak ~$24 — CONFIRMED.** `[EXACT] buy property in panama` (344425790102) leaked $17.33 across 6 "for sale" variants; `[EXACT] panama home for sale` (296729676904) leaked $6.75 on "homes in panama for sale." Total: **$24.08**. Specific terms match the report exactly.
+- **(c) DECISIVE — CORRECTED, report is wrong.** The converting query "panama home for sale" ($2.89, 1 conv) was served by **`[PHRASE] buy property in panama` (criterion 351567246136)**, NOT by `[EXACT] panama home for sale` (296729676904). The exact keyword matched only "homes in panama for sale" as a close variant — it has not yet proven it captures the converting query. The morning report's cor
+- **Waste rate — PARTIALLY CORRECTED.** Visible data: ~$67–76 of waste out of ~$96 visible spend = roughly **65–79%**, an improvement from the Jul 22 baseline of ~86%. Not "directionally unchanged" but not clean either — ~$128 of total Jul 23 spend ($224) is in the unverified tail.
+**Revised recommendation:** Hold the phrase pause. The 8 surgical EXACT negatives for the leaked close-variant queries remain valid and should proceed. Revisit the phrase pause once the exact keyword has accumulated enough data to confirm it reliably captures "panama home for sale" queries — minimum Jul 26–28 read.
+*— Search Term Hunter*
+
+### 2026-07-24 11:50 — Orchestrated finding
+
+{
+  "summary": "CORRECTED: the conversion came through the phrase, not the exact \u2014 do not pause the phrase today; proceed only with the 8 EXACT negatives and revisit the pause at Jul 26\u201328 with real data from the exact keyword.",
+  "findings": [
+    {
+      "claim": "The converting 'panama home for sale' query was served by [PHRASE] buy property in panama, not [EXACT] panama home for sale \u2014 the exact has not proven it captures this conversion lane",
+      "severity": "high",
+      "confidence": 0.99,
+      "sources": [
+        "Live GAQL: criterion 351567246136 (PHRASE) on 'panama home for sale' 1 click 1 conv $2.89; criterion 296729676904 (EXACT) matched only 'homes in panama for sale' $6.75, 0 conv"
+      ],
+      "disconfirmed_by": "Jul 26\u201328 search-terms pull showing criterion 296729676904 capturing 'panama home for sale' directly with conversions",
+      "id": "c2-f0"
+    },
+    {
+      "claim": "Waste rate improved modestly to ~65\u201379% (from ~86% Jul 22 baseline) \u2014 not directionally unchanged, but still material",
+      "severity": "medium",
+      "confidence": 0.72,
+      "sources": [
+        "Live GAQL: ~$67\u201376 of listing-browse NONE out of ~$96 visible spend Jul 23\u201324; ~$128 of $224 total Jul 23 spend in unverified tail"
+      ],
+      "disconfirmed_by": "Full-tail pull showing the unverified $128 is predominantly on-program queries \u2014 would lower the true waste rate further",
+      "id": "c2-f1"
+    },
+    {
+      "claim": "The 8 surgical EXACT negatives for leaked close-variant queries are valid and unaffected by the correction",
+      "severity": "low",
+      "confidence": 0.96,
+      "sources": [
+        "Live GAQL confirms specific terms: 'property for sale in panama' $6.49, 'real estate for sale in panama' $3.86, 'homes in panama for sale' $6.75 all NONE via close-variant expansion"
+      ],
+      "disconfirmed_by": "Nothing \u2014 these are directly observed waste terms with no conversion data",
+      "id": 

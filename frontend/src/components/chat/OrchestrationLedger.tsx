@@ -8,6 +8,7 @@ import {
   Gavel,
   AlertTriangle,
   Hourglass,
+  Scale,
   History as HistoryIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,8 @@ import type {
   BudgetNoticePayload,
   DegradePayload,
   TurnQueuedPayload,
+  PositionChangePayload,
+  PositionReversalWarningPayload,
   Finding,
 } from '@/types/orchestration';
 
@@ -179,6 +182,32 @@ interface QueuedRow {
   message?: string;
 }
 
+/** Anti-sycophancy — the Director declared a reversal of a prior position.
+ *  Quiet/neutral for reason:"evidence" (shows the new fact); amber for
+ *  reason:"deference" (shows "deferring to user — recommendation stands: X").
+ *  Survives the post-completion collapse. */
+interface PositionChangeRow {
+  kind: 'position_change';
+  order: number;
+  key: string;
+  prior: string;
+  next: string;
+  reason: string;
+  evidence?: string;
+  standsAs?: string;
+}
+
+/** Anti-sycophancy ENFORCEMENT — the answer reversed a prior position with NO
+ *  declaration. Loud (danger box), never silent; survives collapse. */
+interface PositionReversalWarningRow {
+  kind: 'position_reversal_warning';
+  order: number;
+  key: string;
+  prior: string;
+  next: string;
+  detail?: string;
+}
+
 /** P0 safety — a user pressed stop while an approved write was mid-dispatch, so
  *  the write MAY NOT have executed. Rendered prominently; never silent (§P0). */
 interface StopWarningRow {
@@ -216,7 +245,9 @@ type LedgerRow =
   | StopWarningRow
   | BudgetNoticeRow
   | DegradeRow
-  | QueuedRow;
+  | QueuedRow
+  | PositionChangeRow
+  | PositionReversalWarningRow;
 
 interface LedgerModel {
   rows: LedgerRow[];
@@ -484,6 +515,34 @@ function buildModel(events: OrchestrationEvent[]): LedgerModel {
           order: idx,
           key: `qd-${idx}`,
           message: p.message,
+        });
+        break;
+      }
+
+      case 'position_change': {
+        const p = payloadOf<PositionChangePayload>(ev);
+        rows.push({
+          kind: 'position_change',
+          order: idx,
+          key: `pc-${idx}`,
+          prior: p.prior,
+          next: p.new,
+          reason: p.reason,
+          evidence: p.evidence,
+          standsAs: p.stands_as,
+        });
+        break;
+      }
+
+      case 'position_reversal_warning': {
+        const p = payloadOf<PositionReversalWarningPayload>(ev);
+        rows.push({
+          kind: 'position_reversal_warning',
+          order: idx,
+          key: `pr-${idx}`,
+          prior: p.prior,
+          next: p.new,
+          detail: p.detail,
         });
         break;
       }
@@ -1082,6 +1141,91 @@ function DegradeLedgerRow({ row }: { row: DegradeRow }) {
   );
 }
 
+// ---- position-change row (anti-sycophancy piece 4) -------------------------
+
+// The Director DECLARED a reversal of a prior directional position.
+//  - reason:"evidence"  → quiet/neutral: a legitimate flip on a genuinely new
+//    fact; show the fact. Not alarming — this is the system working.
+//  - reason:"deference" → amber: a labeled flip to the user's judgment with NO
+//    new evidence; show "deferring to user — recommendation stands: X" so the
+//    honesty is visible, not buried in prose.
+// Survives the post-completion collapse (a declared flip is durable context).
+function PositionChangeLedgerRow({ row }: { row: PositionChangeRow }) {
+  const isDeference = row.reason === 'deference';
+  if (isDeference) {
+    const stands = row.standsAs?.trim() || row.next;
+    return (
+      <div className="-mx-2 rounded-md border border-warning/40 bg-warning-soft px-2 py-1.5">
+        <div className="flex items-start gap-2">
+          <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-[12px] font-medium text-warning">
+              Deferring to your judgment — no new evidence
+            </p>
+            <p className="text-[11px] leading-snug text-warning/90">
+              Recommendation stands: {stands}
+            </p>
+            {row.prior && (
+              <p className="text-[11px] leading-snug text-warning/80">
+                (reverses prior position: {row.prior})
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // reason:"evidence" (or anything non-deference) — quiet neutral row.
+  return (
+    <div>
+      <Row>
+        <Scale className="h-3 w-3 shrink-0 text-subtle" aria-hidden="true" />
+        <span className="min-w-0 truncate font-medium text-text">
+          Position changed on new evidence
+        </span>
+      </Row>
+      <Indent>
+        <div className="space-y-0.5 py-1">
+          {row.evidence && (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              New fact: {row.evidence}
+            </p>
+          )}
+          <p className="text-[11px] leading-snug text-subtle">
+            {row.prior} → {row.next}
+          </p>
+        </div>
+      </Indent>
+    </div>
+  );
+}
+
+// ---- position reversal WARNING row (anti-sycophancy enforcement) -----------
+
+// The answer reversed a prior position but the Director emitted NO declaration.
+// Loud by design — a silent flip to please the user is the exact failure this
+// system guards against. Same danger-box treatment as the stop-write warning.
+function PositionReversalWarningLedgerRow({ row }: { row: PositionReversalWarningRow }) {
+  return (
+    <div className="-mx-2 rounded-md border border-danger/40 bg-danger-soft px-2 py-1.5">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger" aria-hidden="true" />
+        <div className="min-w-0 space-y-1">
+          <p className="text-[12px] font-medium text-danger">
+            Recommendation reversed without declaration
+          </p>
+          <p className="text-[11px] leading-snug text-danger/90">
+            Prior position: {row.prior}
+          </p>
+          <p className="text-[11px] leading-snug text-danger/90">
+            Now: {row.next}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- queued row (item 4) ---------------------------------------------------
 
 // This turn was queued behind another still-running turn on the same
@@ -1139,6 +1283,10 @@ function rowSignature(row: LedgerRow): string {
       return `dg`+row.key+row.stage+row.what+row.impact;
     case 'queued':
       return `qd`+row.key;
+    case 'position_change':
+      return `pc`+row.key+row.reason+row.prior+row.next+(row.evidence ?? '')+(row.standsAs ?? '');
+    case 'position_reversal_warning':
+      return `pr`+row.key+row.prior+row.next+(row.detail ?? '');
     default:
       return JSON.stringify(row);
   }
@@ -1190,6 +1338,10 @@ function LedgerRowViewImpl({
       return <DegradeLedgerRow row={row} />;
     case 'queued':
       return <QueuedLedgerRow />;
+    case 'position_change':
+      return <PositionChangeLedgerRow row={row} />;
+    case 'position_reversal_warning':
+      return <PositionReversalWarningLedgerRow row={row} />;
     default:
       return null;
   }
@@ -1250,12 +1402,27 @@ export default function OrchestrationLedger({
   // item 2 — degrade rows survive the collapse (like stop warnings): a missing
   // input the user should know about must not vanish when the turn folds up.
   const degradeRows = model.rows.filter((r): r is DegradeRow => r.kind === 'degrade');
+  // Anti-sycophancy — a declared position change AND (louder) an undeclared
+  // reversal warning both survive the collapse: an honesty signal about a
+  // reversed recommendation must not vanish when the turn folds up.
+  const positionChangeRows = model.rows.filter(
+    (r): r is PositionChangeRow => r.kind === 'position_change'
+  );
+  const reversalWarningRows = model.rows.filter(
+    (r): r is PositionReversalWarningRow => r.kind === 'position_reversal_warning'
+  );
 
   if (isComplete && collapsed) {
     return (
       <div className="mt-1 space-y-0.5 text-xs">
         {stopWarnings.map((row) => (
           <StopWarningLedgerRow key={row.key} row={row} />
+        ))}
+        {reversalWarningRows.map((row) => (
+          <PositionReversalWarningLedgerRow key={row.key} row={row} />
+        ))}
+        {positionChangeRows.map((row) => (
+          <PositionChangeLedgerRow key={row.key} row={row} />
         ))}
         {degradeRows.map((row) => (
           <DegradeLedgerRow key={row.key} row={row} />

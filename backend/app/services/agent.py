@@ -31,8 +31,39 @@ from app.services.compaction import (
     get_compaction_status, compact_conversation, load_checkpoint_context,
     WARN_THRESHOLD, COMPACT_THRESHOLD,
 )
+from app.services.roles import RULE_0_ANTI_SYCOPHANCY
 
 logger = logging.getLogger(__name__)
+
+# === VERIFICATION & INTEGRITY GUARDRAILS === (global; survives role overrides,
+# applies to Director-mode whose role prompt isn't injected). Module-level so it
+# is importable + assertable by tests. RULE-0 (anti-sycophancy) is appended here
+# AND onto every persona in roles.py — belt-and-suspenders so truth-over-deference
+# holds even if a persona prompt is overridden.
+INTEGRITY_GUARDRAILS = (
+    "=== VERIFICATION & INTEGRITY GUARDRAILS ===\n"
+    "VERIFY BEFORE YOU DIAGNOSE: NEVER assert that the landing page has or "
+    "lacks a form, or that tracking/conversions are or aren't firing, without "
+    "a SAME-SESSION fetch of the ad's actual final_url. If a "
+    "'LIVE LANDING PAGE STATE (fetched this session)' block is present, treat "
+    "IT as ground truth over any stored note. If page state is unknown or the "
+    "fetch failed, SAY SO and fetch/ask — do NOT assume.\n"
+    "STALE FINDINGS: Findings marked ⚠️ STALE reflect a PAST state; re-verify "
+    "with a live pull/fetch before ANY budget, bid, status, or URL "
+    "recommendation. Do not act on stale numbers as if current.\n"
+    "ID INTEGRITY: Never state a specific conversion action ID, GTM container "
+    "ID (GTM-…), Google Ads conversion ID (AW-…), GA4 measurement ID (G-…), or "
+    "conversion label unless it came from a live query/tag pull THIS session — "
+    "and LABEL it with its source. If an ID isn't confirmed live, say "
+    "'ID not verified — pull it before relying on it' rather than reciting from memory.\n"
+    "MECHANISM CLAIMS NEED THE PULL: any explanation of a metric DISCREPANCY "
+    "(X in the UI vs Y in the API/CRM — e.g. 'the 5 = 3 primary + 2 GA4 "
+    "secondary fires') MUST cite a live SEGMENTED conversion pull run THIS "
+    "session (by conversion_action / source). Without that pull, phrase it as "
+    "an UNVERIFIED HYPOTHESIS with the segmented pull as the next step — never "
+    "'almost certainly' about the breakdown before you have queried it.\n\n"
+    + RULE_0_ANTI_SYCOPHANCY
+)
 
 _NODE_PATH = shutil.which("node") or "node"
 
@@ -1059,6 +1090,7 @@ async def stream_agent_response(
     attachments: list[dict] | None = None,
     tool_allowlist: list[str] | None = None,
     proc_key: tuple[str, str] | None = None,
+    actor: tuple[str, str] | None = None,
 ) -> AsyncIterator[dict]:
     """Stream agent responses with full layered memory.
 
@@ -1512,30 +1544,9 @@ async def stream_agent_response(
 
         system_parts.append(f"\nYou are responding as the {role_obj.name}. Sign your analysis with your role perspective.")
 
-    # === VERIFICATION & INTEGRITY GUARDRAILS === (global; survives role overrides)
-    system_parts.append(
-        "=== VERIFICATION & INTEGRITY GUARDRAILS ===\n"
-        "VERIFY BEFORE YOU DIAGNOSE: NEVER assert that the landing page has or "
-        "lacks a form, or that tracking/conversions are or aren't firing, without "
-        "a SAME-SESSION fetch of the ad's actual final_url. If a "
-        "'LIVE LANDING PAGE STATE (fetched this session)' block is present, treat "
-        "IT as ground truth over any stored note. If page state is unknown or the "
-        "fetch failed, SAY SO and fetch/ask — do NOT assume.\n"
-        "STALE FINDINGS: Findings marked ⚠️ STALE reflect a PAST state; re-verify "
-        "with a live pull/fetch before ANY budget, bid, status, or URL "
-        "recommendation. Do not act on stale numbers as if current.\n"
-        "ID INTEGRITY: Never state a specific conversion action ID, GTM container "
-        "ID (GTM-…), Google Ads conversion ID (AW-…), GA4 measurement ID (G-…), or "
-        "conversion label unless it came from a live query/tag pull THIS session — "
-        "and LABEL it with its source. If an ID isn't confirmed live, say "
-        "'ID not verified — pull it before relying on it' rather than reciting from memory.\n"
-        "MECHANISM CLAIMS NEED THE PULL: any explanation of a metric DISCREPANCY "
-        "(X in the UI vs Y in the API/CRM — e.g. 'the 5 = 3 primary + 2 GA4 "
-        "secondary fires') MUST cite a live SEGMENTED conversion pull run THIS "
-        "session (by conversion_action / source). Without that pull, phrase it as "
-        "an UNVERIFIED HYPOTHESIS with the segmented pull as the next step — never "
-        "'almost certainly' about the breakdown before you have queried it."
-    )
+    # === VERIFICATION & INTEGRITY GUARDRAILS === (global; survives role overrides;
+    # includes RULE-0 anti-sycophancy). Module constant → importable + testable.
+    system_parts.append(INTEGRITY_GUARDRAILS)
 
     # Assemble the base system prompt (P0 — always included)
     system_prompt_base = "\n".join(system_parts)
@@ -1707,6 +1718,18 @@ async def stream_agent_response(
         env["LANGAR_AGENT_TOOL_ALLOWLIST"] = ",".join(tool_allowlist) if tool_allowlist else "__NONE__"
     else:
         env.pop("LANGAR_AGENT_TOOL_ALLOWLIST", None)
+    # Actor attribution for the Changelog (V25). The MCP change-capture hook
+    # (CampaignScopeMiddleware._record_change) reads these to attribute each write
+    # to whoever drove it. Default: a chat specialist; the scheduler passes an
+    # explicit actor=('scheduler-plan', <plan title>).
+    if actor:
+        env["LANGAR_ACTOR_TYPE"], env["LANGAR_ACTOR_DETAIL"] = str(actor[0]), str(actor[1])
+    else:
+        env["LANGAR_ACTOR_TYPE"] = "chat-specialist"
+        _role = (active_role or "director").replace("_", " ").title()
+        env["LANGAR_ACTOR_DETAIL"] = (
+            f"{_role}" + (f" · {campaign_name}" if campaign_name else "")
+        )
 
     result_queue: queue.Queue[dict | None] = queue.Queue()
     full_response_text: list[str] = []

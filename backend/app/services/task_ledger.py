@@ -18,11 +18,141 @@ Design rules:
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+
+# ── Anti-sycophancy: directional-position extraction ──────────────────
+# A "position" is a directional RECOMMENDATION already on record (pause/keep/
+# add/remove/raise/…). These get surfaced as a distinct PRIOR POSITIONS block so
+# the Director must DECLARE a reversal rather than silently flip to please the
+# user (the observed 4-flip failure). This set is a SUPERSET of the opposing
+# verb PAIRS the orchestrator uses for reversal detection — a position may show
+# in the block even when it has no clean opposite (e.g. "launch"), which is fine.
+_DIRECTIONAL_VERBS = {
+    "pause", "keep", "hold", "add", "remove", "raise", "lower", "increase",
+    "decrease", "cut", "scale", "switch", "enable", "disable", "expand",
+    "shrink", "kill", "launch", "stop", "start", "drop", "boost", "maintain",
+    "reduce", "grow", "hold off", "leave",
+}
+
+
+def _has_directional_verb(text: str) -> bool:
+    """True when `text` carries a recommendation verb (word-boundary match)."""
+    low = (text or "").lower()
+    for v in _DIRECTIONAL_VERBS:
+        if re.search(r"\b" + re.escape(v) + r"\b", low):
+            return True
+    return False
+
+
+def _findings_from_text(text: str) -> list[dict]:
+    """Best-effort: pull finding dicts ({claim, confidence, disconfirmed_by, …})
+    out of a specialist report OR a role-notes body — WITHOUT importing the heavy
+    workflow_orchestrator (import-cycle safe). Handles both the fenced findings
+    JSON the specialist emits AND the {"summary","findings":[…]} blobs writeback
+    appends. Never raises. `\\[.*?\\]` closes on the first `]` — finding objects
+    carry no `]`, so the first one always closes the array."""
+    out: list[dict] = []
+    if not text:
+        return out
+    for m in re.finditer(r'"findings"\s*:\s*(\[.*?\])', text, re.DOTALL):
+        try:
+            arr = json.loads(m.group(1))
+        except Exception:
+            continue
+        if isinstance(arr, list):
+            for f in arr:
+                if isinstance(f, dict) and f.get("claim"):
+                    out.append(f)
+    return out
+
+
+def _position_when(entry: dict) -> str:
+    """Human 'when' for a prior position: the created_at date if present, else a
+    coarse age string, else 'earlier'."""
+    ca = entry.get("created_at")
+    if ca:
+        s = str(ca).strip().replace(" ", "T", 1).rstrip("Z")
+        try:
+            return datetime.fromisoformat(s).date().isoformat()
+        except (ValueError, TypeError):
+            return str(ca)[:10]
+    age = entry.get("age_days")
+    if isinstance(age, int):
+        return "today" if age <= 0 else f"~{age}d ago"
+    return "earlier"
+
+
+def _norm_position(text: str) -> str:
+    """Normalized key for de-duplicating positions across sources."""
+    return re.sub(r"\s+", " ", (text or "").strip().lower())[:200]
+
+
+def extract_positions(entries: list[dict]) -> list[dict]:
+    """Extract DIRECTIONAL prior positions from recalled findings (piece 1).
+
+    Each recall entry MAY carry structured `findings` (parsed from the report /
+    role-notes content before truncation); those give a high-confidence position
+    with the stated flip-condition (`disconfirmed_by`). Entries with only prose
+    `summary` are scanned sentence-by-sentence for a recommendation verb — a
+    CHEAP heuristic, marked `low_confidence=True` and carrying no flip-condition.
+
+    Returns a list of:
+        {position, when, flip_condition, confidence, role_id, source,
+         low_confidence}
+    De-duplicated by normalized position text (structured wins over prose)."""
+    positions: list[dict] = []
+    seen: set[str] = set()
+    for e in entries or []:
+        when = _position_when(e)
+        role_id = e.get("role_id")
+        source = e.get("source")
+        # 1) structured findings → high-confidence positions
+        for f in (e.get("findings") or []):
+            if not isinstance(f, dict):
+                continue
+            claim = str(f.get("claim") or "").strip()
+            if not claim or not _has_directional_verb(claim):
+                continue
+            key = _norm_position(claim)
+            if key in seen:
+                continue
+            seen.add(key)
+            conf = f.get("confidence")
+            positions.append({
+                "position": claim[:200],
+                "when": when,
+                "flip_condition": str(f.get("disconfirmed_by") or "").strip()[:200],
+                "confidence": conf if isinstance(conf, (int, float)) else None,
+                "role_id": role_id,
+                "source": source,
+                "low_confidence": False,
+            })
+        # 2) prose fallback — scan the summary for directional sentences
+        for sent in re.split(r"(?<=[.!?])\s+|\n+", e.get("summary") or ""):
+            sent = sent.strip()
+            if len(sent) < 6 or not _has_directional_verb(sent):
+                continue
+            key = _norm_position(sent)
+            if key in seen:
+                continue
+            seen.add(key)
+            positions.append({
+                "position": sent[:200],
+                "when": when,
+                "flip_condition": "",
+                "confidence": None,
+                "role_id": role_id,
+                "source": source,
+                "low_confidence": True,
+            })
+    return positions
 
 
 # ── §8.2 staleness matrix — the SINGLE source of truth ────────────────
@@ -184,6 +314,9 @@ async def recall(
                         "created_at": r["created_at"],
                         "data_class": "specialist",
                         "summary": (r["content"] or "")[:300],
+                        # parse structured findings from the FULL content BEFORE
+                        # truncation so extract_positions sees the flip-conditions
+                        "findings": _findings_from_text(r["content"] or ""),
                     })
         finally:
             await db.close()
@@ -266,6 +399,9 @@ async def recall(
                 "age_days": age_days,          # already resolved from the header
                 "data_class": "specialist",
                 "summary": body[:300],
+                # writeback appends {"summary","findings":[…]} blobs — parse them
+                # from the FULL body so prior positions survive the 300-char cut
+                "findings": _findings_from_text(body),
             })
     except Exception as e:
         logger.debug("recall source role_notes failed: %s", e)
@@ -296,6 +432,9 @@ async def recall(
             "staleness": staleness,
             "decision": decision,
             "summary": c.get("summary", "")[:300],
+            # structured findings ride along so extract_positions can pull
+            # directional prior positions + their flip-conditions (piece 1)
+            "findings": c.get("findings") or [],
             "_score": score,
         })
 

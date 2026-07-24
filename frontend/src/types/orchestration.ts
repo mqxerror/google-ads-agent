@@ -155,6 +155,30 @@ export interface TurnQueuedPayload {
   behind_turn_id?: string;
 }
 
+/** Anti-sycophancy — the Director DECLARED that today's recommendation reverses
+ *  a PRIOR POSITION (piece 2). `reason:"evidence"` names the genuinely-new fact;
+ *  `reason:"deference"` is a labeled flip to the user's judgment with the
+ *  recommendation that STANDS. Rendered quiet for evidence, amber for deference;
+ *  survives the post-completion collapse. */
+export interface PositionChangePayload {
+  prior: string;
+  new: string;
+  reason: 'evidence' | 'deference' | string;
+  /** Present when reason=evidence: the new fact + when it became known. */
+  evidence?: string;
+  /** Present when reason=deference: the recommendation that stands. */
+  stands_as?: string;
+}
+
+/** Anti-sycophancy ENFORCEMENT — the answer reversed a prior directional
+ *  position but the Director did NOT emit a position_change declaration. Loud by
+ *  design (a silent flip is the whole failure being guarded); survives collapse. */
+export interface PositionReversalWarningPayload {
+  prior: string;
+  new: string;
+  detail?: string;
+}
+
 /** A budget threshold was crossed mid-turn. Two flavors, keyed by `kind`:
  *  - 'notice' — the $5 WATCH level was crossed; the turn KEEPS running. Purely
  *    informational (Wassim: on CLI/subscription, no hard limit — just SHOW when a
@@ -221,6 +245,8 @@ export type OrchestrationEventType =
   | 'budget_notice'
   | 'degrade'
   | 'turn_queued'
+  | 'position_change'
+  | 'position_reversal_warning'
   | 'turn_done'
   | 'turn_error'
   | 'turn_stopped';
@@ -258,6 +284,8 @@ export const V2_EVENT_TYPES: ReadonlySet<string> = new Set<OrchestrationEventTyp
   'budget_notice',
   'degrade',
   'turn_queued',
+  'position_change',
+  'position_reversal_warning',
   'turn_done',
   'turn_error',
   'turn_stopped',

@@ -1,6 +1,6 @@
 # Analytics Analyst Notes
 
-**Last updated:** 2026-07-23 13:21
+**Last updated:** 2026-07-24 13:00
 
 {
   "summary": "steady",
@@ -2255,6 +2255,348 @@
 }
 
 ### 2026-07-23 13:21 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:30 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:30 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:31 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:39 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:40 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:42 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:44 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:46 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:47 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:47 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:48 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:48 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:49 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:50 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:50 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:53 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:57 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 12:58 — Orchestrated finding
+
+{
+  "summary": "steady",
+  "findings": [
+    {
+      "claim": "keep budget steady",
+      "severity": "low",
+      "confidence": 0.7,
+      "sources": [
+        "ctx"
+      ],
+      "disconfirmed_by": "a CPA spike",
+      "id": "c2-f0"
+    }
+  ]
+}
+
+### 2026-07-24 13:00 — Orchestrated finding
 
 {
   "summary": "steady",

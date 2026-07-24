@@ -60,8 +60,8 @@ async def _schema_version() -> int:
 
 class MigrationV23(unittest.TestCase):
     def test_schema_version_is_23(self):
-        # Bumped to 24 by the brief_source migration (CHANGE-1 DB).
-        self.assertEqual(_run(_schema_version()), 24)
+        # Head moves as migrations are added: 24 (brief_source) → 25 (change_log).
+        self.assertEqual(_run(_schema_version()), 25)
 
     def test_studio_video_projects_columns(self):
         cols = _run(_columns("studio_video_projects"))
@@ -84,10 +84,10 @@ class MigrationV23(unittest.TestCase):
         self.assertEqual(len(cols), 7, f"expected 7 columns, got {cols}")
 
     def test_rerun_init_db_is_idempotent(self):
-        """Re-running init_db on an already-migrated DB must not crash and stays 24."""
+        """Re-running init_db on an already-migrated DB must not crash and stays at head."""
         _run(init_db())
         _run(init_db())
-        self.assertEqual(_run(_schema_version()), 24)
+        self.assertEqual(_run(_schema_version()), 25)
         # Tables still intact after re-run.
         self.assertIn("consult_director", _run(_columns("studio_video_projects")))
         self.assertIn("soul_id", _run(_columns("brand_avatars")))

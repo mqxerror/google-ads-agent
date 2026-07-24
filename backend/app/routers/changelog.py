@@ -21,7 +21,7 @@ import re
 from datetime import date as _date
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
@@ -153,3 +153,50 @@ async def list_types():
         types.add(entry.type)
         tags.update(entry.tags)
     return {"types": sorted(types), "tags": sorted(tags)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Campaign Changelog — the account-change feed + 1-click revert (NotFair
+# "Operations" parity, with a working revert). Distinct from the product
+# release-notes above: this reads the `change_log` table (V25) merged with
+# `external_change`, and can undo revertible rows via the revert executor.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/changes")
+async def list_changes(
+    account_id: str | None = None,
+    campaign_id: str | None = None,
+    actor: str | None = None,   # app-user | chat-specialist | scheduler-plan | api | external | revert
+    limit: int = 200,
+):
+    """Merged campaign-change feed, newest first. Batch writes collapse into one
+    grouped entry. Includes external (out-of-app) changes, always non-revertible."""
+    from app.services import change_log
+
+    feed = await change_log.build_feed(
+        account_id=account_id,
+        campaign_id=campaign_id,
+        actor_type=actor,
+        limit=min(max(limit, 1), 500),
+    )
+    return feed
+
+
+@router.post("/{change_id}/revert")
+async def revert_change(change_id: int):
+    """Undo a revertible change (or its whole batch) via the inverse op, verify by
+    read-back, and log the revert. Idempotent — a second revert returns 409."""
+    from app.services import change_revert
+
+    try:
+        return await change_revert.revert_change(change_id)
+    except change_revert.RevertNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except change_revert.RevertConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except change_revert.RevertNotSupported as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:  # a live SDK failure during the inverse op
+        logger.exception("revert of change #%s failed", change_id)
+        raise HTTPException(status_code=502, detail=f"Revert failed: {e}")
