@@ -390,7 +390,7 @@ AVAILABLE_MODELS = {
     # bracket notation ever breaks on the CLI, fall back to plain "claude-fable-5".
     "fable": "claude-fable-5[1m]",
     "sonnet": "claude-sonnet-4-6",
-    "opus": "claude-opus-4-8",
+    "opus": "claude-opus-5",
     "haiku": "claude-haiku-4-5-20251001",
 }
 
@@ -400,9 +400,9 @@ AVAILABLE_MODELS = {
 # `result` event carries a non-success subtype / error, or the process exits
 # non-zero with a "usage limit" / "rate limit" / "limit reached" / 429 line on
 # stderr. Rather than surface a hard failure, we retry the SAME prompt ONCE
-# with the model swapped to Opus 4.8 (a distinct model that isn't sharing
+# with the model swapped to Opus 5 (a distinct model that isn't sharing
 # Fable's cap). Mirrors the meta-ads-agent claude_runner fallback contract.
-_FALLBACK_MODEL = "claude-opus-4-8"
+_FALLBACK_MODEL = "claude-opus-5"
 # Case-insensitive signals for a transient usage/rate/limit condition, matched
 # against the CLI's result-event error, stderr, and any api_retry event error.
 _LIMIT_RE = re.compile(r"usage limit|rate limit|limit reached|429", re.I)
@@ -1896,7 +1896,7 @@ async def stream_agent_response(
                     if not limit_hit and _LIMIT_RE.search(err_text):
                         limit_hit = True
 
-                # ── One-shot usage/rate-limit fallback → Opus 4.8 ──────────
+                # ── One-shot usage/rate-limit fallback → Opus 5 ──────────
                 # If the configured (non-fallback) model hit a usage/rate limit
                 # on this first attempt, retry the SAME prompt ONCE with Opus.
                 # Guards: only before any continuation, only once, and never

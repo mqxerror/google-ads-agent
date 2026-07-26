@@ -399,7 +399,7 @@ async def _call_haiku(prompt: str) -> str | None:
             *cli_cmd,
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
-            "--model", "claude-opus-4-8",
+            "--model", "claude-opus-5",
             "--permission-mode", "bypassPermissions",
         ]
 

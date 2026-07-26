@@ -417,7 +417,7 @@ async def _call_haiku(prompt: str) -> Optional[str]:
             *cli_cmd,
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
-            "--model", "claude-opus-4-8",
+            "--model", "claude-opus-5",
             "--permission-mode", "bypassPermissions",
         ]
         env = {**os.environ, "CLAUDE_CODE_ENTRYPOINT": "sdk-py"}

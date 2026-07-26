@@ -198,7 +198,7 @@ Return ONLY the chronicle entry text (1-2 lines, no bullets, no date prefix). Or
             *cli_cmd,
             "--print", "--verbose", "--output-format", "stream-json",
             "--max-turns", "1",
-            "--model", "claude-opus-4-8",
+            "--model", "claude-opus-5",
             "--permission-mode", "bypassPermissions",
         ]
 
