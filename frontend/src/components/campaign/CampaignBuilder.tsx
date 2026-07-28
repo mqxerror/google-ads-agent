@@ -4,13 +4,14 @@ import {
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
   Circle, Upload, X, LinkIcon, Globe, Languages, DollarSign,
   Sparkles, Rocket, Zap, Brain, RefreshCw,
-  Layers, Video,
+  Layers, Video, Megaphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import PMaxWizard from './PMaxWizard';
+import DemandGenWizard from './DemandGenWizard';
 // chatApi used for atomic conversation creation in runStage and Research
 
 type ModelId = 'fable' | 'sonnet' | 'opus' | 'haiku';
@@ -41,7 +42,7 @@ const STAGE_COLORS = [
 ];
 
 type WizardStep = 'type' | 'input' | 'pipeline' | 'review';
-type CampaignType = 'search' | 'pmax' | 'video';
+type CampaignType = 'search' | 'pmax' | 'demandgen' | 'video';
 
 export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const accountId = useClientAccountId();
@@ -347,12 +348,27 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     );
   }
 
+  // Demand Gen has its own asset-bundle flow (like PMax), so short-circuit to
+  // its dedicated wizard rather than the Search pipeline.
+  if (campaignType === 'demandgen') {
+    return (
+      <DemandGenWizard
+        onClose={onClose}
+        onBackToTypePicker={() => {
+          persistCampaignType(null);
+          setStep('type');
+        }}
+      />
+    );
+  }
+
   // Campaign-type picker — first step on a fresh session.
   if (step === 'type') {
     const TYPE_CARDS: { id: CampaignType; label: string; tagline: string; icon: typeof Search; available: boolean; note?: string }[] = [
-      { id: 'search', label: 'Search', tagline: 'Keyword-driven text ads on Google.com', icon: Search, available: true },
-      { id: 'pmax',   label: 'Performance Max', tagline: "Google's all-network campaign with auto-placed creative.", icon: Layers, available: true },
-      { id: 'video',  label: 'Video (YouTube)', tagline: 'YouTube + Discover video ads.', icon: Video, available: false, note: 'Coming soon — needs YouTube channel linked.' },
+      { id: 'search',    label: 'Search', tagline: 'Keyword-driven text ads on Google.com', icon: Search, available: true },
+      { id: 'pmax',      label: 'Performance Max', tagline: "Google's all-network campaign with auto-placed creative.", icon: Layers, available: true },
+      { id: 'demandgen', label: 'Demand Gen', tagline: 'Visual ads across YouTube, Discover & Display (Gmail off by default).', icon: Megaphone, available: true },
+      { id: 'video',     label: 'Video (YouTube)', tagline: 'YouTube + Discover video ads.', icon: Video, available: false, note: 'Coming soon — needs YouTube channel linked.' },
     ];
     return (
       <div className="max-w-2xl mx-auto py-8 px-6">
@@ -368,7 +384,7 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
             <p className="text-sm text-muted-foreground">Pick a campaign type to start.</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {TYPE_CARDS.map(({ id, label, tagline, icon: Icon, available, note }) => (
             <button
               key={id}

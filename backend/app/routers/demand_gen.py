@@ -22,6 +22,7 @@ from google_ads.services.campaign.demand_gen_orchestrator import (
     ApiCtx,
     DemandGenAdUpdateError,
     DemandGenOrchestrator,
+    DemandGenStepError,
     DemandGenValidationError,
 )
 
@@ -45,6 +46,145 @@ def _ensure_sdk_client() -> None:
     except Exception:
         set_sdk_client(GoogleAdsSdkClient())
         logger.info("Initialized Google Ads SDK client for the REST Demand Gen path")
+
+
+class DemandGenMarketingImages(BaseModel):
+    """Marketing-image slots for the Demand Gen multi-asset ad. All refs may be
+    Google asset resource names, bare numeric asset ids, OR local library UUIDs
+    (uploaded / generated) — the orchestrator uploads + crops local files to
+    each slot's exact aspect at submit."""
+
+    landscape: List[str] = Field(default_factory=list)      # 1.91:1
+    square: List[str] = Field(default_factory=list)         # 1:1
+    portrait: List[str] = Field(default_factory=list)       # 4:5
+    tall_portrait: List[str] = Field(default_factory=list)  # 9:16
+
+
+class DemandGenChannels(BaseModel):
+    """The six explicitly-selectable Demand Gen channels. Defaults match the
+    orchestrator's DEFAULT_CHANNELS — Gmail OFF, everything else ON — so an
+    omitted block still produces the intended out-of-the-box shape."""
+
+    youtube_in_stream: bool = True
+    youtube_in_feed: bool = True
+    youtube_shorts: bool = True
+    discover: bool = True
+    gmail: bool = False   # OFF by default — the whole point of this surface
+    display: bool = True
+
+
+class DemandGenCreateRequest(BaseModel):
+    """Wizard submit payload. Every field is validated server-side too — the
+    wizard's client-side validation is a UX nicety; the orchestrator rejects
+    anything that doesn't meet Google's hard minimums (headlines ≤5/≤30c,
+    descriptions ≤5/≤90c, business_name ≤25c, at least one channel ON)."""
+
+    name: str
+    budget_micros: int
+    final_urls: List[str]
+    business_name: str
+    headlines: List[str]
+    descriptions: List[str]
+    logos: List[str] = Field(default_factory=list)
+    marketing_images: DemandGenMarketingImages = Field(default_factory=DemandGenMarketingImages)
+    channels: DemandGenChannels = Field(default_factory=DemandGenChannels)
+    call_to_action_text: Optional[str] = None
+    target_cpa_micros: Optional[int] = None
+    location_ids: Optional[List[str]] = None
+    excluded_location_ids: Optional[List[str]] = None
+    language_ids: Optional[List[str]] = None
+    audience_user_list_ids: Optional[List[str]] = None
+    excluded_user_list_ids: Optional[List[str]] = None
+    final_mobile_urls: Optional[List[str]] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+class DemandGenCreateResponse(BaseModel):
+    campaign_id: str
+    budget_id: str
+    ad_group_id: str
+    ad_group_ad_id: str
+    channels: Dict[str, bool]
+    image_asset_ids: Dict[str, List[str]]
+    warnings: List[str] = Field(default_factory=list)
+
+
+@router.post(
+    "/accounts/{account_id}/campaigns/demand-gen",
+    response_model=DemandGenCreateResponse,
+)
+async def create_demand_gen(
+    account_id: str, body: DemandGenCreateRequest
+) -> DemandGenCreateResponse:
+    """Create a Demand Gen campaign (PAUSED) from the wizard's bundle.
+
+    Mirrors app/routers/pmax.py::create_pmax — the visual wizard and the chat
+    agent both drive the SAME `DemandGenOrchestrator`, no duplicated logic.
+
+    Returns 422 with a field-by-field error list when Google's hard minimums
+    aren't met; 502 when a Google Ads call fails mid-recipe (the orchestrator
+    has already rolled back the prior creations, so a retry is safe).
+    """
+    bundle: Dict[str, Any] = {
+        "name": body.name,
+        "budget_micros": body.budget_micros,
+        "final_urls": body.final_urls,
+        "final_mobile_urls": body.final_mobile_urls,
+        "business_name": body.business_name,
+        "headlines": body.headlines,
+        "descriptions": body.descriptions,
+        "call_to_action_text": body.call_to_action_text,
+        "logos": body.logos,
+        "marketing_images": {
+            "landscape": body.marketing_images.landscape,
+            "square": body.marketing_images.square,
+            "portrait": body.marketing_images.portrait,
+            "tall_portrait": body.marketing_images.tall_portrait,
+        },
+        "channels": body.channels.model_dump(),
+        "target_cpa_micros": body.target_cpa_micros,
+        "location_ids": body.location_ids,
+        "excluded_location_ids": body.excluded_location_ids,
+        "language_ids": body.language_ids,
+        "audience_user_list_ids": body.audience_user_list_ids,
+        "excluded_user_list_ids": body.excluded_user_list_ids,
+        "start_date": body.start_date,
+        "end_date": body.end_date,
+    }
+    try:
+        _ensure_sdk_client()
+        result = await _orchestrator.create_demand_gen_campaign(
+            ctx=ApiCtx(),
+            customer_id=account_id,
+            bundle=bundle,
+        )
+        return DemandGenCreateResponse(**result)
+    except DemandGenValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION_FAILED", "errors": e.errors},
+        )
+    except DemandGenStepError as e:
+        logger.exception(
+            "Demand Gen orchestrator failed for account=%s at step '%s'",
+            account_id, e.step,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "GOOGLE_ADS_ERROR",
+                "step": e.step,
+                "rolled_back": e.rollback_report,
+                "message": str(e)[:800],
+            },
+        )
+    except Exception as e:
+        logger.exception("Demand Gen orchestrator failed for account=%s", account_id)
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "GOOGLE_ADS_ERROR", "message": str(e)[:500]},
+        )
 
 
 class DemandGenUpdateImagesRequest(BaseModel):
