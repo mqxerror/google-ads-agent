@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.mcp_server import mcp_lifespan
-from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, guidelines, landing_page, memory, operations, outcomes, plans, pmax, pmax_video, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, video_director, video_engine, workflows, youtube
+from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, demand_gen, guidelines, landing_page, memory, operations, outcomes, plans, pmax, pmax_video, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, video_director, video_engine, workflows, youtube
 from app.services.sync_engine import start_background_sync, stop_background_sync
 
 
@@ -84,6 +84,7 @@ app.include_router(memory.router)
 app.include_router(operations.router)
 app.include_router(outcomes.router)
 app.include_router(pmax.router)
+app.include_router(demand_gen.router)
 app.include_router(pmax_video.router)
 app.include_router(video_engine.router)
 app.include_router(youtube.router)

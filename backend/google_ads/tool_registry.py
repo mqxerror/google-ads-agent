@@ -154,6 +154,9 @@ _CATALOG_WRITE_CANDIDATES = [
     "campaign_asset_update_campaign_asset_status",
     # single-shot campaign orchestrators (budget+campaign+assets+ad in one call)
     "demand_gen_create_demand_gen_campaign",
+    # in-place Demand Gen ad image refresh (Studio push-to-ad — replace/append
+    # marketing/square/portrait/tall/logo images on a live multi-asset ad)
+    "demand_gen_update_ad_images",
 ]
 
 

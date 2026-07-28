@@ -63,6 +63,8 @@ async def draft_variants(
     target: str,                 # 'image' | 'video'
     account_id: str | None,
     campaign_id: str | None,
+    preset: str | None = None,           # e.g. 'demand_gen'
+    reference_note: str | None = None,   # anchor prompts to the user's assets
 ) -> dict[str, Any]:
     """Run the 2-stage pipeline and return the variant package.
 
@@ -77,6 +79,14 @@ async def draft_variants(
             "pinned_claims_used": [<list of claim strings>],
         }
 
+    `preset` tunes Stage 2 for a specific ad format. 'demand_gen' produces
+    corporate-brand, premium-editorial image prompts sized for Demand Gen's
+    image slots (1.91:1 landscape, 1:1 square, optional 4:5) with NO text
+    overlays. `reference_note`, when the operator has attached their own
+    reference assets (hotel / property photos), instructs every variant to
+    anchor its composition to that real subject ("this exact hotel property")
+    instead of inventing a generic scene.
+
     All exceptions raise with a structured `message` attribute so the
     router can surface them to the UI without leaking raw stack
     traces.
@@ -89,6 +99,8 @@ async def draft_variants(
         target=target,
         pinned_claims=pinned,
         visual_director_system=visual_director,
+        preset=preset,
+        reference_note=reference_note,
     )
     return {
         "brief": brief,
@@ -161,12 +173,55 @@ async def _stage1_decompose(
 # ── Stage 2: brief + role + pinned → 3 angle variants ────────────────
 
 
+# ── Demand Gen creative preset ────────────────────────────────────────
+# Corporate-brand editorial images for Demand Gen's image slots. The whole
+# reason this preset exists: the generic AI creative was rejected — DG needs
+# premium, brand-consistent, text-free images (Google overlays the headline
+# itself, so any baked-in text double-prints and gets disapproved) at the
+# exact slot aspects.
+_DEMAND_GEN_ADDENDUM = (
+    "\nDEMAND GEN CREATIVE PRESET — every `prompt` must produce a premium, "
+    "editorial, brand-consistent IMAGE suitable for a corporate immigration / "
+    "residency-by-investment advertiser's Demand Gen ad:\n"
+    "  - Composed for Demand Gen image slots — a clean, centered subject that "
+    "reads at BOTH 1.91:1 (landscape) and 1:1 (square), plus optional 4:5. "
+    "Keep the key subject away from edges so a center-crop to any slot works.\n"
+    "  - ABSOLUTELY NO text, logos, watermarks, captions, or graphic overlays "
+    "in the image — Google renders the headline/CTA itself; baked-in text gets "
+    "the ad disapproved.\n"
+    "  - Register: aspirational corporate editorial — natural light, real "
+    "architecture / interiors / people, magazine-quality. NOT stocky, NOT "
+    "clip-art, NOT surreal, NOT collage.\n"
+    "  - Photographic realism: 35mm or 50mm lens, shallow-to-medium depth of "
+    "field, golden-hour or soft daylight.\n"
+)
+
+
+def _reference_block(reference_note: str | None) -> str:
+    """Instruct Stage 2 to anchor every variant to the operator's REAL
+    attached reference assets instead of an invented generic scene."""
+    if not reference_note or not reference_note.strip():
+        return ""
+    return (
+        "\nREFERENCE ASSETS ATTACHED — the operator has supplied their OWN real "
+        "images as visual references"
+        f" ({reference_note.strip()}). Anchor EVERY variant to that exact real "
+        "subject: describe THIS specific property / interior / scene (\"this "
+        "exact hotel property\", \"this building's real facade\"), preserving "
+        "its identifiable architecture, materials, and setting. Do NOT invent a "
+        "different generic location — the point is to feature the advertiser's "
+        "actual asset.\n"
+    )
+
+
 async def _stage2_draft(
     *,
     brief: dict[str, Any],
     target: str,
     pinned_claims: list[str],
     visual_director_system: str,
+    preset: str | None = None,
+    reference_note: str | None = None,
 ) -> list[dict[str, Any]]:
     """Stage 2: produce three angle variants using the visual_director
     role file as the system prompt + pinned claims + structured brief."""
@@ -194,6 +249,12 @@ async def _stage2_draft(
             "50mm / 85mm), depth-of-field, lighting register required.\n"
         )
 
+    # Demand Gen preset (image only) + optional reference-asset anchoring.
+    preset_block = ""
+    if (preset or "").lower() == "demand_gen" and target_label == "image":
+        preset_block = _DEMAND_GEN_ADDENDUM
+    preset_block += _reference_block(reference_note)
+
     user = (
         "Draft the three angle variants for the brief below. Return ONLY the "
         "JSON object specified in your OUTPUT FORMAT — no preamble, no markdown.\n\n"
@@ -206,7 +267,7 @@ async def _stage2_draft(
         f"  program:          {brief['program']}\n"
         f"  hard_constraints: {brief['hard_constraints']}\n"
         f"  claim_hints:      {brief['claim_hints']}\n"
-        f"{pinned_block}{target_addendum}\n"
+        f"{pinned_block}{target_addendum}{preset_block}\n"
         f"Target: {target_label}\n"
     )
 

@@ -344,6 +344,10 @@ export interface HiggsfieldGenerateImageRequest {
   soul_id?: string;
   account_id?: string;
   campaign_id?: string;
+  /** Local library asset ids to feed the model as REFERENCE images (the
+   * operator's own hotel / property photos) so the generation is anchored to
+   * that real subject. Requires a reference-capable model. */
+  reference_asset_ids?: string[];
 }
 
 export interface StudioJobStatus {
@@ -568,12 +572,48 @@ export interface ExtractBriefRequest {
    * operator-verified claims. */
   account_id?: string;
   campaign_id?: string;
+  /** Creative preset. 'demand_gen' → corporate-brand, text-free, premium
+   * editorial image prompts at Demand Gen slot aspects. */
+  preset?: string;
+  /** Short note describing the operator's attached reference assets so every
+   * drafted variant anchors to that real subject. */
+  reference_note?: string;
 }
 export function studioExtractBrief(body: ExtractBriefRequest): Promise<ExtractBriefResponse> {
   return request<ExtractBriefResponse>('/studio/extract-brief', {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+// ── Demand Gen push-to-ad (in-place image refresh on a live ad) ──
+export interface DemandGenUpdateImagesRequest {
+  /** Target ad — either the resource name, or both ad_group_id + ad_id. */
+  ad_resource_name?: string;
+  ad_group_id?: string;
+  ad_id?: string;
+  mode: 'replace' | 'append';
+  logos?: string[];
+  landscape_images?: string[];
+  square_images?: string[];
+  portrait_images?: string[];
+  tall_portrait_images?: string[];
+}
+export interface DemandGenUpdateImagesResponse {
+  ad_id: string;
+  ad_resource_name: string;
+  mode: string;
+  updated_slots: Record<string, string[]>;
+  field_mask: string[];
+}
+export function demandGenUpdateAdImages(
+  accountId: string,
+  body: DemandGenUpdateImagesRequest,
+): Promise<DemandGenUpdateImagesResponse> {
+  return request<DemandGenUpdateImagesResponse>(
+    `/accounts/${accountId}/demand-gen/update-ad-images`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
 }
 
 /**

@@ -69,6 +69,13 @@ class GenerateImageRequest(BaseModel):
     soul_id: Optional[str] = None
     account_id: Optional[str] = None
     campaign_id: Optional[str] = None
+    # Local library asset ids (from /api/assets/upload or a prior generation)
+    # to feed the model as REFERENCE images — e.g. the operator's own hotel /
+    # property photos. Each is uploaded to Higgsfield and passed as `--image`
+    # so the generation is anchored to that real subject (image-to-image /
+    # reference-conditioned). Requires a reference-capable model (Nano Banana,
+    # GPT Image, Soul); ignored by models that take no reference input.
+    reference_asset_ids: Optional[list[str]] = None
 
 
 class GenerateImageResponse(BaseModel):
@@ -301,6 +308,7 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
                 prompt=body.prompt,
                 aspect_ratio=aspect,
                 soul_id=body.soul_id,
+                reference_asset_ids=body.reference_asset_ids,
             )
         )
         _BACKGROUND_TASKS.add(task)
@@ -500,6 +508,48 @@ async def stream_job(asset_id: str) -> StreamingResponse:
 # ── Worker ────────────────────────────────────────────────────────────
 
 
+async def _upload_reference_assets(
+    client: HiggsfieldClient, asset_ids: list[str],
+) -> list[str]:
+    """Map local library asset ids → Higgsfield upload ids for use as
+    `--image` references.
+
+    Reuses `creative_images.locate_local_image` (the same DB-row-is-truth
+    resolver the Google Ads image pipeline uses) to find each asset's on-disk
+    bytes, then `client.upload_media` to register it with Higgsfield. A
+    reference that can't be located on disk is skipped (logged) rather than
+    failing the whole generation; if EVERY requested reference is unusable the
+    caller surfaces that so the operator isn't silently given an un-anchored
+    image. Raises HiggsfieldError only when the Higgsfield upload itself fails.
+    """
+    from google_ads.services.campaign.creative_images import locate_local_image
+
+    upload_ids: list[str] = []
+    located_any = False
+    for ref in asset_ids:
+        try:
+            path, _mime = await locate_local_image(ref)
+        except LookupError as e:
+            logger.warning("reference asset %s not locatable, skipping: %s", ref, e)
+            continue
+        located_any = True
+        envelope = await client.upload_media(file_path=str(path))
+        up_id = None
+        if isinstance(envelope, dict):
+            up_id = envelope.get("id") or (envelope.get("upload") or {}).get("id")
+        if up_id:
+            upload_ids.append(str(up_id))
+    if asset_ids and not located_any:
+        raise HiggsfieldError(
+            message=(
+                "none of the selected reference images could be found on this "
+                "server — re-upload them and try again"
+            ),
+            code="shape",
+        )
+    return upload_ids
+
+
 async def _run_image_job(
     *,
     asset_id: str,
@@ -507,22 +557,48 @@ async def _run_image_job(
     prompt: str,
     aspect_ratio: str,
     soul_id: Optional[str],
+    reference_asset_ids: Optional[list[str]] = None,
 ) -> None:
     """Background task: submit higgsfield, download result, update row.
 
     Never raises — all failures land in `status=failed` so the FE always
     sees a terminal state. Acquires the global semaphore to enforce the
     6-job parallelism cap.
+
+    When `reference_asset_ids` are supplied, each local library image is
+    uploaded to Higgsfield first and passed as an `--image` reference so the
+    generation is anchored to the operator's own subject (their real hotel /
+    property photos) rather than an invented scene.
     """
     async with _GENERATION_SEMAPHORE:
         await _update_asset_status(asset_id, status="running")
         client = HiggsfieldClient()
+
+        # Resolve reference library assets → Higgsfield upload ids (best-effort:
+        # a missing/failed reference is skipped so the generation still runs,
+        # but a total failure of all requested references is surfaced).
+        reference_upload_ids: list[str] = []
+        if reference_asset_ids:
+            try:
+                reference_upload_ids = await _upload_reference_assets(
+                    client, reference_asset_ids,
+                )
+            except HiggsfieldError as e:
+                await _update_asset_status(
+                    asset_id, status="failed",
+                    error_code=e.code or "run",
+                    error_message=f"reference upload failed: {e.message}",
+                )
+                logger.warning("higgsfield reference upload failed (asset=%s): %s", asset_id, e.message)
+                return
+
         try:
             result = await client.submit_image(
                 model=model,
                 prompt=prompt,
                 aspect_ratio=aspect_ratio,
                 **({"soul_id": soul_id} if soul_id else {}),
+                **({"image": reference_upload_ids} if reference_upload_ids else {}),
             )
         except HiggsfieldError as e:
             await _update_asset_status(
@@ -613,6 +689,14 @@ class ExtractBriefRequest(BaseModel):
     # these, social-proof falls back to composition-only authority.
     account_id: Optional[str] = None
     campaign_id: Optional[str] = None
+    # Creative preset that tunes Stage 2. 'demand_gen' produces corporate-
+    # brand, text-free, premium-editorial image prompts at Demand Gen slot
+    # aspects (1.91:1 / 1:1 / optional 4:5). Omit for the default flow.
+    preset: Optional[str] = None
+    # When the operator attached their OWN reference assets (hotel/property
+    # photos), a short note describing them (e.g. filenames) so every drafted
+    # variant anchors to that real subject instead of a generic invented scene.
+    reference_note: Optional[str] = None
 
 
 class BriefVariant(BaseModel):
@@ -711,6 +795,8 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
             target=body.target,
             account_id=body.account_id,
             campaign_id=body.campaign_id,
+            preset=body.preset,
+            reference_note=body.reference_note,
         )
     except PromptDrafterError as e:
         raise HTTPException(

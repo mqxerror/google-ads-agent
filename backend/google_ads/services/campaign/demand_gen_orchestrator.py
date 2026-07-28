@@ -82,10 +82,15 @@ from google.ads.googleads.v23.services.types.ad_group_service import (
     AdGroupOperation,
     MutateAdGroupsRequest,
 )
+from google.ads.googleads.v23.services.types.ad_service import (
+    AdOperation,
+    MutateAdsRequest,
+)
 from google.ads.googleads.v23.services.types.campaign_service import (
     CampaignOperation,
     MutateCampaignsRequest,
 )
+from google.protobuf import field_mask_pb2
 
 from google_ads.sdk_client import get_sdk_client
 from google_ads.services.assets.asset_service import AssetService
@@ -147,6 +152,13 @@ DEFAULT_CHANNELS = {
     "display": True,
 }
 
+# How an image-refresh call folds NEW refs into a live ad. `replace` swaps the
+# slot's image list wholesale (the reject-the-AI-creative → push-my-own-photos
+# flow); `append` keeps the ad's current images and adds the new ones after
+# them (A/B a variant without dropping the incumbent). Only the slots the
+# caller supplies refs for are touched — untouched slots keep their live value.
+UPDATE_MODES = ("replace", "append")
+
 
 class DemandGenValidationError(Exception):
     """Raised when the input bundle doesn't meet Demand Gen's minimums.
@@ -181,6 +193,19 @@ class DemandGenStepError(Exception):
             f"Demand Gen create failed at step '{step}'. {cleanup} "
             f"Underlying error: {original}"
         )
+
+
+class DemandGenAdUpdateError(Exception):
+    """Raised when the in-place image update fails at the Google API call.
+
+    Carries the operator-useful message so the REST route / chat agent can show
+    it verbatim. No rollback is needed: an ad-image update is a single mutate
+    that either lands or doesn't — a rejected request changes nothing live.
+    """
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
 
 
 def _extract_resource_name(mutate_response: Dict[str, Any]) -> str:
@@ -280,6 +305,51 @@ def _validate_bundle(bundle: Dict[str, Any]) -> None:
         raise DemandGenValidationError(errs)
 
 
+def _validate_update_bundle(bundle: Dict[str, Any]) -> None:
+    """Pre-flight for an in-place ad-image update (no campaign create).
+
+    Requires (a) a way to name the target ad — either ``ad_resource_name`` or
+    both ``ad_group_id`` + ``ad_id`` — (b) a valid ``mode``, and (c) at least
+    one image ref in at least one slot (an update that touches nothing is a
+    caller mistake, not a no-op we should silently accept). Image aspect / size
+    is verified separately by ``_resolve_image_plan`` at push time; logo count
+    is capped here to mirror the create path.
+    """
+    errs: List[str] = []
+
+    has_rn = bool(bundle.get("ad_resource_name"))
+    has_pair = bool(bundle.get("ad_group_id") and bundle.get("ad_id"))
+    if not (has_rn or has_pair):
+        errs.append(
+            "target ad is required — pass ad_resource_name "
+            "(customers/<cid>/ads/<ad_id>) or both ad_group_id and ad_id"
+        )
+
+    mode = str(bundle.get("mode") or "replace").lower()
+    if mode not in UPDATE_MODES:
+        errs.append(f"mode must be one of {list(UPDATE_MODES)} (got {mode!r})")
+
+    mi = bundle.get("marketing_images") or {}
+    logos = bundle.get("logos") or []
+    any_images = bool(
+        logos
+        or mi.get("landscape")
+        or mi.get("square")
+        or mi.get("portrait")
+        or mi.get("tall_portrait")
+    )
+    if not any_images:
+        errs.append(
+            "provide at least one image ref in a slot (logos / landscape / "
+            "square / portrait / tall_portrait) — nothing to update otherwise"
+        )
+    if len(logos) > MAX_LOGOS:
+        errs.append(f"too many logos: {len(logos)} (max {MAX_LOGOS})")
+
+    if errs:
+        raise DemandGenValidationError(errs)
+
+
 class DemandGenOrchestrator:
     """The Demand Gen recipe. Holds references to each primitive service so
     it can sequence them and roll back on failure."""
@@ -293,6 +363,7 @@ class DemandGenOrchestrator:
         self._ad_group_client: Optional[Any] = None
         self._ad_group_ad_client: Optional[Any] = None
         self._ad_group_criterion_client: Optional[Any] = None
+        self._ad_client: Optional[Any] = None
         self._google_ads: Optional[Any] = None
 
     # ── lazy SDK clients (same pattern as the per-resource services) ──────
@@ -329,6 +400,16 @@ class DemandGenOrchestrator:
         return self._ad_group_criterion_client
 
     @property
+    def ad_client(self) -> Any:
+        """AdService client — the in-place image update mutates the shared `Ad`
+        resource (customers/<cid>/ads/<id>), NOT the AdGroupAd wrapper, so the
+        same ad id / history / text survive (mirrors AdService.update_rsa_pins).
+        """
+        if self._ad_client is None:
+            self._ad_client = get_sdk_client().client.get_service("AdService")
+        return self._ad_client
+
+    @property
     def google_ads_client(self) -> Any:
         if self._google_ads is None:
             self._google_ads = get_sdk_client().client.get_service("GoogleAdsService")
@@ -361,6 +442,37 @@ class DemandGenOrchestrator:
             if w and h:
                 dims[row.asset.resource_name] = (w, h)
         return dims
+
+    def _fetch_current_ad_images(
+        self, customer_id: str, ad_id: str
+    ) -> Dict[str, List[str]]:
+        """Read the live DemandGenMultiAssetAd's current image asset resource
+        names, keyed by the abstract slot names in ``IMAGE_SLOT_TO_AD_FIELD``.
+
+        Only used by ``mode='append'`` — replace never needs the incumbents.
+        Isolated (like ``_fetch_image_asset_dims``) so unit tests can stub it
+        without a live SDK client. Returns every slot with a (possibly empty)
+        list so callers can index safely.
+        """
+        out: Dict[str, List[str]] = {slot: [] for slot in IMAGE_SLOT_TO_AD_FIELD}
+        fields = ", ".join(
+            f"ad_group_ad.ad.demand_gen_multi_asset_ad.{field_name}"
+            for field_name in IMAGE_SLOT_TO_AD_FIELD.values()
+        )
+        query = (
+            f"SELECT {fields} FROM ad_group_ad "
+            f"WHERE ad_group_ad.ad.id = {ad_id} LIMIT 1"
+        )
+        for row in self.google_ads_client.search(
+            customer_id=customer_id, query=query
+        ):
+            info = row.ad_group_ad.ad.demand_gen_multi_asset_ad
+            for slot, field_name in IMAGE_SLOT_TO_AD_FIELD.items():
+                out[slot] = [
+                    img.asset for img in getattr(info, field_name) if img.asset
+                ]
+            break
+        return out
 
     async def _resolve_image_plan(
         self, customer_id: str, bundle: Dict[str, Any]
@@ -845,6 +957,152 @@ class DemandGenOrchestrator:
                 step=failed_step, original=e, rollback_report=rollback_report
             ) from e
 
+    async def update_ad_images(
+        self,
+        ctx: Context,
+        customer_id: str,
+        bundle: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Swap / add image creatives on an EXISTING DemandGenMultiAssetAd.
+
+        The reject-the-AI-creative → iterate-with-my-own-photos flow: a Studio
+        selection (uploaded property photos and/or freshly generated images)
+        replaces or appends the ad's image assets IN PLACE — same ad id, same
+        text, same history — never a delete-and-recreate.
+
+        Pipeline (mirrors the create path's image handling, reused not
+        duplicated):
+
+          1. Pre-flight ``_resolve_image_plan`` — classify every new ref as a
+             Google asset (pass-through, aspect-verified) or a local upload
+             UUID (center-crop to the slot's EXACT aspect, transcode, size-cap).
+             A bad image fails as a clean ``DemandGenValidationError`` here,
+             before anything touches the live ad.
+          2. ``_upload_images`` — push local bytes to Google image assets;
+             pre-existing Google refs pass through.
+          3. ``mode='append'`` only — read the ad's live images per slot.
+          4. Build a ``DemandGenMultiAssetAdInfo`` carrying ONLY the touched
+             slots and an ``AdOperation`` update masked to exactly those image
+             fields (``demand_gen_multi_asset_ad.<field>``). Untouched slots
+             keep their live value; text / business_name / CTA are never in the
+             mask so they are preserved.
+
+        Returns::
+
+            {
+                "ad_id": str,
+                "ad_resource_name": str,
+                "mode": "replace" | "append",
+                "updated_slots": {<slot>: [<image_asset_id>, ...], ...},
+                "field_mask": ["demand_gen_multi_asset_ad.<field>", ...],
+            }
+
+        Raises ``DemandGenValidationError`` pre-flight; ``DemandGenAdUpdateError``
+        when the Google mutate itself is rejected (nothing changed live).
+        """
+        _validate_update_bundle(bundle)
+        customer_id = format_customer_id(customer_id)
+        mode = str(bundle.get("mode") or "replace").lower()
+
+        # Resolve the target ad's resource name + numeric id. The `Ad` resource
+        # is keyed by ad id alone (not the ad-group composite), matching
+        # AdService.update_rsa_pins.
+        ad_rn = bundle.get("ad_resource_name")
+        if ad_rn:
+            resource_name = str(ad_rn)
+            ad_id = resource_name.rstrip("/").rsplit("/", 1)[-1]
+        else:
+            ad_id = str(bundle["ad_id"])
+            resource_name = f"customers/{customer_id}/ads/{ad_id}"
+
+        # 1 — classify + crop + aspect-verify every NEW image ref pre-flight.
+        image_plan = await self._resolve_image_plan(customer_id, bundle)
+
+        # 2 — bridge local uploads to Google image assets (google refs pass
+        #     through unchanged).
+        new_rns_by_slot = await self._upload_images(
+            ctx=ctx,
+            customer_id=customer_id,
+            name=str(bundle.get("name") or f"DG ad {ad_id} image refresh"),
+            image_plan=image_plan,
+        )
+        provided = {slot for slot, rns in new_rns_by_slot.items() if rns}
+        if not provided:
+            # _validate_update_bundle already guarantees ≥1 ref, but resolve can
+            # legitimately end with nothing (e.g. all refs empty strings) — fail
+            # closed rather than send an empty field mask (FIELD_MASK_MISSING).
+            raise DemandGenValidationError(
+                ["no resolvable image refs after pre-flight — nothing to update"]
+            )
+
+        # 3 — append mode: fold in the ad's current images per touched slot.
+        current_by_slot: Dict[str, List[str]] = {}
+        if mode == "append":
+            current_by_slot = self._fetch_current_ad_images(customer_id, ad_id)
+
+        # 4 — build the partial ad + field mask over exactly the touched slots.
+        info = DemandGenMultiAssetAdInfo()
+        paths: List[str] = []
+        updated_slots: Dict[str, List[str]] = {}
+        for slot, field_name in IMAGE_SLOT_TO_AD_FIELD.items():  # stable order
+            if slot not in provided:
+                continue
+            combined: List[str] = []
+            if mode == "append":
+                combined.extend(current_by_slot.get(slot, []))
+            combined.extend(new_rns_by_slot[slot])
+            # De-dup preserving order (append can re-list an incumbent).
+            seen: set[str] = set()
+            ordered: List[str] = []
+            for rn in combined:
+                if rn and rn not in seen:
+                    seen.add(rn)
+                    ordered.append(rn)
+            repeated = getattr(info, field_name)
+            for rn in ordered:
+                repeated.append(AdImageAsset(asset=rn))
+            paths.append(f"demand_gen_multi_asset_ad.{field_name}")
+            updated_slots[slot] = ordered
+
+        ad = Ad()
+        ad.resource_name = resource_name
+        ad.demand_gen_multi_asset_ad = info
+
+        op = AdOperation()
+        op.update = ad
+        op.update_mask.CopyFrom(field_mask_pb2.FieldMask(paths=paths))
+        request = MutateAdsRequest()
+        request.customer_id = customer_id
+        request.operations = [op]
+
+        await ctx.log(
+            level="info",
+            message=(
+                f"[DemandGen] {mode.upper()} images on ad {ad_id}: "
+                f"{', '.join(f'{s}×{len(rns)}' for s, rns in updated_slots.items())}"
+            ),
+        )
+        try:
+            resp = self.ad_client.mutate_ads(request=request)
+        except GoogleAdsException as e:
+            raise DemandGenAdUpdateError(
+                f"Google Ads rejected the image update for ad {ad_id} "
+                f"(nothing changed): {e.failure}"
+            ) from e
+
+        return {
+            "ad_id": ad_id,
+            "ad_resource_name": _extract_resource_name(
+                serialize_proto_message(resp)
+            ),
+            "mode": mode,
+            "updated_slots": {
+                slot: [_id_from_resource_name(rn) for rn in rns]
+                for slot, rns in updated_slots.items()
+            },
+            "field_mask": paths,
+        }
+
     async def _post_create_sync(
         self,
         ctx: Context,
@@ -1155,9 +1413,104 @@ def create_demand_gen_orchestrator_tools(
     return [create_demand_gen_campaign]
 
 
+def create_demand_gen_ad_image_tools(
+    service: DemandGenOrchestrator,
+) -> List[Callable[..., Awaitable[Any]]]:
+    """Wrap the in-place image-update flow as FastMCP tool function(s).
+
+    Kept as a SEPARATE factory from ``create_demand_gen_orchestrator_tools`` so
+    the create tool's call-sites / tests that unpack a single-element tuple stay
+    intact; both factories share the one ``DemandGenOrchestrator`` instance.
+    """
+
+    async def update_ad_images(
+        ctx: Context,
+        customer_id: str,
+        ad_group_id: Optional[str] = None,
+        ad_id: Optional[str] = None,
+        ad_resource_name: Optional[str] = None,
+        mode: str = "replace",
+        landscape_images: Optional[List[str]] = None,
+        square_images: Optional[List[str]] = None,
+        portrait_images: Optional[List[str]] = None,
+        tall_portrait_images: Optional[List[str]] = None,
+        logos: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Replace or append the image creatives on an existing Demand Gen ad.
+
+        The iterate-in-Studio flow: after rejecting the auto-generated creative,
+        push your OWN property photos (uploaded to the Studio library) and/or
+        freshly generated images onto the live ad IN PLACE — same ad id, text,
+        and history preserved (only the masked image slots change).
+
+        Every image ref may be a Google Ads asset resource name
+        (customers/<cid>/assets/<id>), a bare numeric asset id, OR a local asset
+        UUID from /api/assets/upload or a Studio generation — local files are
+        uploaded to Google and center-cropped to each slot's EXACT aspect
+        automatically (logo/square 1:1, landscape 1.91:1, portrait 4:5, tall
+        9:16). Off-aspect or below-minimum images fail pre-flight before the
+        live ad is touched.
+
+        Args:
+            customer_id: Google Ads customer ID.
+            ad_group_id: The ad group ID (with ``ad_id`` when
+                ``ad_resource_name`` is not supplied).
+            ad_id: The ad ID (with ``ad_group_id`` when ``ad_resource_name`` is
+                not supplied).
+            ad_resource_name: Full ad resource name
+                (customers/<cid>/ads/<ad_id>); overrides ad_group_id/ad_id.
+            mode: 'replace' (default — swap the slot's images wholesale) or
+                'append' (keep the ad's current images, add the new ones after).
+            landscape_images: 1.91:1 marketing image refs.
+            square_images: 1:1 marketing image refs.
+            portrait_images: 4:5 portrait marketing image refs.
+            tall_portrait_images: 9:16 tall portrait marketing image refs.
+            logos: 1:1 logo image refs (max 5).
+
+        Only the slots you pass refs for are touched; omitted slots keep their
+        live images. At least one image ref in one slot is required.
+
+        Returns:
+            {
+                "ad_id": "...",
+                "ad_resource_name": "...",
+                "mode": "replace" | "append",
+                "updated_slots": {"landscape": ["<asset_id>", ...], ...},
+                "field_mask": ["demand_gen_multi_asset_ad.marketing_images", ...]
+            }
+        """
+        bundle = {
+            "ad_group_id": ad_group_id,
+            "ad_id": ad_id,
+            "ad_resource_name": ad_resource_name,
+            "mode": mode,
+            "logos": logos or [],
+            "marketing_images": {
+                "landscape": landscape_images or [],
+                "square": square_images or [],
+                "portrait": portrait_images or [],
+                "tall_portrait": tall_portrait_images or [],
+            },
+        }
+        try:
+            return await service.update_ad_images(
+                ctx=ctx, customer_id=customer_id, bundle=bundle
+            )
+        except DemandGenValidationError as e:
+            return {"error": "VALIDATION_FAILED", "errors": e.errors}
+
+    return [update_ad_images]
+
+
 def register_demand_gen_tools(mcp: FastMCP[Any]) -> DemandGenOrchestrator:
-    """Register the Demand Gen orchestrator tool with the FastMCP server."""
+    """Register the Demand Gen orchestrator tools with the FastMCP server.
+
+    One shared orchestrator backs both the single-shot campaign create and the
+    in-place image-update tool.
+    """
     service = DemandGenOrchestrator()
     for tool in create_demand_gen_orchestrator_tools(service):
+        mcp.tool(tool)
+    for tool in create_demand_gen_ad_image_tools(service):
         mcp.tool(tool)
     return service

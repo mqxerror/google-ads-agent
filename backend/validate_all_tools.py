@@ -148,6 +148,8 @@ def fetch_real_ids() -> Dict[str, Any]:
         "conversion_custom_variable_id": None,
         "image_asset_id": None,
         "image_asset_rn": None,
+        "demand_gen_ad_id": None,        # a live DemandGenMultiAssetAd (ad id)
+        "demand_gen_ad_rn": None,        # ...its Ad resource name
         "text_asset_id": None,          # a TEXT asset (for HEADLINE/DESCRIPTION)
         "sitelink_asset_id": None,      # a SITELINK asset (for SITELINK field)
         "youtube_video_id": None,
@@ -473,6 +475,19 @@ def fetch_real_ids() -> Dict[str, Any]:
             ids["keyword_plan_id"] = str(rows[0].keyword_plan.id)
             ids["keyword_plan_rn"] = rows[0].keyword_plan.resource_name
 
+    def _demand_gen_ad() -> None:
+        # A live DemandGenMultiAssetAd — the only ad type the image-refresh
+        # tool can validly target. Absent in most test accounts -> honest SKIP.
+        rows = _search(
+            "SELECT ad_group_ad.ad.id, ad_group_ad.ad.resource_name "
+            "FROM ad_group_ad "
+            "WHERE ad_group_ad.ad.type = 'DEMAND_GEN_MULTI_ASSET_AD' "
+            "AND ad_group_ad.status != 'REMOVED' LIMIT 5"
+        )
+        if rows:
+            ids["demand_gen_ad_id"] = str(rows[0].ad_group_ad.ad.id)
+            ids["demand_gen_ad_rn"] = rows[0].ad_group_ad.ad.resource_name
+
     _try("ad_group", _ad_groups)
     _try("keyword", _keyword)
     _try("campaigns", _campaigns)
@@ -503,6 +518,7 @@ def fetch_real_ids() -> Dict[str, Any]:
     _try("youtube_asset", _youtube_asset)
     _try("remarketing_action", _remarketing_action)
     _try("keyword_plan", _keyword_plan)
+    _try("demand_gen_ad", _demand_gen_ad)
     return ids
 
 
@@ -1468,6 +1484,18 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         # the harness row documents the channel-control contract.
         "enable_gmail": False,
         "enable_display": True,
+    },
+    # In-place image refresh on a LIVE Demand Gen multi-asset ad. Fail-closed to
+    # SKIP unless BOTH a real DemandGenMultiAssetAd (demand_gen_ad_rn) AND a real
+    # IMAGE asset (image_asset_id) are harvested. mode='replace' so no live read
+    # runs; the masked mutate is forced validate_only. The harvested generic
+    # image is aspect-verified pre-flight, so a wrong-aspect one is rejected as
+    # VALIDATION_FAILED before any mutate — no live entity is touched.
+    "demand_gen_update_ad_images": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "ad_resource_name": _req(ids["demand_gen_ad_rn"], _ABSENT + " (demand_gen ad)"),
+        "mode": "replace",
+        "landscape_images": [_req(ids["image_asset_id"], "no image_asset_id")],
     },
     # ── recommendation ────────────────────────────────────────────────────
     "recommendation_apply_recommendation": lambda ids: {

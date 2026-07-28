@@ -514,13 +514,22 @@ def _build_cli_argv(
     # `soul_id` → `--soul-id` is the only key we rename (`_` to `-`)
     # because that's how Higgsfield's CLI flag is spelled. Everything
     # else passes through with its key unchanged.
+    #
+    # A LIST/TUPLE value repeats the flag (e.g. `image=[id1, id2]` →
+    # `--image id1 --image id2`). This is exactly how the CLI takes multiple
+    # reference images on `generate create` (same repeated-`--image` shape
+    # `soul-id create` uses); a scalar keeps the single-flag form.
     for key, value in params.items():
         if value is None or value == "":
             continue
-        if key == "soul_id":
-            argv.extend(["--soul-id", str(value)])
+        flag = "--soul-id" if key == "soul_id" else f"--{key}"
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                if item is None or item == "":
+                    continue
+                argv.extend([flag, str(item)])
         else:
-            argv.extend([f"--{key}", str(value)])
+            argv.extend([flag, str(value)])
     return argv
 
 

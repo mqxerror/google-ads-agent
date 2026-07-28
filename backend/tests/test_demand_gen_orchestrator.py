@@ -44,6 +44,10 @@ from google.ads.googleads.v23.services.types.ad_group_service import (
     MutateAdGroupResult,
     MutateAdGroupsResponse,
 )
+from google.ads.googleads.v23.services.types.ad_service import (
+    MutateAdResult,
+    MutateAdsResponse,
+)
 from google.ads.googleads.v23.services.types.campaign_service import (
     MutateCampaignResult,
     MutateCampaignsResponse,
@@ -52,10 +56,13 @@ from google.ads.googleads.v23.services.types.campaign_service import (
 from google_ads.services.campaign import demand_gen_orchestrator as dg
 from google_ads.services.campaign.demand_gen_orchestrator import (
     ApiCtx,
+    DemandGenAdUpdateError,
     DemandGenOrchestrator,
     DemandGenStepError,
     DemandGenValidationError,
     _validate_bundle,
+    _validate_update_bundle,
+    create_demand_gen_ad_image_tools,
     create_demand_gen_orchestrator_tools,
 )
 
@@ -408,6 +415,214 @@ class ToolWrapperTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(out["errors"])
 
 
+# ── in-place image update (push-to-ad) ───────────────────────────────────
+def _update_orchestrator():
+    """A DemandGenOrchestrator wired for the image-update path only: a fake
+    AdService client (captures the mutate) + a fake AssetService (records
+    uploads). `_fetch_current_ad_images` is left real so append tests can stub
+    it explicitly."""
+    orch = DemandGenOrchestrator()
+    fake_assets = _FakeAssetService()
+    orch._asset = fake_assets  # type: ignore[assignment]
+    orch._ad_client = _FakeMutateClient(  # type: ignore[assignment]
+        "mutate_ads",
+        MutateAdsResponse(
+            results=[MutateAdResult(resource_name=f"customers/{CUSTOMER}/ads/818")]
+        ),
+    )
+    return orch, fake_assets
+
+
+class UpdateValidationTests(unittest.TestCase):
+    def _bundle(self, **overrides):
+        b = {
+            "ad_resource_name": f"customers/{CUSTOMER}/ads/818",
+            "mode": "replace",
+            "logos": [],
+            "marketing_images": {
+                "landscape": ["land-uuid"], "square": [],
+                "portrait": [], "tall_portrait": [],
+            },
+        }
+        b.update(overrides)
+        return b
+
+    def test_valid_update_bundle_passes(self):
+        _validate_update_bundle(self._bundle())  # no raise
+
+    def test_missing_ad_reference_rejected(self):
+        with self.assertRaises(DemandGenValidationError) as cm:
+            _validate_update_bundle(self._bundle(ad_resource_name=None))
+        self.assertIn("target ad is required", "; ".join(cm.exception.errors))
+
+    def test_ad_group_id_plus_ad_id_is_accepted(self):
+        _validate_update_bundle(
+            self._bundle(ad_resource_name=None, ad_group_id="205", ad_id="818")
+        )  # no raise
+
+    def test_no_images_rejected(self):
+        with self.assertRaises(DemandGenValidationError) as cm:
+            _validate_update_bundle(self._bundle(marketing_images={
+                "landscape": [], "square": [], "portrait": [], "tall_portrait": []}))
+        self.assertIn("at least one image", "; ".join(cm.exception.errors))
+
+    def test_bad_mode_rejected(self):
+        with self.assertRaises(DemandGenValidationError) as cm:
+            _validate_update_bundle(self._bundle(mode="destroy"))
+        self.assertIn("mode must be one of", "; ".join(cm.exception.errors))
+
+    def test_too_many_logos_rejected(self):
+        with self.assertRaises(DemandGenValidationError) as cm:
+            _validate_update_bundle(self._bundle(logos=[f"l{i}" for i in range(6)]))
+        self.assertIn("too many logos", "; ".join(cm.exception.errors))
+
+
+class UpdateAdImagesFlowTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        # 16:9 source → cropped per slot (landscape 1.91:1, square/logo 1:1).
+        self.img_path = Path(self._tmp.name) / "hotel.png"
+        Image.new("RGB", (1600, 900), (18, 52, 96)).save(self.img_path, "PNG")
+
+        async def locate(ref):
+            if ref in ("hotel-uuid", "logo-uuid", "sq-uuid"):
+                return self.img_path, "image/png"
+            raise LookupError("unknown local ref")
+
+        self._orig_locate = dg._locate_local_image
+        dg._locate_local_image = locate  # type: ignore[assignment]
+
+    def tearDown(self) -> None:
+        dg._locate_local_image = self._orig_locate  # type: ignore[assignment]
+        self._tmp.cleanup()
+
+    def _bundle(self, **overrides):
+        b = {
+            "ad_resource_name": f"customers/{CUSTOMER}/ads/818",
+            "mode": "replace",
+            "logos": [],
+            "marketing_images": {
+                "landscape": ["hotel-uuid"], "square": [],
+                "portrait": [], "tall_portrait": [],
+            },
+        }
+        b.update(overrides)
+        return b
+
+    async def test_replace_masks_only_touched_slot(self):
+        orch, fake_assets = _update_orchestrator()
+        result = await orch.update_ad_images(ApiCtx(), CUSTOMER, self._bundle())
+
+        # Exactly one mutate, on the AdService (the shared Ad resource).
+        self.assertEqual(len(orch._ad_client.requests), 1)
+        op = orch._ad_client.requests[0].operations[0]
+        # Field mask covers ONLY the provided landscape slot.
+        self.assertEqual(list(op.update_mask.paths),
+                         ["demand_gen_multi_asset_ad.marketing_images"])
+        info = op.update.demand_gen_multi_asset_ad
+        self.assertEqual(len(info.marketing_images), 1)
+        self.assertEqual(len(info.square_marketing_images), 0)
+        self.assertEqual(len(info.logo_images), 0)
+        # The image was uploaded to Google and cropped to 1.91:1.
+        self.assertEqual(len(fake_assets.image_uploads), 1)
+        self.assertAlmostEqual(
+            _aspect(fake_assets.image_uploads[0]["data"]), 1.91, delta=1.91 * 0.011)
+        # Result shape.
+        self.assertEqual(result["ad_id"], "818")
+        self.assertEqual(result["mode"], "replace")
+        self.assertIn("landscape", result["updated_slots"])
+        self.assertEqual(result["field_mask"],
+                         ["demand_gen_multi_asset_ad.marketing_images"])
+
+    async def test_replace_multiple_slots_each_cropped_to_own_aspect(self):
+        orch, fake_assets = _update_orchestrator()
+        bundle = self._bundle(
+            logos=["logo-uuid"],
+            marketing_images={"landscape": ["hotel-uuid"], "square": ["sq-uuid"],
+                              "portrait": [], "tall_portrait": []},
+        )
+        await orch.update_ad_images(ApiCtx(), CUSTOMER, bundle)
+        op = orch._ad_client.requests[0].operations[0]
+        self.assertEqual(set(op.update_mask.paths), {
+            "demand_gen_multi_asset_ad.marketing_images",
+            "demand_gen_multi_asset_ad.square_marketing_images",
+            "demand_gen_multi_asset_ad.logo_images",
+        })
+        info = op.update.demand_gen_multi_asset_ad
+        by_rn = {u["rn"]: u for u in fake_assets.image_uploads}
+        self.assertAlmostEqual(
+            _aspect(by_rn[info.marketing_images[0].asset]["data"]), 1.91, delta=1.91 * 0.011)
+        self.assertAlmostEqual(
+            _aspect(by_rn[info.square_marketing_images[0].asset]["data"]), 1.0, delta=0.011)
+        self.assertAlmostEqual(
+            _aspect(by_rn[info.logo_images[0].asset]["data"]), 1.0, delta=0.011)
+
+    async def test_append_keeps_incumbents_then_new(self):
+        orch, _ = _update_orchestrator()
+        old_rn = f"customers/{CUSTOMER}/assets/700"
+        orch._fetch_current_ad_images = lambda cid, ad_id: {  # type: ignore[method-assign]
+            "logos": [], "landscape": [old_rn], "square": [],
+            "portrait": [], "tall_portrait": [],
+        }
+        await orch.update_ad_images(ApiCtx(), CUSTOMER, self._bundle(mode="append"))
+        info = orch._ad_client.requests[0].operations[0].update.demand_gen_multi_asset_ad
+        # Incumbent first, new image second.
+        self.assertEqual(len(info.marketing_images), 2)
+        self.assertEqual(info.marketing_images[0].asset, old_rn)
+        self.assertNotEqual(info.marketing_images[1].asset, old_rn)
+
+    async def test_append_dedupes_incumbent_already_present(self):
+        orch, fake_assets = _update_orchestrator()
+        # Pre-existing Google ref supplied AND already on the ad → appears once.
+        preexisting = f"customers/{CUSTOMER}/assets/900"
+        orch._fetch_image_asset_dims = lambda cid, rns: {preexisting: (1910, 1000)}  # type: ignore[method-assign]
+        orch._fetch_current_ad_images = lambda cid, ad_id: {  # type: ignore[method-assign]
+            "logos": [], "landscape": [preexisting], "square": [],
+            "portrait": [], "tall_portrait": [],
+        }
+        bundle = self._bundle(mode="append", marketing_images={
+            "landscape": ["900"], "square": [], "portrait": [], "tall_portrait": []})
+        await orch.update_ad_images(ApiCtx(), CUSTOMER, bundle)
+        info = orch._ad_client.requests[0].operations[0].update.demand_gen_multi_asset_ad
+        self.assertEqual([m.asset for m in info.marketing_images], [preexisting])
+
+    async def test_google_api_rejection_raises_update_error(self):
+        orch, _ = _update_orchestrator()
+        orch._ad_client = _RaisingGoogleAdsClient("mutate_ads")  # type: ignore[assignment]
+        with self.assertRaises(DemandGenAdUpdateError):
+            await orch.update_ad_images(ApiCtx(), CUSTOMER, self._bundle())
+
+    async def test_ad_resource_name_derives_ad_id(self):
+        orch, _ = _update_orchestrator()
+        result = await orch.update_ad_images(
+            ApiCtx(), CUSTOMER,
+            self._bundle(ad_resource_name=f"customers/{CUSTOMER}/ads/999"))
+        self.assertEqual(result["ad_id"], "999")
+        self.assertEqual(orch._ad_client.requests[0].operations[0].update.resource_name,
+                         f"customers/{CUSTOMER}/ads/999")
+
+
+class _RaisingGoogleAdsClient:
+    """Raises a real GoogleAdsException so the orchestrator's except clause
+    (which reads `e.failure`) is exercised, not a bare RuntimeError."""
+
+    def __init__(self, method_name: str) -> None:
+        setattr(self, method_name, self._boom)
+
+    def _boom(self, request):
+        from google.ads.googleads.errors import GoogleAdsException
+        raise GoogleAdsException(None, None, None, "req-id")
+
+
+class UpdateToolWrapperTests(unittest.IsolatedAsyncioTestCase):
+    async def test_validation_error_returned_structured(self):
+        svc = DemandGenOrchestrator()
+        (tool,) = create_demand_gen_ad_image_tools(svc)
+        out = await tool(ctx=ApiCtx(), customer_id=CUSTOMER)  # no ad, no images
+        self.assertEqual(out["error"], "VALIDATION_FAILED")
+        self.assertTrue(out["errors"])
+
+
 # ── registry + harness wiring ────────────────────────────────────────────
 class WiringTests(unittest.TestCase):
     TOOL = "demand_gen_create_demand_gen_campaign"
@@ -429,6 +644,35 @@ class WiringTests(unittest.TestCase):
         ids = {"image_asset_id": None, "geo_target_id": "21132", "language_id": "1000"}
         with self.assertRaises(vat.SkipTool):
             vat.HARVEST_TOOL_ARGS[self.TOOL](ids)
+
+
+class UpdateAdImagesWiringTests(unittest.TestCase):
+    TOOL = "demand_gen_update_ad_images"
+
+    def test_registered_under_exact_name(self):
+        from google_ads.tool_registry import registered_tool_names
+        self.assertIn(self.TOOL, registered_tool_names())
+
+    def test_in_execution_catalog_write(self):
+        from google_ads.tool_registry import execution_catalog
+        self.assertIn(self.TOOL, execution_catalog()["write"])
+
+    def test_classified_as_mutate(self):
+        import validate_all_tools as vat
+        self.assertTrue(vat.is_mutate_tool("update_ad_images"))
+
+    def test_harness_entry_present_and_fail_closed(self):
+        import validate_all_tools as vat
+        self.assertIn(self.TOOL, vat.HARVEST_TOOL_ARGS)
+        # No harvested DemandGen ad → SKIP (fail-closed, no live mutation).
+        with self.assertRaises(vat.SkipTool):
+            vat.HARVEST_TOOL_ARGS[self.TOOL](
+                {"demand_gen_ad_rn": None, "image_asset_id": "123"})
+        # DG ad present but no image asset → still SKIP.
+        with self.assertRaises(vat.SkipTool):
+            vat.HARVEST_TOOL_ARGS[self.TOOL](
+                {"demand_gen_ad_rn": f"customers/{CUSTOMER}/ads/818",
+                 "image_asset_id": None})
 
 
 if __name__ == "__main__":

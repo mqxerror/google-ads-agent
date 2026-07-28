@@ -28,11 +28,13 @@ import MarketingPresetsPanel from './MarketingPresetsPanel';
 import StudioPanel, { type StudioPanelPreset } from './StudioPanel';
 import AssetLibrary, { ASSETS_QUERY_KEY } from './AssetLibrary';
 import SoulCreator from './SoulCreator';
+import DemandGenCreative from './DemandGenCreative';
 
-type HubSection = 'library' | 'souls' | 'presets';
+type HubSection = 'library' | 'demand_gen' | 'souls' | 'presets';
 
 const SECTIONS: { key: HubSection; label: string }[] = [
   { key: 'library', label: 'Library' },
+  { key: 'demand_gen', label: 'Demand Gen' },
   { key: 'souls', label: 'Souls' },
   { key: 'presets', label: 'Presets' },
 ];
@@ -303,6 +305,13 @@ export default function StudioHome() {
           accountId={accountId}
           campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
           onCreate={() => openCreate('image')}
+          onUpload={() => fileInputRef.current?.click()}
+        />
+      )}
+
+      {section === 'demand_gen' && (
+        <DemandGenCreative
+          accountId={accountId}
           onUpload={() => fileInputRef.current?.click()}
         />
       )}
