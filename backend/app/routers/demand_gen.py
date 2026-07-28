@@ -187,6 +187,164 @@ async def create_demand_gen(
         )
 
 
+# ── Assisted copy drafting (mirrors app/routers/pmax.py::draft-copy) ──────
+#
+# The DG wizard's assisted flow drafts business_name + headlines + descriptions
+# from the campaign brief + landing page through the SAME pipeline PMax uses
+# (`stream_agent_response` with the creative_director role, no Google Ads
+# tools). It differs from PMax only in the OUTPUT shape: Demand Gen has NO long
+# headlines and DOES carry a business_name, and its hard limits are DG's
+# (headlines ≤5/≤30c, descriptions ≤5/≤90c, business_name ≤25c) — so a draft
+# can never exceed what `_validate_bundle` will later accept.
+#
+# Same job+poll shape as PMax: a single 1-3 min HTTP request kept dying when the
+# Vite dev proxy or either server blipped mid-draft, so the wizard POLLS. The
+# in-memory store is fine — drafts are ephemeral and single-process.
+
+
+class DGDraftRequest(BaseModel):
+    brief: str = ""
+    final_url: str = ""
+    business_name: str = ""
+    campaign_name: str = ""
+
+
+class DGDraftResponse(BaseModel):
+    business_name: str
+    headlines: List[str]
+    descriptions: List[str]
+
+
+# (min_count, max_count, max_chars) — enforced server-side on whatever the
+# model returns. Mirrors demand_gen_orchestrator._TEXT_RULES + BUSINESS_NAME_MAX.
+_DG_DRAFT_LIMITS = {
+    "headlines": (1, 5, 30),
+    "descriptions": (1, 5, 90),
+}
+_DG_BUSINESS_NAME_MAX = 25
+
+_dg_draft_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+async def _run_dg_draft_job(job_id: str, account_id: str, body: DGDraftRequest) -> None:
+    try:
+        result = await _draft_dg_copy_inner(account_id, body)
+        _dg_draft_jobs[job_id] = {"status": "done", "result": result.model_dump()}
+    except HTTPException as e:
+        detail = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
+        _dg_draft_jobs[job_id] = {"status": "error", "message": detail.get("message", "draft failed")}
+    except Exception as e:
+        logger.exception("Demand Gen draft job %s failed", job_id)
+        _dg_draft_jobs[job_id] = {"status": "error", "message": str(e)[:300]}
+
+
+@router.post("/accounts/{account_id}/demand-gen/draft-copy")
+async def start_draft_demand_gen_copy(account_id: str, body: DGDraftRequest) -> Dict[str, str]:
+    """Start a Creative Director draft job; poll GET .../demand-gen/draft-copy/{id}."""
+    import asyncio
+    import uuid as _uuid
+
+    job_id = str(_uuid.uuid4())
+    _dg_draft_jobs[job_id] = {"status": "running"}
+    asyncio.create_task(_run_dg_draft_job(job_id, account_id, body))
+    return {"draft_id": job_id, "status": "running"}
+
+
+@router.get("/demand-gen/draft-copy/{draft_id}")
+async def get_draft_demand_gen_copy(draft_id: str) -> Dict[str, Any]:
+    job = _dg_draft_jobs.get(draft_id)
+    if not job:
+        return {"status": "error", "message": "unknown draft id (server restarted?) — start a new draft"}
+    return job
+
+
+async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraftResponse:
+    """Draft Demand Gen text assets with the Creative Director role from the
+    campaign brief + landing page. Analysis-only (no Google Ads tools); the
+    agent may fetch the landing page to ground the copy. DG's hard limits are
+    re-enforced here so the wizard never receives an over-length or over-count
+    bundle — over-length lines are DROPPED (never truncated into garbage) and a
+    draft that yields too few valid lines fails so the operator regenerates."""
+    import json as _json
+    import re as _re
+
+    from app.services.agent import stream_agent_response
+
+    prompt = (
+        "Draft Google Demand Gen ad copy for this campaign. First fetch the "
+        "landing page to ground every claim — never invent offers or numbers.\n\n"
+        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
+        f"Business name (brand): {body.business_name or '-'}\n"
+        f"Campaign name: {body.campaign_name or '-'}\n"
+        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
+        "HARD LIMITS (Google rejects violations): business_name ≤25 chars, "
+        "headlines ≤30 chars each, descriptions ≤90 chars each. Provide up to 5 "
+        "headlines and up to 5 descriptions.\n"
+        "DEMAND GEN POLICY: NO prices or discounts in the copy · NO citizenship "
+        "or guaranteed-approval promises · avoid the symbols ~ | + (flagged as "
+        "gimmicky). No em dashes. No third-party brand names. Vary the angles: "
+        "benefit, aspiration, social proof, specificity.\n"
+        "business_name is the advertiser's SHORT brand label shown on the ad — "
+        "keep it the real brand (≤25 chars), not a slogan.\n\n"
+        "Respond with ONLY this JSON, no prose:\n"
+        '{"business_name": "<brand, ≤25 chars>", '
+        '"headlines": [3-5 strings ≤30 chars], '
+        '"descriptions": [3-5 strings ≤90 chars]}'
+    )
+
+    parts: list[str] = []
+    async for ev in stream_agent_response(
+        user_message=prompt,
+        account_id=account_id,
+        active_role="creative_director",
+        tool_allowlist=[],  # no Google Ads tools; built-in web fetch still works
+    ):
+        if ev.get("type") in ("text", "text_delta"):
+            parts.append(ev.get("content", ""))
+    raw = "".join(parts)
+
+    m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+    if not m:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "DRAFT_FAILED", "message": "Creative Director returned no JSON — try again."},
+        )
+    try:
+        parsed = _json.loads(m.group(0))
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "DRAFT_FAILED", "message": "Could not parse the draft — try again."},
+        )
+
+    out: Dict[str, List[str]] = {}
+    for field, (min_n, max_n, max_chars) in _DG_DRAFT_LIMITS.items():
+        items = [
+            s.strip() for s in (parsed.get(field) or [])
+            if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars
+        ]
+        out[field] = items[:max_n]
+        if len(out[field]) < min_n:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": "DRAFT_FAILED",
+                    "message": f"Draft produced too few valid {field} "
+                               f"({len(out[field])}/{min_n}) — try again.",
+                },
+            )
+
+    # business_name: the brand is a proper noun (unlikely to exceed 25), so
+    # clip defensively rather than fail; fall back to the operator's own entry
+    # from the brief step if the model omitted it or returned an empty value.
+    bn = str(parsed.get("business_name") or "").strip()
+    if not bn:
+        bn = (body.business_name or "").strip()
+    bn = bn[:_DG_BUSINESS_NAME_MAX]
+
+    return DGDraftResponse(business_name=bn, **out)
+
+
 class DemandGenUpdateImagesRequest(BaseModel):
     """Studio push-to-ad payload. All refs may be Google asset resource names,
     bare numeric asset ids, OR local library UUIDs (uploaded / generated) — the

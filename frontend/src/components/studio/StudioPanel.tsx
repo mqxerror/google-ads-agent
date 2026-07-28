@@ -63,9 +63,22 @@ export interface StudioPanelContext {
   slot?: string;
   /** Locks the aspect selector, e.g. "1:1". */
   aspect?: string;
+  /** Creative preset forwarded to the drafter (Enhance) — e.g. 'demand_gen'
+   * for corporate-brand, text-free, editorial image prompts. Hosts that don't
+   * set it keep the default flow unchanged. */
+  preset?: string;
+  /** Short note describing the operator's attached reference assets so every
+   * Enhance variant anchors to that real subject instead of a generic scene. */
+  referenceNote?: string;
+  /** Local library asset ids fed to the image model as REFERENCE images (the
+   * operator's own hotel / property photos) so the generation is anchored to
+   * that real subject. Requires a reference-capable model (the image default
+   * nano_banana_2 is). */
+  referenceAssetIds?: string[];
 }
 
 export interface CopyDraftResult {
+  business_name?: string;
   headlines?: string[];
   long_headlines?: string[];
   descriptions?: string[];
@@ -369,6 +382,10 @@ export default function StudioPanel({
         target: genKind,
         account_id: accountId,
         campaign_id: context?.campaignId,
+        // DG assisted flow: corporate-brand preset + anchor to the operator's
+        // attached reference photos. PMax leaves both unset → default flow.
+        preset: context?.preset,
+        reference_note: context?.referenceNote,
       });
       if (res.variants?.length) setAngleVariants(res.variants.filter((v) => v.prompt));
       else if (res.drafted_prompt) setPrompt(res.drafted_prompt);
@@ -450,6 +467,7 @@ export default function StudioPanel({
           soul_id: supportsSoul && soulId ? soulId : undefined,
           account_id: accountId,
           campaign_id: context?.campaignId,
+          reference_asset_ids: context?.referenceAssetIds?.length ? context.referenceAssetIds : undefined,
         });
         jobs.watch(res.asset_ids);
       }
@@ -481,6 +499,7 @@ export default function StudioPanel({
           variants_per_aspect: 1,
           soul_id: supportsSoul && soulId ? soulId : undefined,
           account_id: accountId, campaign_id: context?.campaignId,
+          reference_asset_ids: context?.referenceAssetIds?.length ? context.referenceAssetIds : undefined,
         });
         jobs.watchMore(res.asset_ids, [failedId]);
       }
@@ -903,6 +922,9 @@ export default function StudioPanel({
               )}
               {copyResult && (
                 <div className="space-y-2.5">
+                  {copyResult.business_name && (
+                    <CopyList label="Business name" items={[copyResult.business_name]} />
+                  )}
                   <CopyList label="Headlines" items={copyResult.headlines} />
                   <CopyList label="Long headlines" items={copyResult.long_headlines} />
                   <CopyList label="Descriptions" items={copyResult.descriptions} />

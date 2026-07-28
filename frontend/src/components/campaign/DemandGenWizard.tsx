@@ -36,6 +36,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+import StudioPanel, {
+  type CopyDraftResult,
+  type StudioPanelContext,
+} from '@/components/studio/StudioPanel';
+import type { StudioJobStatus } from '@/lib/api';
 
 const STEPS = [
   { id: 'brief',     label: 'Brief & budget'   },
@@ -75,6 +80,8 @@ interface DGBundle {
   finalUrl: string;
   businessName: string;
   brief: string;
+  corporateBrand: boolean;     // assisted image gen uses the demand_gen preset
+  referenceAssetIds: string[]; // operator's own hotel/property photos (local ids)
   targetCpa: string;           // optional dollars; blank = pure Maximize Conversions
   locationIds: string;         // comma-separated geo target constant ids
   excludedLocationIds: string;
@@ -92,6 +99,7 @@ interface DGBundle {
 
 const EMPTY_BUNDLE: DGBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
+  corporateBrand: true, referenceAssetIds: [],
   targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '',
   headlines: [''], descriptions: [''], ctaText: '',
   logos: [], landscape: [], square: [], portrait: [], tallPortrait: [],
@@ -127,6 +135,9 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       parsed.square = (parsed.square || []).filter(isLocalRef);
       parsed.portrait = (parsed.portrait || []).filter(isLocalRef);
       parsed.tallPortrait = (parsed.tallPortrait || []).filter(isLocalRef);
+      // Reference photos are library ids too — keep only local refs so a leaked
+      // Google resource name can't ride back in as a bogus reference.
+      parsed.referenceAssetIds = (parsed.referenceAssetIds || []).filter(isLocalRef);
       return parsed;
     } catch { return EMPTY_BUNDLE; }
   });
@@ -294,9 +305,9 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       </div>
 
       <div className="border border-border rounded-lg p-6 bg-card mb-4">
-        {stepId === 'brief'     && <StepBrief     bundle={bundle} setField={setField} />}
+        {stepId === 'brief'     && <StepBrief     bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'targeting' && <StepTargeting bundle={bundle} setField={setField} />}
-        {stepId === 'text'      && <StepText      bundle={bundle} setField={setField} />}
+        {stepId === 'text'      && <StepText      bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'images'    && <StepImages    bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'channels'  && <StepChannels  bundle={bundle} setField={setField} />}
         {stepId === 'review'    && <StepReview    bundle={bundle} submitResult={submitResult} submitting={submitting} />}
@@ -362,8 +373,36 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
 
 type SetField = <K extends keyof DGBundle>(k: K, v: DGBundle[K]) => void;
 
-function StepBrief({ bundle, setField }: { bundle: DGBundle; setField: SetField }) {
+function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
   const nameOver = bundle.businessName.length > RULES.businessNameMaxChars;
+  const [showRefLib, setShowRefLib] = useState(false);
+  // Preview meta for the attached reference chips (id → url/filename), sourced
+  // from the same ad_assets library the picker reads.
+  const [refMeta, setRefMeta] = useState<Record<string, SlotAssetMeta>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const qs = new URLSearchParams({ asset_type: 'image', limit: '500' });
+    if (accountId) qs.set('account_id', accountId);
+    fetch(`/api/assets?${qs}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((rows: { id: string; url: string; filename: string }[]) => {
+        if (cancelled) return;
+        setRefMeta(prev => {
+          const next = { ...prev };
+          rows.forEach(r => { next[r.id] = { url: r.url, filename: r.filename }; });
+          return next;
+        });
+      })
+      .catch(() => { /* chips degrade to placeholder tiles */ });
+    return () => { cancelled = true; };
+  }, [accountId]);
+
+  const toggleRef = (id: string, asset?: LibraryAsset) => {
+    if (asset?.url) setRefMeta(prev => ({ ...prev, [id]: { url: asset.url, filename: asset.filename } }));
+    const cur = bundle.referenceAssetIds;
+    setField('referenceAssetIds', cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -393,6 +432,89 @@ function StepBrief({ bundle, setField }: { bundle: DGBundle; setField: SetField 
           className={cn(nameOver && 'border-red-500')}
         />
         <p className="text-[10px] text-muted-foreground mt-1">Shown on the ad; keep it short and brand-faithful (≤{RULES.businessNameMaxChars} chars).</p>
+      </div>
+
+      {/* Campaign brief — fuels the assisted copy + image drafts */}
+      <div>
+        <label className="text-xs font-medium mb-1.5 block">Campaign brief (optional)</label>
+        <textarea
+          value={bundle.brief}
+          onChange={e => setField('brief', e.target.value)}
+          rows={3}
+          placeholder="Who is this for, what's the offer, what makes it different? The Creative Director uses this (plus your landing page) to draft the business name, headlines & descriptions in the Text step — and to generate on-brand images in the Assets step."
+          className="w-full text-sm rounded-md border border-border bg-background p-2.5 resize-none placeholder:text-muted-foreground/60"
+        />
+      </div>
+
+      {/* Corporate-brand toggle — drives the demand_gen image preset */}
+      <label className="flex items-start gap-2 cursor-pointer select-none border border-border rounded-md p-3 bg-secondary/20">
+        <input
+          type="checkbox"
+          checked={bundle.corporateBrand}
+          onChange={e => setField('corporateBrand', e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="text-xs font-medium">Corporate-brand images</span>
+          <span className="block text-[10px] text-muted-foreground mt-0.5">
+            Generated images use the Demand Gen preset — premium, editorial, text-free (Google renders the headline itself, so baked-in text gets disapproved). Turn off for a looser creative style.
+          </span>
+        </span>
+      </label>
+
+      {/* Reference photos — anchor image generation to the operator's real assets */}
+      <div className="border border-border rounded-md p-3 bg-secondary/20 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <ImageIcon className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+            <div>
+              <span className="text-xs font-medium">Reference photos (optional)</span>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Attach your OWN hotel / property photos from the library. Image generation in the Assets step anchors to these real subjects instead of inventing a generic scene.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setShowRefLib(v => !v)} className="gap-1.5 shrink-0">
+            <FolderOpen className="h-3.5 w-3.5" />
+            {bundle.referenceAssetIds.length ? `${bundle.referenceAssetIds.length} attached` : 'Attach'}
+          </Button>
+        </div>
+        {bundle.referenceAssetIds.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {bundle.referenceAssetIds.map(id => {
+              const meta = refMeta[id];
+              return (
+                <span key={id} className="relative inline-flex">
+                  {meta ? (
+                    <img src={meta.url} alt={meta.filename} className="h-12 w-12 rounded border border-border object-cover" loading="lazy" />
+                  ) : (
+                    <span className="h-12 w-12 rounded border border-border bg-secondary/40 flex items-center justify-center">
+                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => toggleRef(id)}
+                    className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-secondary"
+                    aria-label="Remove reference"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+        {showRefLib && (
+          <LibraryPicker
+            accountId={accountId}
+            items={bundle.referenceAssetIds}
+            onToggle={toggleRef}
+            targetLabel="reference"
+            maxItems={6}
+            onClose={() => setShowRefLib(false)}
+          />
+        )}
       </div>
 
       {/* Bidding */}
@@ -443,9 +565,120 @@ function StepTargeting({ bundle, setField }: { bundle: DGBundle; setField: SetFi
   );
 }
 
-function StepText({ bundle, setField }: { bundle: DGBundle; setField: SetField }) {
+function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
+  const [resuming, setResuming] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  // A DG draft fills business_name (Brief step), headlines + descriptions.
+  const applyDraft = useCallback((result: CopyDraftResult) => {
+    if (result.business_name) setField('businessName', result.business_name.slice(0, RULES.businessNameMaxChars));
+    if (result.headlines?.length) setField('headlines', result.headlines);
+    if (result.descriptions?.length) setField('descriptions', result.descriptions);
+  }, [setField]);
+
+  // Poll-based (mirrors PMax): the draft takes 1-3 min and a single long
+  // request died whenever the dev proxy or a server blipped. The job id lives
+  // in localStorage so a page refresh resumes it.
+  const pollDraftResult = useCallback(async (draftId: string): Promise<CopyDraftResult> => {
+    const started = Date.now();
+    while (Date.now() - started < 6 * 60_000) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/demand-gen/draft-copy/${draftId}`);
+        const job = await res.json();
+        if (job.status === 'done') {
+          localStorage.removeItem('demandgen-draft-id');
+          return (job.result || {}) as CopyDraftResult;
+        }
+        if (job.status === 'error') {
+          localStorage.removeItem('demandgen-draft-id');
+          throw new Error(job.message || 'draft failed');
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
+      }
+    }
+    throw new Error('Draft timed out after 6 minutes — try again.');
+  }, []);
+
+  // Host-injected drafter for StudioPanel copy mode — the panel never calls a
+  // campaign-specific endpoint itself. The operator's extra intent from the
+  // panel's input rides along inside the brief.
+  const draftForPanel = useCallback(async (intent: string): Promise<CopyDraftResult> => {
+    const brief = intent.trim()
+      ? `${bundle.brief}\n\nOperator emphasis for this draft: ${intent.trim()}`.trim()
+      : bundle.brief;
+    const res = await fetch(`/api/accounts/${accountId}/demand-gen/draft-copy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        brief,
+        final_url: bundle.finalUrl,
+        business_name: bundle.businessName,
+        campaign_name: bundle.name,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
+    localStorage.setItem('demandgen-draft-id', data.draft_id);
+    return pollDraftResult(data.draft_id);
+  }, [accountId, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name, pollDraftResult]);
+
+  // Resume a draft that was in flight when the page was refreshed — applies
+  // directly (the panel may not be open).
+  useEffect(() => {
+    const pending = localStorage.getItem('demandgen-draft-id');
+    if (!pending) return;
+    setResuming(true);
+    pollDraftResult(pending)
+      .then(applyDraft)
+      .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setResuming(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="space-y-5">
+      {/* Creative Director draft — opens the shared Studio panel; the result
+          previews there before it replaces the fields below (+ business name). */}
+      <div className="border border-border bg-secondary/20 rounded-md p-3 text-xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <p className="text-muted-foreground leading-relaxed">
+              Let the <b>Creative Director</b> draft the business name, headlines and descriptions from your
+              brief and landing page ({bundle.finalUrl || 'set the Final URL in step 1'}).
+              You preview the draft before it replaces what's below.
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setPanelOpen(true)} disabled={resuming || !bundle.finalUrl} className="gap-1.5 shrink-0">
+            {resuming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {resuming ? 'Resuming draft…' : 'Draft with Creative Director'}
+          </Button>
+        </div>
+        {draftError && (
+          <p className="mt-2 flex items-center gap-1.5 text-red-500">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {draftError}
+          </p>
+        )}
+      </div>
+
+      <StudioPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        mode="copy"
+        accountId={accountId}
+        context={{
+          brief: bundle.brief,
+          businessName: bundle.businessName,
+          finalUrl: bundle.finalUrl,
+          slot: 'Text assets',
+        }}
+        onDraftCopy={draftForPanel}
+        onUseCopy={applyDraft}
+      />
+
       <PolicyHint />
       <TextList
         label="Headlines"
@@ -520,48 +753,68 @@ function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setFiel
     setAssetMeta(prev => ({ ...prev, [id]: meta }));
   }, []);
 
+  // A short note naming the attached reference photos (filenames) so every
+  // generated variant anchors to those real subjects, not a generic scene.
+  const referenceNote = useMemo(() => {
+    if (!bundle.referenceAssetIds.length) return undefined;
+    const names = bundle.referenceAssetIds.map(id => assetMeta[id]?.filename).filter(Boolean);
+    return names.length ? names.join(', ') : `${bundle.referenceAssetIds.length} attached image(s)`;
+  }, [bundle.referenceAssetIds, assetMeta]);
+
+  // Shared context every slot's StudioPanel opens with. The corporate-brand
+  // toggle picks the demand_gen preset; the operator's reference photos condition
+  // the generation. Slot label + aspect get appended per group in ImageGroup.
+  const baseContext: StudioPanelContext = {
+    brief: bundle.brief,
+    businessName: bundle.businessName,
+    finalUrl: bundle.finalUrl,
+    preset: bundle.corporateBrand ? 'demand_gen' : undefined,
+    referenceAssetIds: bundle.referenceAssetIds.length ? bundle.referenceAssetIds : undefined,
+    referenceNote,
+  };
+
   return (
     <div className="space-y-5">
       <div className="border border-border bg-secondary/20 rounded-md p-3 text-[11px] leading-relaxed text-muted-foreground">
-        Pick images from the Studio asset library (everything you generated or uploaded) or upload new files. Each slot
-        {' '}shows the image exactly as Google will receive it — mismatched aspects get center-cropped at submit and are flagged.
-        {' '}Need on-brand creative? Generate it in <b className="text-foreground">Studio → Demand Gen Creative</b> first, then pick it here.
+        <b className="text-foreground">Generate</b> on-brand images per slot (the aspect is locked to the slot), pick from the
+        {' '}Studio asset library, or upload files. Generated images anchor to your reference photos from step 1 and land in the
+        {' '}library. Each slot shows the image exactly as Google will receive it — mismatched aspects get center-cropped at submit and are flagged.
       </div>
       <ImageGroup
         label="Logos" spec="Auto-cropped to 1:1 · min 128×128 · transparent bg preferred"
-        targetRatio={1} targetLabel="1:1"
+        targetRatio={1} targetLabel="1:1" slotAspect="1:1"
         items={bundle.logos} onChange={v => setField('logos', v)}
         accountId={accountId} minItems={RULES.logos.min} maxItems={RULES.logos.max}
-        assetMeta={assetMeta} onAssetKnown={registerAsset}
+        assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Landscape marketing image (1.91:1)" spec="Any aspect works — cropped to 1.91:1 · min 600×314 · 1200×628 recommended"
-        targetRatio={1.91} targetLabel="1.91:1"
+        targetRatio={1.91} targetLabel="1.91:1" slotAspect="16:9"
         items={bundle.landscape} onChange={v => setField('landscape', v)}
         accountId={accountId} minItems={0} maxItems={20}
-        assetMeta={assetMeta} onAssetKnown={registerAsset}
+        assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Square marketing image (1:1)" spec="Any aspect works — cropped to 1:1 · min 300×300 · 1200×1200 recommended"
-        targetRatio={1} targetLabel="1:1"
+        targetRatio={1} targetLabel="1:1" slotAspect="1:1"
         items={bundle.square} onChange={v => setField('square', v)}
         accountId={accountId} minItems={0} maxItems={20}
-        assetMeta={assetMeta} onAssetKnown={registerAsset}
+        assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <p className="text-[10px] text-muted-foreground -mt-2">Provide at least one landscape or square marketing image. Portrait &amp; tall are optional extras.</p>
       <ImageGroup
         label="Portrait marketing image (4:5)" spec="Optional · cropped to 4:5 · min 480×600 · 960×1200 recommended"
-        targetRatio={0.8} targetLabel="4:5"
+        targetRatio={0.8} targetLabel="4:5" slotAspect="4:5"
         items={bundle.portrait} onChange={v => setField('portrait', v)}
         accountId={accountId} minItems={0} maxItems={20}
-        assetMeta={assetMeta} onAssetKnown={registerAsset}
+        assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Tall portrait image (9:16)" spec="Optional · cropped to 9:16 · for YouTube Shorts placements"
-        targetRatio={0.5625} targetLabel="9:16"
+        targetRatio={0.5625} targetLabel="9:16" slotAspect="9:16"
         items={bundle.tallPortrait} onChange={v => setField('tallPortrait', v)}
         accountId={accountId} minItems={0} maxItems={20}
-        assetMeta={assetMeta} onAssetKnown={registerAsset}
+        assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
     </div>
   );
@@ -740,19 +993,27 @@ function TextList({
 }
 
 function ImageGroup({
-  label, spec, targetRatio, targetLabel,
+  label, spec, targetRatio, targetLabel, slotAspect,
   items, onChange, accountId, minItems, maxItems = 20,
-  assetMeta, onAssetKnown,
+  assetMeta, onAssetKnown, promptContext,
 }: {
   label: string; spec: string; targetRatio: number; targetLabel: string;
+  /** Higgsfield generation aspect for this slot (e.g. '16:9' for the 1.91:1
+   * landscape — the closest supported aspect; the server center-crops the
+   * negligible difference at submit). Locks the StudioPanel aspect selector. */
+  slotAspect: string;
   items: string[]; onChange: (v: string[]) => void;
   accountId: string; minItems: number; maxItems?: number;
   assetMeta: Record<string, SlotAssetMeta>;
   onAssetKnown: (id: string, meta: SlotAssetMeta) => void;
+  /** Shared campaign context for the Generate panel (brief, business name,
+   * demand_gen preset, reference photos). Slot label + aspect appended here. */
+  promptContext?: StudioPanelContext;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLib, setShowLib] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const toggleLibraryAsset = (assetId: string, asset?: LibraryAsset) => {
     if (asset?.url) onAssetKnown(assetId, { url: asset.url, filename: asset.filename });
@@ -761,6 +1022,17 @@ function ImageGroup({
     } else if (items.length < maxItems) {
       onChange([...items, assetId]);
     }
+  };
+
+  // "Use in slot" from the StudioPanel — the asset id is the same local-UUID
+  // shape upload/library produce, so the orchestrator's aspect-crop bridge
+  // resolves it unchanged at submit.
+  const handleUse = (asset: StudioJobStatus) => {
+    if (asset.status !== 'completed' || !asset.asset_id) return;
+    if (asset.url) onAssetKnown(asset.asset_id, { url: asset.url, filename: asset.asset_id });
+    if (items.includes(asset.asset_id)) return;
+    if (items.length >= maxItems) return;
+    onChange([...items, asset.asset_id]);
   };
 
   const handleUpload = async (file: File) => {
@@ -818,6 +1090,15 @@ function ImageGroup({
         })}
         <button
           type="button"
+          onClick={() => setPanelOpen(true)}
+          className="cursor-pointer border border-dashed border-primary/40 rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-primary/10 transition-colors text-primary"
+          title={`Open the Studio panel with the ${slotAspect} aspect locked to this slot`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Generate
+        </button>
+        <button
+          type="button"
           onClick={() => setShowLib(v => !v)}
           className={cn(
             'cursor-pointer border border-dashed border-border rounded-md px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-secondary/50 transition-colors',
@@ -855,6 +1136,21 @@ function ImageGroup({
           onClose={() => setShowLib(false)}
         />
       )}
+      {/* Shared Studio panel — slot's aspect locked so the operator can't
+          generate a 16:9 for the square slot. Stays mounted: jobs keep
+          streaming while it's closed and finished results wait on reopen. */}
+      <StudioPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        mode="image"
+        accountId={accountId}
+        context={{
+          ...promptContext,
+          slot: label,
+          aspect: slotAspect,
+        }}
+        onUse={handleUse}
+      />
     </div>
   );
 }
