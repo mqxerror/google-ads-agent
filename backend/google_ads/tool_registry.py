@@ -152,6 +152,8 @@ _CATALOG_WRITE_CANDIDATES = [
     "asset_update_asset",
     "asset_remove_asset",
     "campaign_asset_update_campaign_asset_status",
+    # single-shot campaign orchestrators (budget+campaign+assets+ad in one call)
+    "demand_gen_create_demand_gen_campaign",
 ]
 
 
