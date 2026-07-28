@@ -125,7 +125,7 @@ def _orchestrator():
     orch = DemandGenOrchestrator()
     calls = {
         "budget": 0, "remove_campaign": 0, "remove_budget": 0,
-        "loc": 0, "lang": 0,
+        "loc": 0, "lang": 0, "loc_kwargs": [],
     }
     fake_assets = _FakeAssetService()
 
@@ -143,6 +143,7 @@ def _orchestrator():
 
     async def add_loc(**kw):
         calls["loc"] += 1
+        calls["loc_kwargs"].append(kw)
         return {}
 
     async def add_lang(**kw):
@@ -344,6 +345,29 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(excluded), 1)
         self.assertIn("userLists/111", included[0].user_list.user_list)
         self.assertIn("userLists/222", excluded[0].user_list.user_list)
+
+    async def test_excluded_location_ids_add_negative_geo_criterion(self):
+        orch, _, calls = _orchestrator()
+        await orch.create_demand_gen_campaign(
+            ApiCtx(), CUSTOMER,
+            _valid_bundle(location_ids=["2784"],
+                          excluded_location_ids=["9041083", "1000013"]))
+        # Two add_location_criteria calls: one positive (target UAE), one
+        # negative (exclude the Dubai emirate + city).
+        self.assertEqual(calls["loc"], 2)
+        positive = [k for k in calls["loc_kwargs"] if not k.get("negative")]
+        negative = [k for k in calls["loc_kwargs"] if k.get("negative")]
+        self.assertEqual(len(positive), 1)
+        self.assertEqual(len(negative), 1)
+        self.assertEqual(positive[0]["location_ids"], ["2784"])
+        self.assertEqual(negative[0]["location_ids"], ["9041083", "1000013"])
+
+    async def test_no_excluded_locations_means_no_negative_geo_call(self):
+        orch, _, calls = _orchestrator()
+        await orch.create_demand_gen_campaign(ApiCtx(), CUSTOMER, _valid_bundle())
+        # Default bundle has location_ids but no exclusions → exactly one call.
+        self.assertEqual(calls["loc"], 1)
+        self.assertFalse(any(k.get("negative") for k in calls["loc_kwargs"]))
 
     async def test_rollback_on_ad_failure(self):
         orch, _, calls = _orchestrator()

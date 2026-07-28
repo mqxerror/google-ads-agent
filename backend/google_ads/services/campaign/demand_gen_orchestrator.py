@@ -707,6 +707,9 @@ class DemandGenOrchestrator:
             # ── Step 3 — Geo + language targeting ─────────────────────
             failed_step = "geo/language targeting"
             location_ids = [str(x) for x in (bundle.get("location_ids") or [])]
+            excluded_location_ids = [
+                str(x) for x in (bundle.get("excluded_location_ids") or [])
+            ]
             language_ids = [str(x) for x in (bundle.get("language_ids") or [])]
             if location_ids:
                 await self._campaign_criterion.add_location_criteria(
@@ -714,6 +717,17 @@ class DemandGenOrchestrator:
                     customer_id=customer_id,
                     campaign_id=campaign_id,
                     location_ids=location_ids,
+                )
+            if excluded_location_ids:
+                # Negative location criteria — carve regions OUT of the geo
+                # target (e.g. exclude the Dubai emirate while targeting the
+                # UAE). Same CampaignCriterion path, `negative=True`.
+                await self._campaign_criterion.add_location_criteria(
+                    ctx=ctx,
+                    customer_id=customer_id,
+                    campaign_id=campaign_id,
+                    location_ids=excluded_location_ids,
+                    negative=True,
                 )
             if language_ids:
                 await self._campaign_criterion.add_language_criteria(
@@ -1018,6 +1032,7 @@ def create_demand_gen_orchestrator_tools(
         landscape_images: Optional[List[str]] = None,
         square_images: Optional[List[str]] = None,
         location_ids: Optional[List[str]] = None,
+        excluded_location_ids: Optional[List[str]] = None,
         language_ids: Optional[List[str]] = None,
         portrait_images: Optional[List[str]] = None,
         tall_portrait_images: Optional[List[str]] = None,
@@ -1065,6 +1080,9 @@ def create_demand_gen_orchestrator_tools(
             square_images: 1:1 marketing images. At least one of
                 landscape_images/square_images is required.
             location_ids: Optional geo target constant IDs for targeting.
+            excluded_location_ids: Optional geo target constant IDs to EXCLUDE
+                (negative location criteria) — e.g. exclude the Dubai emirate
+                while still targeting the United Arab Emirates.
             language_ids: Optional language constant IDs for targeting.
             portrait_images: Optional 4:5 portrait marketing images.
             tall_portrait_images: Optional 9:16 tall portrait marketing images.
@@ -1110,6 +1128,7 @@ def create_demand_gen_orchestrator_tools(
                 "tall_portrait": tall_portrait_images or [],
             },
             "location_ids": location_ids or [],
+            "excluded_location_ids": excluded_location_ids or [],
             "language_ids": language_ids or [],
             "call_to_action_text": call_to_action_text,
             "target_cpa_micros": target_cpa_micros,
