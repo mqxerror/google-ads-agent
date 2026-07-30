@@ -60,8 +60,9 @@ async def _schema_version() -> int:
 
 class MigrationV23(unittest.TestCase):
     def test_schema_version_is_23(self):
-        # Head moves as migrations are added: 24 (brief_source) → 25 (change_log).
-        self.assertEqual(_run(_schema_version()), 25)
+        # Head moves as migrations are added: 24 (brief_source) → 25 (change_log)
+        # → 26 (pause_confirmation_grants).
+        self.assertEqual(_run(_schema_version()), 26)
 
     def test_studio_video_projects_columns(self):
         cols = _run(_columns("studio_video_projects"))
@@ -87,7 +88,7 @@ class MigrationV23(unittest.TestCase):
         """Re-running init_db on an already-migrated DB must not crash and stays at head."""
         _run(init_db())
         _run(init_db())
-        self.assertEqual(_run(_schema_version()), 25)
+        self.assertEqual(_run(_schema_version()), 26)
         # Tables still intact after re-run.
         self.assertIn("consult_director", _run(_columns("studio_video_projects")))
         self.assertIn("soul_id", _run(_columns("brand_avatars")))

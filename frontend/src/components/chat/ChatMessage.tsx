@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import ToolCallBlock from './ToolCallBlock';
 import AgentAvatar from './AgentAvatar';
 import OrchestrationLedger from './OrchestrationLedger';
+import PauseConfirmCard from './PauseConfirmCard';
+import type { PauseConfirmPayload } from '@/types';
 import { getAgentProfile } from '@/lib/agentProfiles';
 import { getToolDescription } from '@/lib/toolDescriptions';
 import { useAppStore } from '@/stores/appStore';
@@ -46,6 +48,9 @@ interface ChatMessageProps {
   /** Per-specialist stop (story 3.4). Present only for a LIVE turn; undefined in
    *  history replay so per-row stop buttons hide (the ledger handles undefined). */
   onStopCall?: (callId: string) => void;
+  /** Pause-protection: fired after the confirm card mints a grant, so the parent
+   *  re-issues the pause through the normal chat path (chokepoint consumes it). */
+  onConfirmPause?: (payload: PauseConfirmPayload) => void;
 }
 
 /** Internal tools the user doesn't care about (chain-of-thought noise) */
@@ -154,7 +159,7 @@ function InternalToolsGroup({ tools }: { tools: ToolCall[] }) {
   );
 }
 
-export default function ChatMessage({ message, onDelete, conversationId, isStreaming, turnEvents, turnComplete, onStopCall }: ChatMessageProps) {
+export default function ChatMessage({ message, onDelete, conversationId, isStreaming, turnEvents, turnComplete, onStopCall, onConfirmPause }: ChatMessageProps) {
   const [handoffState, setHandoffState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [scheduleState, setScheduleState] = useState<'idle' | 'loading' | 'error'>('idle');
   const accountId = useClientAccountId();
@@ -279,6 +284,15 @@ export default function ChatMessage({ message, onDelete, conversationId, isStrea
             </a>
           </div>
         </div>
+      )}
+
+      {/* Pause-protection confirm card — a working campaign's PAUSE/REMOVE was
+          blocked at the backend chokepoint and needs an explicit click here. */}
+      {!isUser && message.pauseConfirm && (
+        <PauseConfirmCard
+          payload={message.pauseConfirm}
+          onConfirmed={(p) => onConfirmPause?.(p)}
+        />
       )}
 
       {/* Live activity — a quiet pulsing line for what's happening RIGHT NOW. */}

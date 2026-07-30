@@ -1212,7 +1212,35 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V25 migration complete (change_log — Changelog + revert).")
 
-        if version >= 25:
-            logger.info("Database schema is V25 (up to date).")
+        # V26: Working-campaign pause protection (2026-07-27 incident fix).
+        # A PAUSE/REMOVE of a campaign with recent performance is blocked at the
+        # MCP chokepoint unless the call carries a one-shot, UI-minted grant.
+        # Chat text can never mint one — only an explicit click on the confirm
+        # card (POST /api/pause-confirmations) can. See services/pause_guard.py.
+        if version < 26:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pause_confirmation_grants (
+                    id TEXT PRIMARY KEY,
+                    customer_id TEXT,
+                    campaign_id TEXT NOT NULL,
+                    action TEXT NOT NULL,          -- PAUSED | REMOVED
+                    campaign_name TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    expires_at TEXT NOT NULL,      -- short TTL
+                    consumed_at TEXT               -- NULL until consumed (consume-once)
+                )
+                """
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pause_grants_lookup "
+                "ON pause_confirmation_grants(campaign_id, action, consumed_at)"
+            )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (26)")
+            await db.commit()
+            logger.info("V26 migration complete (pause_confirmation_grants — pause protection).")
+
+        if version >= 26:
+            logger.info("Database schema is V26 (up to date).")
     finally:
         await db.close()

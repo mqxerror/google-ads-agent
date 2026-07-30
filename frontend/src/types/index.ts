@@ -74,6 +74,24 @@ export interface ChatMessage {
   videoThumbnail?: string; // optional poster image
   turnId?: string;         // v2 orchestration turn id — when set, the message
                            // renders an OrchestrationLedger over its v2 events
+  pauseConfirm?: PauseConfirmPayload; // pause-protection confirm card (working
+                           // campaign PAUSE/REMOVE requires an explicit UI click)
+}
+
+// Working-campaign pause protection. The MCP chokepoint blocks a PAUSE/REMOVE of
+// a campaign with recent performance and returns this payload; the chat renders
+// a confirm card. Clicking Confirm mints a one-shot grant (POST
+// /api/pause-confirmations) and re-issues the pause — chat text never suffices.
+export interface PauseConfirmPayload {
+  kind: 'pause_confirmation';
+  campaign_id: string;
+  customer_id?: string;
+  campaign_name: string;
+  action: 'PAUSED' | 'REMOVED';
+  cost: number | null;         // last-7-day spend (dollars)
+  conversions: number | null;  // last-7-day conversions
+  cpa: number | null;          // last-7-day CPA (dollars) or null when 0 conv
+  lookup_ok?: boolean;         // false when stats lookup failed (fail-closed)
 }
 
 export interface ToolCall {

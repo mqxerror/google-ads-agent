@@ -556,6 +556,26 @@ class CampaignScopeMiddleware(Middleware):
                     f"a different campaign, ask them to switch in the sidebar — "
                     f"do not silently substitute."
                 )
+        # Working-campaign pause protection (2026-07-27 incident). A PAUSE/REMOVE
+        # of a campaign with recent performance is BLOCKED here unless the call
+        # carries a one-shot, UI-minted confirmation grant — chat text can never
+        # satisfy it. This is the ONE chokepoint every path crosses (chat seats,
+        # direct MCP tools, scheduler). Non-pause tool calls are never affected;
+        # check_and_gate returns None instantly for them and fails CLOSED (blocks)
+        # for a real pause/remove if anything errors. See app.services.pause_guard.
+        _confirm_payload = None
+        try:
+            from app.services import pause_guard
+            _confirm_payload = pause_guard.check_and_gate(tool_name, args)
+        except Exception:
+            # Gate infrastructure unavailable (e.g. import failure). Allow rather
+            # than break every unrelated tool call; the stats-lookup fail-closed
+            # that the contract requires lives INSIDE check_and_gate.
+            _confirm_payload = None
+        if _confirm_payload is not None:
+            import json as _json
+            raise ValueError("CONFIRMATION_REQUIRED:" + _json.dumps(_confirm_payload))
+
         # Additive change-capture (Changelog V25): for a tracked WRITE, read the
         # cheap before-state before mutating so the change is revertible. Entirely
         # best-effort — a failure here must NEVER affect the tool call.
@@ -573,7 +593,7 @@ class CampaignScopeMiddleware(Middleware):
         except Exception as exc:
             # Don't pollute the log with our own intentional rejections.
             _intentional = isinstance(exc, ValueError) and str(exc).startswith(
-                ("CAMPAIGN_SCOPE_VIOLATION:", "TOOL_NOT_ALLOWED:")
+                ("CAMPAIGN_SCOPE_VIOLATION:", "TOOL_NOT_ALLOWED:", "CONFIRMATION_REQUIRED:")
             )
             if not _intentional:
                 _log_mcp_error(tool_name, exc)

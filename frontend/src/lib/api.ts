@@ -1588,3 +1588,26 @@ export interface OutcomeDashboard {
 export function fetchOutcomes(accountId: string): Promise<OutcomeDashboard> {
   return request<OutcomeDashboard>(`/accounts/${encodeURIComponent(accountId)}/outcomes`);
 }
+
+// ── Pause-protection: mint a one-shot confirmation grant ─────────────
+// Called only by the confirm card's Confirm button. Mints a grant scoped to
+// exactly (campaign_id, action); the MCP chokepoint consumes it once on the
+// next matching status write. Chat text never reaches this endpoint.
+export interface PauseConfirmGrant {
+  token: string;
+  campaign_id: string;
+  action: string;
+  expires_at: string;
+}
+
+export function mintPauseConfirmation(body: {
+  campaign_id: string;
+  action: 'PAUSED' | 'REMOVED';
+  customer_id?: string;
+  campaign_name?: string;
+}): Promise<PauseConfirmGrant> {
+  return request<PauseConfirmGrant>('/pause-confirmations', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}

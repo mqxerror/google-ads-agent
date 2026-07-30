@@ -13,7 +13,7 @@ import AgentAvatar from '@/components/chat/AgentAvatar';
 import ChatInput, { type ModelId, type Attachment } from '@/components/chat/ChatInput';
 import MemoryPanel from '@/components/chat/MemoryPanel';
 import { Input } from '@/components/ui/input';
-import type { ChatMessage, ToolCall, Campaign } from '@/types';
+import type { ChatMessage, ToolCall, Campaign, PauseConfirmPayload } from '@/types';
 
 // FIX 3 — window inside which an IDENTICAL trimmed message is treated as an
 // accidental duplicate (queue+lag re-fire) and dropped. A DIFFERENT message is
@@ -294,6 +294,12 @@ export default function ChatPanel() {
                   if (isCurrent()) setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
                 } else if (event.type === 'routing') {
                   if (isCurrent()) setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: event.role_id, agentRoleName: event.role_name, agentRoleAvatar: event.role_avatar } : m));
+                } else if (event.type === 'confirmation_required') {
+                  if (isCurrent()) setMessages((prev) => [...prev, {
+                    id: `msg-${Date.now()}-pauseconfirm`, role: 'assistant', content: '',
+                    createdAt: new Date().toISOString(), agentRole: 'director',
+                    pauseConfirm: event.payload as PauseConfirmPayload,
+                  }]);
                 } else if (event.type === 'done' || event.type === 'error') {
                   if (isCurrent()) setIsResponding(false);
                 }
@@ -679,6 +685,20 @@ export default function ChatPanel() {
               case 'context_meta':
                 setContextMeta(ev.payload as unknown as ContextMetaData);
                 break;
+              case 'confirmation_required': {
+                // Pause protection under the v2 turn transport — same confirm
+                // card, dropped as its own assistant bubble.
+                const p = ev.payload as unknown as PauseConfirmPayload;
+                guardedSetMessages((prev) => [...prev, {
+                  id: `msg-${Date.now()}-pauseconfirm`,
+                  role: 'assistant',
+                  content: '',
+                  createdAt: new Date().toISOString(),
+                  agentRole: 'director',
+                  pauseConfirm: p,
+                }]);
+                break;
+              }
               case 'final_chunk': {
                 const p = ev.payload as { text?: string; content?: string } | undefined;
                 directorText += p?.text ?? p?.content ?? '';
@@ -914,6 +934,19 @@ export default function ChatPanel() {
                 refetchConversations();
                 // Notify Campaign Builder and other listeners that the agent is done
                 window.dispatchEvent(new Event('agent:done'));
+              } else if (event.type === 'confirmation_required') {
+                // Working-campaign pause protection: the backend chokepoint
+                // blocked a PAUSE/REMOVE and needs an explicit UI click. Drop a
+                // dedicated confirm-card bubble (separate from the prose bubble).
+                const payload = event.payload as PauseConfirmPayload;
+                guardedSetMessages((prev) => [...prev, {
+                  id: `msg-${Date.now()}-pauseconfirm`,
+                  role: 'assistant',
+                  content: '',
+                  createdAt: new Date().toISOString(),
+                  agentRole: 'director',
+                  pauseConfirm: payload,
+                }]);
               } else if (event.type === 'error') {
                 assistantText += `\n\n**Error:** ${event.message}`;
                 guardedSetMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
@@ -955,6 +988,17 @@ export default function ChatPanel() {
     },
     [ensureConversation, selectedCampaignId, ACCOUNT_ID, queryClient, refetchConversations, orchestratedSend]
   );
+
+  // Pause-protection: after the confirm card mints a grant, re-issue the pause
+  // through the NORMAL chat path so the backend chokepoint consumes the grant and
+  // applies the change. The grant (not this text) is what authorizes it — typing
+  // the same words without the click still blocks.
+  const handleConfirmPause = useCallback((payload: PauseConfirmPayload) => {
+    const verb = payload.action === 'REMOVED' ? 'remove' : 'pause';
+    handleSend(
+      `Confirmed via the UI — please ${verb} the campaign "${payload.campaign_name}" (${payload.campaign_id}) now.`,
+    );
+  }, [handleSend]);
 
   // Listen for external "chat:send" events (from Landing Page tab, Builder, etc.)
   const handleSendRef = useRef(handleSend);
@@ -1251,6 +1295,7 @@ export default function ChatPanel() {
                     ? (callId) => { stopTurnCall(conversationId, msg.turnId!, callId).catch(() => {}); }
                     : undefined
                 }
+                onConfirmPause={handleConfirmPause}
                 onDelete={async (msgId) => {
                   if (!conversationId) return;
                   try {

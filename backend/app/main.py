@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.mcp_server import mcp_lifespan
-from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, demand_gen, guidelines, landing_page, memory, operations, outcomes, plans, pmax, pmax_video, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, video_director, video_engine, workflows, youtube
+from app.routers import accounts, activity, assets, campaign_builder, campaigns, changelog, chat, demand_gen, guidelines, landing_page, memory, operations, outcomes, pause_guard as pause_guard_router, plans, pmax, pmax_video, reports, search_terms, settings as settings_router, setup, skills, studio, uploads, video, video_director, video_engine, workflows, youtube
 from app.services.sync_engine import start_background_sync, stop_background_sync
 
 
@@ -101,6 +101,7 @@ app.include_router(changelog.router)
 app.include_router(workflows.router)
 app.include_router(workflows.account_router)   # /api/accounts/{id}/account-report (Story 13.2)
 app.include_router(plans.router)
+app.include_router(pause_guard_router.router)
 
 
 # ── MCP server (Streamable HTTP at /mcp) ────────────────────────────

@@ -1075,6 +1075,54 @@ def _emit_assistant_blocks(blocks: list, result_queue, full_response_text: list,
             result_queue.put({"type": "tool_result", "id": block.get("tool_use_id", ""), "source": "google-ads", "output": str(block.get("content", ""))[:500], "status": "success"})
 
 
+_CONFIRM_MARKER = "CONFIRMATION_REQUIRED:"
+
+
+def _extract_confirmation_payload(text: str) -> dict | None:
+    """Pull the JSON payload out of a ``CONFIRMATION_REQUIRED:{...}`` error string
+    (the pause-protection gate raises this from the MCP chokepoint). Returns the
+    parsed dict, or None if the marker/JSON isn't present. Brace-depth scan so it
+    is robust to any tool-wrapper prefix/suffix around the marker."""
+    if not text or _CONFIRM_MARKER not in text:
+        return None
+    start = text.index(_CONFIRM_MARKER) + len(_CONFIRM_MARKER)
+    brace = text.find("{", start)
+    if brace < 0:
+        return None
+    depth = 0
+    for i in range(brace, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[brace : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _scan_user_blocks_for_confirmation(blocks: list) -> dict | None:
+    """Scan a ``user`` message's content blocks (which carry tool_result errors)
+    for a pause-protection CONFIRMATION_REQUIRED payload. Returns the payload dict
+    or None. This is how the structured confirm card reaches the chat UI — tool
+    errors otherwise never surface (only assistant blocks are parsed)."""
+    for block in blocks or []:
+        if not isinstance(block, dict) or block.get("type") != "tool_result":
+            continue
+        content = block.get("content", "")
+        if isinstance(content, list):
+            content = " ".join(
+                str(c.get("text", c)) if isinstance(c, dict) else str(c) for c in content
+            )
+        payload = _extract_confirmation_payload(str(content))
+        if payload:
+            return payload
+    return None
+
+
 # ── Main: Assemble All Layers ────────────────────────────────────
 
 async def stream_agent_response(
@@ -1850,6 +1898,17 @@ async def stream_agent_response(
                     msg_type = data.get("type", "")
                     if msg_type == "assistant":
                         _parse_assistant_blocks(data.get("message", {}).get("content", []))
+                    elif msg_type == "user":
+                        # Tool-RESULT blocks arrive in user-role messages and are
+                        # otherwise never surfaced. Scan them for the pause-
+                        # protection CONFIRMATION_REQUIRED payload so the chat UI
+                        # can render the confirm card (the ONLY way a working
+                        # campaign's pause gets authorized).
+                        _confirm = _scan_user_blocks_for_confirmation(
+                            data.get("message", {}).get("content", [])
+                        )
+                        if _confirm:
+                            result_queue.put({"type": "confirmation_required", "payload": _confirm})
                     elif msg_type == "stream_event":
                         # Story 1.4: token-level streaming. With
                         # --include-partial-messages the CLI emits stream_event
