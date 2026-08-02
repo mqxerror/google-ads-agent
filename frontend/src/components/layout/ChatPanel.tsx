@@ -5,7 +5,7 @@ import { GripVertical, Maximize2, Minimize2, Trash2, Plus, Search, MessageSquare
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
-import { fetchConversations, createConversation, fetchConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask, startTurn, streamTurn, stopTurn, stopTurnCall } from '@/lib/api';
+import { fetchConversations, createConversation, fetchConversation, deleteConversation, fetchMessages, searchConversations, stopAgentTask, startTurn, streamTurn, stopTurn, stopTurnCall, fetchActiveTurn } from '@/lib/api';
 import type { OrchestrationEvent } from '@/types/orchestration';
 import ContextBadge, { type ContextMetaData } from '@/components/chat/ContextBadge';
 import ChatMessageComponent from '@/components/chat/ChatMessage';
@@ -19,6 +19,15 @@ import type { ChatMessage, ToolCall, Campaign, PauseConfirmPayload } from '@/typ
 // accidental duplicate (queue+lag re-fire) and dropped. A DIFFERENT message is
 // never affected; the same text after this window is a legit repeat and sends.
 const DEDUP_WINDOW_MS = 10_000;
+
+// Watchdog: if the active stream goes SILENT this long, ask the backend truth
+// endpoint whether a turn is really still running. Backend says no → self-heal
+// the composer to idle; says yes → reattach. "Thinking forever" becomes
+// impossible. The check timer is a local interval (WATCHDOG_CHECK_MS); it only
+// TOUCHES the backend when silence crosses WATCHDOG_SILENCE_MS — so this is not
+// a polling loop that hammers the server.
+const WATCHDOG_SILENCE_MS = 105_000;
+const WATCHDOG_CHECK_MS = 20_000;
 
 export default function ChatPanel() {
   const { chatPanelWidth, setChatPanelWidth, selectedCampaignId, chatPanelCollapsed, toggleChatPanel } = useAppStore();
@@ -102,6 +111,26 @@ export default function ChatPanel() {
   // bails on any setMessages when conversationIdRef.current !== convId — killing
   // the F7 cross-campaign bleed where a stale writer wrote into the new window.
   const conversationIdRef = useRef<string | null>(conversationId);
+  // ── Reconciliation state (P0 mode-switch staleness fix) ──────────────────
+  // reconnectAbortRef  — owns the RECONCILE-attached stream (a reconnect to a
+  //   turn we did not start locally). Separate from abortControllerRef (which
+  //   owns a LOCAL send) so "exactly one live stream per panel" is enforced
+  //   without a local send and a reconnect stepping on each other.
+  // localStreamRef     — true while a local actualSend/orchestratedSend owns the
+  //   stream. reconcile() never disturbs a live local stream (except the
+  //   watchdog's forced heal), so flipping the mode toggle mid-turn can't orphan
+  //   it.
+  // lastEventAtRef     — timestamp of the last SSE event on ANY active stream;
+  //   the watchdog measures silence against it.
+  // reconcilingRef     — single-flight guard so overlapping triggers
+  //   (open + mode-switch + watchdog) don't fan out concurrent reconciles.
+  const reconnectAbortRef = useRef<AbortController | null>(null);
+  const localStreamRef = useRef<boolean>(false);
+  const lastEventAtRef = useRef<number>(0);
+  const reconcilingRef = useRef<boolean>(false);
+  // reconcile() is defined below but referenced by loadConversation (defined
+  // above it); a ref breaks the ordering cycle without a forward-decl.
+  const reconcileRef = useRef<((convId: string | null, opts?: { force?: boolean }) => void) | null>(null);
   // chat:display poller timers hoisted to refs so a conversation/campaign switch
   // can tear them down (the interval otherwise fires every 2s for up to 5 min,
   // overwriting whatever chat is now open).
@@ -219,6 +248,11 @@ export default function ChatPanel() {
     } catch {
       setMessages([]);
     }
+    // History is now on screen — reconcile against the backend truth so any
+    // turn still running on this conversation (either engine) is reattached,
+    // and an idle one leaves the composer live. Runs AFTER setMessages so the
+    // reconnect bubble is appended on top of real history (never wipes it).
+    reconcileRef.current?.(convId);
   }, []);
 
   // Auto-load conversation: restore from session or pick the most recent.
@@ -242,79 +276,249 @@ export default function ChatPanel() {
     }
   }, [conversations, conversationId, messages.length, loadConversation, setConversationId]);
 
-  // Reconnect to running agent after page refresh
-  useEffect(() => {
-    if (!conversationId) return;
-    let cancelled = false;
-    // Identity anchor: this reader may only touch shared state while the
-    // displayed conversation is still the one it reconnected to. Guards every
-    // setMessages / setIsResponding below (in addition to the `cancelled` flag,
-    // which only catches switches between chunks).
-    const convId = conversationId;
-    const isCurrent = () => !cancelled && conversationIdRef.current === convId;
-
+  // ── Reconnect to a live DIRECT (legacy ?stream=1) turn ───────────────────
+  // The pre-v2 StreamingResponse engine buffers into _agent_buffers; we tail it
+  // from cursor 0 (full replay). Owned by reconnectAbortRef so a switch / a new
+  // local send / a v2 reattach can cleanly close it (exactly one live stream).
+  const reconnectToDirect = useCallback((convId: string) => {
+    reconnectAbortRef.current?.abort();
+    const controller = new AbortController();
+    reconnectAbortRef.current = controller;
+    setIsResponding(true);
+    setStopping(false);
+    lastEventAtRef.current = Date.now();
+    const assistantMsgId = `msg-${Date.now()}-reconnect`;
+    let assistantText = '';
+    let seeded = false;
+    const guarded: typeof setMessages = (updater) => {
+      if (conversationIdRef.current === convId) setMessages(updater);
+    };
     (async () => {
       try {
-        const res = await fetch(`/api/conversations/${conversationId}/agent/status`);
-        const status = await res.json();
-        if (status.running && isCurrent()) {
-          setIsResponding(true);
-          // Reconnect to the stream from where the buffer is
-          const streamRes = await fetch(`/api/conversations/${conversationId}/agent/stream?cursor=0`);
-          const reader = streamRes.body?.getReader();
-          if (!reader) return;
-
-          const decoder = new TextDecoder();
-          const assistantMsgId = `msg-${Date.now()}-reconnect`;
-          let assistantText = '';
-
-          // Add a placeholder message for the reconnected stream
-          if (isCurrent()) setMessages((prev) => {
-            // Don't add if already has a streaming message
-            if (prev.some(m => m.content === '' && m.role === 'assistant')) return prev;
-            return [...prev, { id: assistantMsgId, role: 'assistant', content: '(reconnecting...)\n\n', toolCalls: [], createdAt: new Date().toISOString() }];
-          });
-
-          let buffer = '';
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done || cancelled) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              const dataStr = line.slice(6).trim();
-              if (!dataStr) continue;
-              try {
-                const event = JSON.parse(dataStr);
-                if (event.type === 'text') {
-                  assistantText += event.content || '';
-                  if (isCurrent()) setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
-                } else if (event.type === 'routing') {
-                  if (isCurrent()) setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: event.role_id, agentRoleName: event.role_name, agentRoleAvatar: event.role_avatar } : m));
-                } else if (event.type === 'confirmation_required') {
-                  if (isCurrent()) setMessages((prev) => [...prev, {
-                    id: `msg-${Date.now()}-pauseconfirm`, role: 'assistant', content: '',
-                    createdAt: new Date().toISOString(), agentRole: 'director',
-                    pauseConfirm: event.payload as PauseConfirmPayload,
-                  }]);
-                } else if (event.type === 'done' || event.type === 'error') {
-                  if (isCurrent()) setIsResponding(false);
-                }
-              } catch {}
-            }
+        const streamRes = await fetch(
+          `/api/conversations/${convId}/agent/stream?cursor=0`,
+          { signal: controller.signal },
+        );
+        const reader = streamRes.body?.getReader();
+        if (!reader) { if (conversationIdRef.current === convId) setIsResponding(false); return; }
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || controller.signal.aborted) break;
+          lastEventAtRef.current = Date.now();
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const dataStr = line.slice(6).trim();
+            if (!dataStr) continue;
+            try {
+              const event = JSON.parse(dataStr);
+              if (!seeded) {
+                seeded = true;
+                guarded((prev) => prev.some((m) => m.id === assistantMsgId)
+                  ? prev
+                  : [...prev, { id: assistantMsgId, role: 'assistant', content: '', toolCalls: [], createdAt: new Date().toISOString() }]);
+              }
+              if (event.type === 'text') {
+                assistantText += event.content || '';
+                guarded((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
+              } else if (event.type === 'routing') {
+                guarded((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, agentRole: event.role_id, agentRoleName: event.role_name, agentRoleAvatar: event.role_avatar } : m));
+              } else if (event.type === 'confirmation_required') {
+                // Pause-guard MUST survive a reconnect (never drop the confirm card).
+                guarded((prev) => [...prev, {
+                  id: `msg-${Date.now()}-pauseconfirm`, role: 'assistant', content: '',
+                  createdAt: new Date().toISOString(), agentRole: 'director',
+                  pauseConfirm: event.payload as PauseConfirmPayload,
+                }]);
+              } else if (event.type === 'done' || event.type === 'error') {
+                if (conversationIdRef.current === convId) setIsResponding(false);
+              }
+            } catch {}
           }
-          if (isCurrent()) setIsResponding(false);
         }
       } catch {
-        // Agent status check failed — no agent running, that's fine
+        // Abort (switch / superseded) or network — leave recovery to reconcile/watchdog.
+      } finally {
+        if (reconnectAbortRef.current === controller) reconnectAbortRef.current = null;
+        if (conversationIdRef.current === convId) setIsResponding(false);
       }
     })();
+  }, []);
 
-    return () => { cancelled = true; };
-  }, [conversationId]);
+  // ── Reconnect to a live v2 turn ("Ask the team" OR detached direct) ──────
+  // Full replay from cursor 0 rebuilds the OrchestrationLedger (turnEvents) AND
+  // the Director's prose (final_chunk accumulation). This is what was missing:
+  // before, a v2 turn was invisible after a refresh / mode switch. The assistant
+  // bubble is UPSERTED by turnId so a concurrent history reload can never wipe it.
+  const reconnectToV2Turn = useCallback((convId: string, turnId: string) => {
+    reconnectAbortRef.current?.abort();
+    const controller = new AbortController();
+    reconnectAbortRef.current = controller;
+    activeTurnRef.current = { conversationId: convId, turnId };
+    setIsResponding(true);
+    setStopping(false);
+    lastEventAtRef.current = Date.now();
+    const assistantMsgId = `msg-${Date.now()}-reattach`;
+    let directorText = '';
+    const upsertBubble = (patch: Partial<ChatMessage>) => {
+      if (conversationIdRef.current !== convId) return;
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.turnId === turnId);
+        if (idx === -1) return [...prev, { id: assistantMsgId, role: 'assistant', content: '', toolCalls: [], createdAt: new Date().toISOString(), turnId, agentRole: 'director', ...patch }];
+        const next = prev.slice();
+        next[idx] = { ...next[idx], ...patch };
+        return next;
+      });
+    };
+    setTurnEvents((prev) => ({ ...prev, [turnId]: prev[turnId] ?? [] }));
+    setCompleteTurns((prev) => ({ ...prev, [turnId]: prev[turnId] ?? false }));
+    upsertBubble({});
+    (async () => {
+      try {
+        await streamTurn(convId, turnId, 0, {
+          signal: controller.signal,
+          onEvent: (ev) => {
+            if (ev.turn_id && ev.turn_id !== turnId) return;
+            if (conversationIdRef.current !== convId) return;
+            lastEventAtRef.current = Date.now();
+            setTurnEvents((prev) => ({ ...prev, [turnId]: [...(prev[turnId] ?? []), ev] }));
+            switch (ev.type) {
+              case 'routing': {
+                const p = ev.payload as { role_id?: string; role_name?: string; role_avatar?: string } | undefined;
+                if (p?.role_id) upsertBubble({ agentRole: p.role_id, agentRoleName: p.role_name, agentRoleAvatar: p.role_avatar });
+                break;
+              }
+              case 'context_meta':
+                setContextMeta(ev.payload as unknown as ContextMetaData);
+                break;
+              case 'confirmation_required': {
+                // Pause-guard MUST survive a reconnect.
+                const p = ev.payload as unknown as PauseConfirmPayload;
+                if (conversationIdRef.current === convId) setMessages((prev) => [...prev, {
+                  id: `msg-${Date.now()}-pauseconfirm`, role: 'assistant', content: '',
+                  createdAt: new Date().toISOString(), agentRole: 'director', pauseConfirm: p,
+                }]);
+                break;
+              }
+              case 'final_chunk': {
+                const p = ev.payload as { text?: string; content?: string } | undefined;
+                directorText += p?.text ?? p?.content ?? '';
+                upsertBubble({ content: directorText });
+                break;
+              }
+              case 'final_done': {
+                const p = ev.payload as { message_id?: string; agent_role?: string; agent_role_name?: string } | undefined;
+                if (p?.agent_role || p?.agent_role_name) upsertBubble({
+                  ...(p?.agent_role ? { agentRole: p.agent_role } : {}),
+                  ...(p?.agent_role_name ? { agentRoleName: p.agent_role_name } : {}),
+                });
+                break;
+              }
+              case 'turn_error': {
+                const p = ev.payload as { message?: string } | undefined;
+                directorText += `\n\n**Error:** ${p?.message ?? 'orchestration failed'}`;
+                upsertBubble({ content: directorText });
+                if (conversationIdRef.current === convId) setCompleteTurns((prev) => ({ ...prev, [turnId]: true }));
+                break;
+              }
+              case 'turn_stopped': {
+                directorText += '\n\n> Stopped by user.';
+                upsertBubble({ content: directorText });
+                if (conversationIdRef.current === convId) setCompleteTurns((prev) => ({ ...prev, [turnId]: true }));
+                break;
+              }
+              case 'turn_done': {
+                if (conversationIdRef.current === convId) setCompleteTurns((prev) => ({ ...prev, [turnId]: true }));
+                break;
+              }
+              default:
+                break;
+            }
+          },
+        });
+      } catch {
+        // Abort / network — reconcile + watchdog own recovery.
+      } finally {
+        if (reconnectAbortRef.current === controller) reconnectAbortRef.current = null;
+        if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = null;
+        if (conversationIdRef.current === convId) { setIsResponding(false); setStopping(false); }
+      }
+    })();
+  }, []);
+
+  // ── reconcile(): the ONE place that aligns UI state with backend truth ──
+  // Called on conversation open (via loadConversation), on mode switch, on a
+  // stream error/close, and by the watchdog. Never on an interval. Backend is
+  // the single source of truth for turn state; the UI only mirrors it.
+  const reconcile = useCallback(async (convId: string | null, opts?: { force?: boolean }) => {
+    if (!convId) return;
+    const force = opts?.force ?? false;
+    // A local send owns the stream — leave it alone unless the watchdog forces a
+    // heal (a local stream that went silent past the hard interval).
+    if (localStreamRef.current && !force) return;
+    if (reconcilingRef.current) return;
+    reconcilingRef.current = true;
+    try {
+      const truth = await fetchActiveTurn(convId).catch(() => null);
+      if (conversationIdRef.current !== convId) return; // switched away mid-fetch
+      if (!truth) return; // transient error — keep state; watchdog retries later
+      if (!truth.active) {
+        // No live turn server-side → self-heal to idle. Kill any orphaned stream.
+        reconnectAbortRef.current?.abort();
+        reconnectAbortRef.current = null;
+        if (force) {
+          abortControllerRef.current?.abort();
+          abortControllerRef.current = null;
+          localStreamRef.current = false;
+        }
+        activeTurnRef.current = null;
+        setIsResponding(false);
+        setStopping(false);
+        return;
+      }
+      // There IS a live turn — attach if we aren't already on it.
+      if (truth.kind === 'v2' && truth.turn_id) {
+        const already = activeTurnRef.current?.turnId === truth.turn_id
+          && (localStreamRef.current || !!reconnectAbortRef.current);
+        if (already) return;
+        if (localStreamRef.current && !force) return;
+        reconnectToV2Turn(convId, truth.turn_id);
+      } else if (truth.kind === 'direct') {
+        if (localStreamRef.current && !force) return; // our own send owns it
+        if (reconnectAbortRef.current && !force) return; // already reconnected
+        reconnectToDirect(convId);
+      }
+    } finally {
+      reconcilingRef.current = false;
+    }
+  }, [reconnectToV2Turn, reconnectToDirect]);
+
+  // Publish reconcile to the ref so loadConversation (declared earlier) can call
+  // it. Assigned during render (not in an effect) so it is already set before the
+  // mount-time auto-load effect fires loadConversation → reconcile on a refresh
+  // — that is exactly the "recover after reload without a second refresh" path.
+  reconcileRef.current = reconcile;
+
+  // Watchdog — while a stream is live, notice a hard silence and reconcile ONCE
+  // against the truth endpoint. Makes "thinking forever" impossible without a
+  // page refresh, and never hammers the backend (only calls on a silence breach).
+  useEffect(() => {
+    if (!isResponding) return;
+    const timer = setInterval(() => {
+      const silent = Date.now() - lastEventAtRef.current;
+      if (silent >= WATCHDOG_SILENCE_MS) {
+        // Reset the clock so we don't fire every tick while the truth call is in
+        // flight; if still stuck, the next breach fires again.
+        lastEventAtRef.current = Date.now();
+        reconcile(conversationIdRef.current, { force: true });
+      }
+    }, WATCHDOG_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [isResponding, reconcile]);
 
   // Deterministic campaign-switch reset. The old guard compared against a
   // sessionStorage value it mutated itself, which the Campaign Builder's
@@ -338,11 +542,16 @@ export default function ChatPanel() {
     // (see chat.py), so we never carry a thread across a real campaign change
     // — the next send opens a fresh thread bound to the new selection.
     if (prev !== undefined && prev !== selectedCampaignId) {
-      // THE CORE BLEED FIX: kill the in-flight send reader and the chat:display
-      // poller BEFORE clearing state, so neither can write into the new
-      // campaign's window. Without this the old reader's finally/error paths and
-      // the 2s poller keep mutating the now-foreign `messages`.
+      // THE CORE BLEED FIX: kill the in-flight send reader, the reconnect
+      // stream, and the chat:display poller BEFORE clearing state, so none can
+      // write into the new campaign's window. Without this the old reader's
+      // finally/error paths and the 2s poller keep mutating the now-foreign
+      // `messages`.
       abortControllerRef.current?.abort();
+      reconnectAbortRef.current?.abort();
+      reconnectAbortRef.current = null;
+      localStreamRef.current = false;
+      activeTurnRef.current = null;
       tearDownChatDisplayPoller();
       setConversationId(null);
       setMessages([]);
@@ -360,6 +569,9 @@ export default function ChatPanel() {
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+      reconnectAbortRef.current?.abort();
+      reconnectAbortRef.current = null;
+      localStreamRef.current = false;
       tearDownChatDisplayPoller();
     };
   }, [conversationId, tearDownChatDisplayPoller]);
@@ -613,6 +825,12 @@ export default function ChatPanel() {
       };
 
       try {
+        // This local send now OWNS the panel's single live stream — close any
+        // reconnect stream and mark the ownership so reconcile() won't disturb it.
+        reconnectAbortRef.current?.abort();
+        reconnectAbortRef.current = null;
+        localStreamRef.current = true;
+        lastEventAtRef.current = Date.now();
         convId = await ensureConversation();
         const controller = new AbortController();
         abortControllerRef.current = controller;
@@ -666,6 +884,7 @@ export default function ChatPanel() {
             // Runs PER-EVENT, before buffering — a stale run never buffers.
             if (ev.turn_id && ev.turn_id !== turn_id) return;
             if (conversationIdRef.current !== convId) return;
+            lastEventAtRef.current = Date.now(); // feed the watchdog
 
             // FIX 2a: buffer the event for the ledger's replayable model — the
             // scheduled flush drains it into ONE setTurnEvents update per tick,
@@ -780,6 +999,7 @@ export default function ChatPanel() {
         stopFlushTimer();
         flushPending();
         abortControllerRef.current = null;
+        localStreamRef.current = false; // this local send no longer owns the stream
         if (activeTurnRef.current?.turnId === turnId) activeTurnRef.current = null;
         if (conversationIdRef.current === convId) {
           setIsResponding(false);
@@ -830,6 +1050,12 @@ export default function ChatPanel() {
       let assistantText = '';
       let assistantMsgId = '';
       try {
+        // This local send OWNS the panel's single live stream — close any
+        // reconnect stream and claim ownership so reconcile() won't disturb it.
+        reconnectAbortRef.current?.abort();
+        reconnectAbortRef.current = null;
+        localStreamRef.current = true;
+        lastEventAtRef.current = Date.now();
         convId = await ensureConversation();
         const controller = new AbortController();
         abortControllerRef.current = controller;
@@ -871,6 +1097,7 @@ export default function ChatPanel() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          lastEventAtRef.current = Date.now(); // feed the watchdog
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -973,6 +1200,7 @@ export default function ChatPanel() {
       } finally {
         // Clearing the controller is always safe — it belongs to this send.
         abortControllerRef.current = null;
+        localStreamRef.current = false; // this local send no longer owns the stream
         // But only flip isResponding / sweep tool calls for the STILL-DISPLAYED
         // conversation. If the user switched away, this send's finally must not
         // yank isResponding or mutate the now-foreign window.
@@ -1012,6 +1240,10 @@ export default function ChatPanel() {
         setConversationId(convId);
         setMessages([]);
         setIsResponding(true);
+        // This handoff poller drives its own lifecycle (2s poll + 6s-idle stop +
+        // 5-min safety); keep the watchdog quiet by treating each tick as
+        // activity so it never prematurely idles an actively-polled handoff.
+        lastEventAtRef.current = Date.now();
         fetchMessages(convId).then((msgs) => {
           // Only apply the initial load if this handoff's conversation is still
           // the displayed one.
@@ -1030,6 +1262,7 @@ export default function ChatPanel() {
             // don't overwrite the now-displayed conversation (the F7 worst-case
             // bleeder — every 2s for up to 5 min).
             if (conversationIdRef.current !== convId) return;
+            lastEventAtRef.current = Date.now(); // handoff activity — keep watchdog quiet
             setMessages(msgs);
             if (msgs.length === lastMsgCount) {
               unchangedCount++;
@@ -1339,6 +1572,7 @@ export default function ChatPanel() {
           disabled={isResponding}
           campaignName={effectiveCampaignName}
           conversationId={conversationId}
+          onModeChange={() => reconcile(conversationId)}
           onEnsureConversation={ensureConversation}
           onVideoReady={(url, script, thumbnail) => {
             setMessages((prev) => [

@@ -55,9 +55,13 @@ interface ChatInputProps {
   conversationId?: string | null;
   onEnsureConversation?: () => Promise<string>;
   onVideoReady?: (url: string, script: string, thumbnail?: string) => void;
+  /** Fired when the user flips the chat MODE (team ↔ individual). ChatPanel
+   *  reconciles against backend truth so a switch can never leave a stale/stuck
+   *  composer or orphan a live turn's stream. */
+  onModeChange?: () => void;
 }
 
-export default function ChatInput({ onSend, disabled, campaignName, onStop, stopping, dupHint, conversations = [], conversationId, onEnsureConversation, onVideoReady }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, campaignName, onStop, stopping, dupHint, conversations = [], conversationId, onEnsureConversation, onVideoReady, onModeChange }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [model, setModel] = useState<ModelId>('fable');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -571,7 +575,7 @@ The question/topic: ${messageText}`;
         {/* "Ask the team" — v2 orchestration toggle. Quiet ghost, DEFAULT OFF.
             ON = the Director convenes specialists for this turn (orchestrate:true). */}
         <button
-          onClick={() => setOrchestrate((v) => !v)}
+          onClick={() => { setOrchestrate((v) => !v); onModeChange?.(); }}
           className={cn(
             'flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors',
             orchestrate

@@ -548,6 +548,56 @@ async def list_active_turns(conversation_id: str) -> dict:
     return {"conversation_id": conversation_id, "turns": turns}
 
 
+@router.get("/conversations/{conversation_id}/active-turn")
+async def active_turn(conversation_id: str) -> dict:
+    """SINGLE SOURCE OF TRUTH: is a turn live on this conversation right now,
+    and — if so — of which KIND, so the UI can attach to its stream regardless
+    of the mode it is currently showing.
+
+    The chat has TWO turn engines and, before this endpoint, the frontend only
+    knew how to reconnect to ONE of them (the legacy `/agent/status`), so a page
+    refresh (or a team↔individual mode switch) during a v2 "Ask the team" turn
+    left the live response orphaned and the composer stale. This endpoint spans
+    both engines so the client reconciles against ONE truth:
+
+      * kind "v2"     — chat_runner turn (orchestrated "Ask the team" AND the
+                        detached direct turns): a running `chat_turns` row.
+                        Attach via GET .../turns/{turn_id}/stream?cursor=0
+                        (full replay rebuilds the ledger + Director prose).
+      * kind "direct" — the legacy `?stream=1` StreamingResponse send, tracked
+                        in-process by _agent_tasks/_agent_done. Attach via
+                        GET .../agent/stream?cursor=0.
+
+    {active: false} when neither engine has a live run. Cheap (one indexed DB
+    read + an in-memory dict check) and NEVER a stream — the UI calls it only on
+    open / mode-switch / stream-error / watchdog, never on an interval.
+    """
+    # v2 engine first — the durable, restart-surviving record. active_turns only
+    # returns status='running' rows, so a stale/finished/stopped turn is excluded.
+    turns = await chat_runner.active_turns(conversation_id)
+    if turns:
+        t = turns[0]  # newest running turn
+        return {
+            "active": True,
+            "kind": "v2",
+            "turn_id": t["turn_id"],
+            "mode": t.get("mode"),
+            "last_seq": t.get("last_seq", 0),
+        }
+    # Legacy in-process direct send (?stream=1). Process-local, so it is only
+    # ever "active" within the same backend process that started it — which is
+    # exactly the reconnect case the client cares about (same tab / a refresh).
+    task = _agent_tasks.get(conversation_id)
+    if task is not None and not task.done() and not _agent_done.get(conversation_id, False):
+        return {
+            "active": True,
+            "kind": "direct",
+            "mode": "direct",
+            "buffered_events": len(_agent_buffers.get(conversation_id, [])),
+        }
+    return {"active": False}
+
+
 @router.get("/conversations/{conversation_id}/turns/{turn_id}/events")
 async def list_turn_events(conversation_id: str, turn_id: str) -> dict:
     """Full persisted event list for a turn (history replay). 404 if the turn

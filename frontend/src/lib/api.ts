@@ -905,6 +905,25 @@ export function fetchActiveTurns(
   return request(`/conversations/${conversationId}/turns/active`);
 }
 
+/** SINGLE SOURCE OF TRUTH for reconciliation: does this conversation have a
+ *  live turn right now, and of which engine? Spans BOTH the v2 chat_runner
+ *  turns ("Ask the team" + detached direct) AND the legacy `?stream=1` direct
+ *  send, so the UI can attach to whatever is running regardless of the mode the
+ *  composer currently shows. `active:false` = idle → the composer self-heals.
+ *  Cheap + never a stream — call it on open / mode-switch / stream-error /
+ *  watchdog, never on an interval. */
+export interface ActiveTurnTruth {
+  active: boolean;
+  kind?: 'v2' | 'direct';
+  turn_id?: string;
+  mode?: string;
+  last_seq?: number;
+  buffered_events?: number;
+}
+export function fetchActiveTurn(conversationId: string): Promise<ActiveTurnTruth> {
+  return request<ActiveTurnTruth>(`/conversations/${conversationId}/active-turn`);
+}
+
 /** Two-step orchestrated send (stories 3.1/3.2). POST /message with
  *  `orchestrate:true` returns JSON `{turn_id}` immediately (NOT a stream); the
  *  caller then opens the turn SSE via `streamTurn`. The direct-mode send path
