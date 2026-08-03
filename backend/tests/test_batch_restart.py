@@ -122,11 +122,25 @@ async def _settled(batch_id: str) -> int:
     return v["progress"]["done"] + v["progress"]["failed"]
 
 
+async def _clear_batches() -> None:
+    """recover_running_batches is a GLOBAL scan; the vitest-style shared test DB
+    accumulates batches from sibling modules. Clear the batch tables before each
+    test so the sweep sees ONLY this test's seed (isolation, not a product path)."""
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM ad_assets WHERE batch_id IS NOT NULL")
+        await db.execute("DELETE FROM creative_batches")
+        await db.commit()
+    finally:
+        await db.close()
+
+
 class RestartRecovery(unittest.TestCase):
     def setUp(self) -> None:
         studio._GENERATION_SEMAPHORE = asyncio.Semaphore(6)
         _RecordingClient.submit_count = 0
         _RecordingClient.wait_calls = []
+        _run(_clear_batches())
 
     def test_resume_reattaches_reenqueues_and_never_rerenders_completed(self):
         async def _flow():

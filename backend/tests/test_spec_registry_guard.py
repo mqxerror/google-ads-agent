@@ -130,6 +130,11 @@ register_scan_file(_BACKEND / "app" / "services" / "near_dup.py", "py", 0)
 # the sentinel scan the moment it owns that enforcement (14.2's accretion). ──
 register_scan_file(_BACKEND / "app" / "services" / "batch_render.py", "py", 0)
 
+# ── Story 17.6 — SmartAspectSet.tsx reads the tile cap from
+# specs.engine.batch_tile_cap (no baked literal); the preflight rejects over-cap
+# client-side with the cap NAMED. It joins the sentinel scan as the batch UI. ──
+register_scan_file(_CREATIVE / "SmartAspectSet.tsx", "tsx", 0)
+
 # ── Story 16.8 — the legacy per-type draft-copy shims are DELETED (strangler step
 # 5 complete); both wizards draft through the unified copy-jobs contract. Tombstone
 # the shim identifiers so they cannot be resurrected in their router files. ──

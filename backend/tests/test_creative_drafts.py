@@ -73,7 +73,7 @@ async def _schema_version() -> int:
 
 class MigrationV27(unittest.TestCase):
     def test_schema_version_is_27(self):
-        self.assertEqual(_run(_schema_version()), 27)
+        self.assertEqual(_run(_schema_version()), 28)  # V28 (creative_batches) is now head
 
     def test_creative_drafts_columns(self):
         cols = _run(_columns("creative_drafts"))
@@ -133,7 +133,7 @@ class MigrationV27(unittest.TestCase):
     def test_rerun_init_db_is_idempotent(self):
         _run(init_db())
         _run(init_db())
-        self.assertEqual(_run(_schema_version()), 27)
+        self.assertEqual(_run(_schema_version()), 28)  # V28 (creative_batches) is now head
         self.assertIn("bundle_json", _run(_columns("creative_drafts")))
         self.assertIn("request_json", _run(_columns("creative_jobs")))
 

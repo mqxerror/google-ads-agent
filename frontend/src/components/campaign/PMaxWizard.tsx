@@ -55,6 +55,19 @@ import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
 } from '@/components/studio/StudioPanel';
+import SmartAspectSet, { type SmartAspectSlot } from '@/components/creative/SmartAspectSet';
+
+// The full slot set for a Performance Max campaign (Smart ASPECT Set — 17.6).
+const PMAX_FULL_SET_SLOTS: SmartAspectSlot[] = [
+  { slot: 'landscape', label: 'Landscape (1.91:1)', aspect: 1.91 },
+  { slot: 'square', label: 'Square (1:1)', aspect: 1 },
+  { slot: 'portrait', label: 'Portrait (4:5)', aspect: 0.8 },
+  { slot: 'logos', label: 'Logo (1:1)', aspect: 1 },
+];
+// Registry slot key → PMax bundle field.
+const PMAX_SLOT_FIELD: Record<string, keyof PMaxBundle> = {
+  landscape: 'landscape', square: 'square', portrait: 'portrait', logos: 'logos',
+};
 import {
   studioListSouls,
   videoEngineEstimate,
@@ -721,6 +734,13 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         headlinesMax={rules.headlines.max}
         descriptions={bundle.descriptions}
         descriptionsMax={rules.descriptions.max}
+        totalImageCap={Number.isFinite(rules.imageMax) ? rules.imageMax : null}
+        imageSlots={[
+          { slot: 'landscape', label: 'Landscape', count: bundle.landscape.length },
+          { slot: 'square', label: 'Square', count: bundle.square.length },
+          { slot: 'portrait', label: 'Portrait', count: bundle.portrait.length },
+          { slot: 'logos', label: 'Logo', count: bundle.logos.length },
+        ]}
       />
 
       <div className="flex items-center justify-between">
@@ -791,6 +811,7 @@ interface SlotAssetMeta { url: string; filename: string }
 
 function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
   const rules = usePMaxRules();
+  const [fullSetOpen, setFullSetOpen] = useState(false);
   // id → preview url for every slot item, sourced from the library
   // list and merged with fresh generations/uploads as they land.
   const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
@@ -833,10 +854,38 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
     setAssetMeta(prev => ({ ...prev, [id]: meta }));
   }, []);
 
+  const handleFullSetAssign = useCallback((slot: string, id: string, url?: string | null) => {
+    const field = PMAX_SLOT_FIELD[slot];
+    if (!field) return;
+    if (url) registerAsset(id, { url, filename: id });
+    const cur = (bundle[field] as string[]) || [];
+    if (!cur.includes(id)) setField(field, [...cur, id] as PMaxBundle[typeof field]);
+  }, [bundle, setField, registerAsset]);
+
   return (
     <div className="space-y-5">
       <AiHint
         body="Upload assets, pick from the Studio library, or click Generate to open the Studio panel with the slot's aspect locked. Every slot shows the image exactly as Google will receive it — mismatched aspects get center-cropped and are flagged below."
+      />
+      {/* Smart ASPECT Set — one art direction → the whole slot set (story 17.6). */}
+      <button
+        type="button"
+        onClick={() => setFullSetOpen(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-primary/50 bg-primary/5 px-4 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+      >
+        <Sparkles className="h-4 w-4" />
+        Generate the full set (all slots in one action)
+      </button>
+      <SmartAspectSet
+        open={fullSetOpen}
+        onClose={() => setFullSetOpen(false)}
+        accountId={accountId}
+        campaignType="pmax"
+        artDirection={bundle.brief}
+        slots={PMAX_FULL_SET_SLOTS}
+        referenceAssetIds={bundle.referenceAssetIds.length ? bundle.referenceAssetIds : undefined}
+        logoAssetId={bundle.logos[0]}
+        onAssign={handleFullSetAssign}
       />
       <ImageGroup
         label="Logos"

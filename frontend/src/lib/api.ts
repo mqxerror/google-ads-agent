@@ -466,6 +466,9 @@ export interface StudioModelInfo {
   kind: 'image' | 'video' | string;
   tier: 'Best quality' | 'Fast' | 'Budget' | string;
   cost_text: string;
+  /** Hand-maintained numeric estimate for the batch preflight (labeled "est."
+   * in the UI; actuals recorded on the batch row — Honesty Ledger #2). */
+  est_credits?: number;
   available: boolean;
   default: boolean;
   constraints: StudioModelConstraints;
@@ -483,6 +486,79 @@ export interface ModelCatalogResponse {
 export function studioListModels(kind?: 'image' | 'video'): Promise<ModelCatalogResponse> {
   const qs = kind ? `?kind=${kind}` : '';
   return request<ModelCatalogResponse>(`/studio/models${qs}`);
+}
+
+// ── Smart ASPECT Set — batch render (Epic 17) ──────────────────
+// One approved art direction → the full slot set, rendered in waves under the
+// SAME 6-job semaphore as ad-hoc Studio generations, surviving restart.
+
+export interface BatchSlotSpec { slot: string; variants: number; }
+
+export interface BatchRenderRequest {
+  account_id: string;
+  art_direction: string;
+  model: string;
+  mode: 'with_logo' | 'without_logo' | 'asset_anchored';
+  campaign_type: string;
+  campaign_id?: string;
+  logo_asset_id?: string;
+  reference_asset_ids?: string[];
+  slots: BatchSlotSpec[];
+}
+
+export interface BatchTile { asset_id: string; slot: string; variant_index: number; }
+
+export interface BatchRenderResponse {
+  batch_id: string;
+  tiles: BatchTile[];
+  est_credits: number;
+}
+
+export function studioBatchRender(body: BatchRenderRequest): Promise<BatchRenderResponse> {
+  return request<BatchRenderResponse>('/studio/batch-render', {
+    method: 'POST', body: JSON.stringify(body),
+  });
+}
+
+export interface SafeZoneVerdict {
+  slot: string;
+  bbox: number[] | null;
+  slots: Record<string, { flagged: boolean; survival: number }>;
+}
+
+export interface BatchTileView {
+  asset_id: string;
+  slot: string;
+  variant_index: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'nsfw' | string;
+  retry_count: number;
+  url: string | null;
+  parent_asset_id: string | null;
+  error_message: string | null;
+  safe_zone: SafeZoneVerdict | null;
+  /** with_logo: the composited image that fills the slot; the base tile stays
+   * recoverable (FR2.1). */
+  composite_asset_id: string | null;
+  composite_url: string | null;
+}
+
+export interface BatchView {
+  batch_id: string;
+  status: 'running' | 'done' | 'done_with_failures' | 'cancelled' | string;
+  mode: string;
+  est_credits: number | null;
+  progress: { done: number; failed: number; total: number };
+  tiles: BatchTileView[];
+}
+
+export function studioGetBatch(batchId: string): Promise<BatchView> {
+  return request<BatchView>(`/studio/batch-render/${batchId}`);
+}
+
+export function studioRetryBatchTile(
+  batchId: string, assetId: string,
+): Promise<{ asset_id: string; status: string; retry_count: number }> {
+  return request(`/studio/batch-render/${batchId}/tiles/${assetId}/retry`, { method: 'POST' });
 }
 
 export interface SoulCharacter {

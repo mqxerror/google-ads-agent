@@ -298,6 +298,42 @@ class SafeZoneFlagStored(SchedulerBase):
         self.assertIn("tall_portrait", tile["safe_zone"]["slots"])
 
 
+class CreditPreflight(SchedulerBase):
+    def test_catalog_image_models_carry_numeric_est_credits(self):
+        from app.services import model_catalog
+        for mid in ("nano_banana_2", "gpt_image_2", "nano_banana"):
+            entry = model_catalog.get_model(mid)
+            self.assertIsInstance(entry.get("est_credits"), int)
+            self.assertGreater(entry["est_credits"], 0)
+
+    def test_estimate_scales_with_tiles(self):
+        per = br.estimate_credits("nano_banana_2", 1)
+        self.assertEqual(br.estimate_credits("nano_banana_2", 10), per * 10)
+
+    def test_models_endpoint_surfaces_est_credits(self):
+        # The batch preflight reads est_credits off /studio/models — the response
+        # model must not strip it (live-smoke regression, 17.6).
+        from fastapi.testclient import TestClient
+        from app.main import app
+        with TestClient(app) as client:
+            body = client.get("/api/studio/models?kind=image").json()
+        by_id = {m["id"]: m.get("est_credits") for m in body["models"]}
+        self.assertIsInstance(by_id.get("nano_banana_2"), int)
+        self.assertGreater(by_id["nano_banana_2"], 0)
+
+    def test_est_credits_recorded_on_batch_row(self):
+        async def _flow():
+            res = await br.create_batch(
+                account_id="acc-est", art_direction="x", model="nano_banana_2",
+                slots=[{"slot": "square", "variants": 3}])
+            batch = await br._read_batch(res["batch_id"])
+            return res["est_credits"], batch["est_credits"]
+
+        resp_est, row_est = _run(_flow())
+        self.assertEqual(resp_est, row_est)
+        self.assertEqual(resp_est, br.estimate_credits("nano_banana_2", 3))
+
+
 class AutoAssignExactAspect(SchedulerBase):
     def test_completed_landscape_tile_crops_to_1_91_within_tolerance(self):
         from google_ads.services.campaign.creative_images import (

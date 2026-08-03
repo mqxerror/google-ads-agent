@@ -248,6 +248,7 @@ class CatalogModel(BaseModel):
     kind: str                      # 'image' | 'video'
     tier: str                      # 'Best quality' | 'Fast' | 'Budget'
     cost_text: str
+    est_credits: Optional[int] = None  # numeric estimate for the batch preflight (FR2.6)
     available: bool = True
     default: bool = False
     origin: Optional[str] = None       # video only: e.g. 'Google (US)' | 'Kuaishou (CN)'
@@ -297,16 +298,10 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
             status_code=400,
             detail="Must request at least one aspect_ratio",
         )
-    total = n_aspects * body.variants_per_aspect
-    if total > 6:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Total parallel generations = {total} ({n_aspects} aspects × "
-                f"{body.variants_per_aspect} variants/aspect) > Higgsfield's "
-                f"per-account 6-job cap. Reduce variants or aspects."
-            ),
-        )
+    # Strangler step 8 complete (story 17.6): the legacy `aspects × variants > 6`
+    # HARD-FAIL is RETIRED now that SmartAspectSet renders full sets server-side.
+    # Requests beyond 6 no longer 400 — the module-level `_GENERATION_SEMAPHORE`
+    # queues them in waves (NFR-Q1), the same ceiling the batch renderer shares.
 
     # Validate every requested aspect against the chosen model's DECLARED
     # aspect_ratios so an unsupported aspect (e.g. '1.91:1', which no image

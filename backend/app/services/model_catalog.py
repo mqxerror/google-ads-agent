@@ -43,37 +43,44 @@ _CATALOG: list[dict[str, Any]] = [
     # ── Images ──────────────────────────────────────────────────────
     {
         "id": "nano_banana_2", "label": "Nano Banana Pro", "kind": "image",
+        "est_credits": 2,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "about 2 credits per image",
         "default": True,
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "nano_banana_flash", "label": "Nano Banana 2", "kind": "image",
+        "est_credits": 2,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "about 1-2 credits per image",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "nano_banana", "label": "Nano Banana", "kind": "image",
+        "est_credits": 1,  # est. only (Honesty Ledger #2)
         "tier": TIER_BUDGET, "cost_text": "about 1 credit per image",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "gpt_image_2", "label": "GPT Image 2", "kind": "image",
+        "est_credits": 4,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "a few credits per image; strongest at text in images",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "flux_2", "label": "FLUX.2", "kind": "image",
+        "est_credits": 4,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "a few credits per image",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "seedream_v5_lite", "label": "Seedream V5 Lite", "kind": "image",
+        "est_credits": 1,  # est. only (Honesty Ledger #2)
         "tier": TIER_BUDGET, "cost_text": "about 1 credit per image",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "text2image_soul_v2", "label": "Soul V2 (face-consistent)", "kind": "image",
+        "est_credits": 4,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "a few credits per image; needs a trained Soul",
         "constraints": {
             "aspect_ratios": ["1:1", "4:5", "9:16", "16:9"],
@@ -82,6 +89,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "soul_cinematic", "label": "Soul Cinematic", "kind": "image",
+        "est_credits": 4,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "a few credits per image; needs a trained Soul",
         "constraints": {
             "aspect_ratios": ["1:1", "4:5", "9:16", "16:9"],
@@ -90,17 +98,20 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "marketing_studio_image", "label": "Marketing Studio (text-in-image)", "kind": "image",
+        "est_credits": 4,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "a few credits per image",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     {
         "id": "image_auto", "label": "Auto (Higgsfield picks)", "kind": "image",
+        "est_credits": 2,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "varies by the model it picks",
         "constraints": {"aspect_ratios": ["1:1", "4:5", "9:16", "16:9"], "duration_type": None},
     },
     # ── Video ───────────────────────────────────────────────────────
     {
         "id": "veo3_1", "label": "Veo 3.1 (Google)", "kind": "video",
+        "est_credits": 40,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "premium; tens of credits per clip",
         "origin": "Google (US)",
         "strengths": "Motion & physics realism; enum clips 4/6/8s — write self-contained shots",
@@ -113,6 +124,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "veo3_1_lite", "label": "Veo 3.1 Lite", "kind": "video",
+        "est_credits": 8,  # est. only (Honesty Ledger #2)
         "tier": TIER_BUDGET, "cost_text": "about 8 credits per 5s clip",
         "default": True,
         "origin": "Google (US)",
@@ -124,6 +136,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "veo3", "label": "Veo 3 (older)", "kind": "video",
+        "est_credits": 20,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "image-to-video only (needs an input image)",
         "origin": "Google (US)",
         "strengths": "Image-to-video only (needs a start image)",
@@ -134,6 +147,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "kling3_0", "label": "Kling 3.0", "kind": "video",
+        "est_credits": 10,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "about 10 credits per 5s in std mode; 4k costs multiples more",
         "origin": "Kuaishou (CN)",
         "strengths": "Continuity king — single takes up to 15s/10s; std mode = cheap",
@@ -145,6 +159,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "kling2_6", "label": "Kling 2.6", "kind": "video",
+        "est_credits": 8,  # est. only (Honesty Ledger #2)
         "tier": TIER_BUDGET, "cost_text": "cheaper Kling; std mode keeps cost down",
         "origin": "Kuaishou (CN)",
         "strengths": "Continuity king — single takes up to 15s/10s; std mode = cheap",
@@ -156,6 +171,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "seedance_2_0", "label": "Seedance 2.0", "kind": "video",
+        "est_credits": 30,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "tens of credits per clip",
         "origin": "ByteDance (CN)",
         "strengths": "Dynamic action & camera movement",
@@ -163,6 +179,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "seedance1_5", "label": "Seedance 1.5 Pro", "kind": "video",
+        "est_credits": 15,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
         "origin": "ByteDance (CN)",
         "strengths": "Dynamic action & camera movement",
@@ -170,6 +187,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "minimax_hailuo", "label": "Minimax Hailuo", "kind": "video",
+        "est_credits": 12,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
         "origin": "MiniMax (CN)",
         "strengths": "Expressive human performance",
@@ -177,6 +195,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "wan2_6", "label": "Wan 2.6", "kind": "video",
+        "est_credits": 13,  # est. only (Honesty Ledger #2)
         "tier": TIER_BUDGET, "cost_text": "about 13 credits per clip",
         "origin": "Alibaba (CN)",
         "strengths": "Budget b-roll; enum 5/10/15s",
@@ -187,6 +206,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "wan2_7", "label": "Wan 2.7", "kind": "video",
+        "est_credits": 15,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
         "origin": "Alibaba (CN)",
         "strengths": "Budget b-roll; enum 5/10/15s",
@@ -197,6 +217,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "soul_cast", "label": "Soul Cast (face-consistent)", "kind": "video",
+        "est_credits": 40,  # est. only (Honesty Ledger #2)
         "tier": TIER_BEST, "cost_text": "premium; needs a trained Soul",
         "origin": "Higgsfield",
         "strengths": "Face-consistent presenter (needs a trained Soul)",
@@ -207,6 +228,7 @@ _CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "grok_video", "label": "Grok Video", "kind": "video",
+        "est_credits": 12,  # est. only (Honesty Ledger #2)
         "tier": TIER_FAST, "cost_text": "mid-priced per clip",
         "origin": "xAI (US)",
         "strengths": "Fast turnaround, mid quality",

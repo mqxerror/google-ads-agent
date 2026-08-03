@@ -58,6 +58,21 @@ import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
 } from '@/components/studio/StudioPanel';
+import SmartAspectSet, { type SmartAspectSlot } from '@/components/creative/SmartAspectSet';
+
+// The full slot set for a Demand Gen campaign (Smart ASPECT Set — story 17.6).
+const DG_FULL_SET_SLOTS: SmartAspectSlot[] = [
+  { slot: 'landscape', label: 'Landscape (1.91:1)', aspect: 1.91 },
+  { slot: 'square', label: 'Square (1:1)', aspect: 1 },
+  { slot: 'portrait', label: 'Portrait (4:5)', aspect: 0.8 },
+  { slot: 'tall_portrait', label: 'Tall portrait (9:16)', aspect: 0.5625 },
+  { slot: 'logos', label: 'Logo (1:1)', aspect: 1 },
+];
+// Registry slot key → DG bundle field.
+const DG_SLOT_FIELD: Record<string, keyof DGBundle> = {
+  landscape: 'landscape', square: 'square', portrait: 'portrait',
+  tall_portrait: 'tallPortrait', logos: 'logos',
+};
 import type { StudioJobStatus } from '@/lib/api';
 
 const STEPS = [
@@ -724,6 +739,14 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
         headlinesMax={rules.headlines.max}
         descriptions={bundle.descriptions}
         descriptionsMax={rules.descriptions.max}
+        totalImageCap={Number.isFinite(rules.imageMax) ? rules.imageMax : null}
+        imageSlots={[
+          { slot: 'landscape', label: 'Landscape', count: bundle.landscape.length },
+          { slot: 'square', label: 'Square', count: bundle.square.length },
+          { slot: 'portrait', label: 'Portrait', count: bundle.portrait.length },
+          { slot: 'tall_portrait', label: 'Tall', count: bundle.tallPortrait.length },
+          { slot: 'logos', label: 'Logo', count: bundle.logos.length },
+        ]}
       />
 
       <div className="flex items-center justify-between">
@@ -786,6 +809,7 @@ interface SlotAssetMeta { url: string; filename: string }
 
 function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
   const rules = useDemandGenRules();
+  const [fullSetOpen, setFullSetOpen] = useState(false);
   // id → preview meta, sourced from the ad_assets library and merged with
   // fresh uploads as they land.
   const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
@@ -830,6 +854,14 @@ function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setFiel
     referenceNote,
   };
 
+  const handleFullSetAssign = useCallback((slot: string, id: string, url?: string | null) => {
+    const field = DG_SLOT_FIELD[slot];
+    if (!field) return;
+    if (url) registerAsset(id, { url, filename: id });
+    const cur = (bundle[field] as string[]) || [];
+    if (!cur.includes(id)) setField(field, [...cur, id] as DGBundle[typeof field]);
+  }, [bundle, setField, registerAsset]);
+
   return (
     <div className="space-y-5">
       <div className="border border-border bg-secondary/20 rounded-md p-3 text-[11px] leading-relaxed text-muted-foreground">
@@ -837,6 +869,27 @@ function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setFiel
         {' '}Studio asset library, or upload files. Generated images anchor to your reference photos from step 1 and land in the
         {' '}library. Each slot shows the image exactly as Google will receive it — mismatched aspects get center-cropped at submit and are flagged.
       </div>
+      {/* Smart ASPECT Set — one art direction → the whole slot set in one queued
+          action (story 17.6). */}
+      <button
+        type="button"
+        onClick={() => setFullSetOpen(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-primary/50 bg-primary/5 px-4 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+      >
+        <Sparkles className="h-4 w-4" />
+        Generate the full set (all slots in one action)
+      </button>
+      <SmartAspectSet
+        open={fullSetOpen}
+        onClose={() => setFullSetOpen(false)}
+        accountId={accountId}
+        campaignType="demand_gen"
+        artDirection={bundle.brief}
+        slots={DG_FULL_SET_SLOTS}
+        referenceAssetIds={bundle.referenceAssetIds.length ? bundle.referenceAssetIds : undefined}
+        logoAssetId={bundle.logos[0]}
+        onAssign={handleFullSetAssign}
+      />
       <ImageGroup
         label="Logos" spec="Auto-cropped to 1:1 · min 128×128 · transparent bg preferred"
         targetRatio={1} targetLabel="1:1" slotAspect="1:1"
