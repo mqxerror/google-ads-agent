@@ -1286,8 +1286,71 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V27 migration complete (creative_drafts + creative_jobs — draft persistence).")
 
-        if version >= 27:
-            logger.info("Database schema is V27 (up to date).")
+        # V28: Image Engine (Unified Creative Engine, Epic 17 / AD-3).
+        #
+        # `creative_batches` = the parent aggregate for a Smart ASPECT Set run
+        # (one approved art direction → N slot×variant tiles). It is the ONLY
+        # new job-layer table: the child tiles ARE `ad_assets` rows (the
+        # additive columns below), so SlotThumb, the library, the SSE stream and
+        # the exact-aspect crop all keep working unchanged — a second job store
+        # beside `ad_assets` would be the limits bug at the job layer (AD-3
+        # rejected-alternatives). `status` walks running → done |
+        # done_with_failures | cancelled; a restart-recovery sweep (batch_render
+        # .recover_running_batches, app lifespan — NOT this migration) respawns a
+        # supervisor for every `running` batch and finalizes any whose children
+        # are all terminal.
+        #
+        # The `ad_assets` additions make a row batch-aware: `batch_id` (parent
+        # link), `slot` + `variant_index` (its place in the set), `retry_count`
+        # (NFR-Q1 bounded retry), `parent_asset_id` (composite → base link so a
+        # with_logo base stays recoverable — FR2.1), `safe_zone_json` (the
+        # advisory subject-crop flags computed free + local at tile completion —
+        # FR2.5), and `meta_json` (lands HERE once; P4's brand-kit object rides
+        # it with no further migration).
+        if version < 28:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS creative_batches (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_id TEXT,
+                    art_direction TEXT NOT NULL,           -- the approved Enhance prompt
+                    model TEXT NOT NULL,
+                    mode TEXT NOT NULL,                    -- with_logo | without_logo | asset_anchored
+                    logo_asset_id TEXT,
+                    reference_asset_ids_json TEXT,
+                    slots_json TEXT NOT NULL,              -- [{slot, variants}]
+                    status TEXT NOT NULL DEFAULT 'running',-- running | done | done_with_failures | cancelled
+                    est_credits INTEGER,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+                """
+            )
+            # Additive columns — guard each with PRAGMA table_info so re-running
+            # init_db on an already-migrated DB never raises (V13/V22 idiom).
+            cursor = await db.execute("PRAGMA table_info(ad_assets)")
+            aa_cols = [row[1] for row in await cursor.fetchall()]
+            for col, decl in [
+                ("batch_id",        "TEXT"),
+                ("slot",            "TEXT"),
+                ("variant_index",   "INTEGER"),
+                ("retry_count",     "INTEGER DEFAULT 0"),
+                ("parent_asset_id", "TEXT"),
+                ("safe_zone_json",  "TEXT"),
+                ("meta_json",       "TEXT"),
+            ]:
+                if col not in aa_cols:
+                    await db.execute(f"ALTER TABLE ad_assets ADD COLUMN {col} {decl}")
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ad_assets_batch "
+                "ON ad_assets(batch_id, variant_index)"
+            )
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (28)")
+            await db.commit()
+            logger.info("V28 migration complete (creative_batches + ad_assets batch columns).")
+
+        if version >= 28:
+            logger.info("Database schema is V28 (up to date).")
     finally:
         await db.close()
 
