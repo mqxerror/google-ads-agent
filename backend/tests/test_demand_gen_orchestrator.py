@@ -7,7 +7,7 @@ Covers the pieces that matter for a money-safe Demand Gen create:
     demand_gen_ad_group_settings.channel_controls.selected_channels
   * image slot → DemandGenMultiAssetAdInfo field mask, with each slot's
     image cropped to its OWN aspect (logo 1:1, marketing 1.91:1, square 1:1)
-  * text char-limit + count validation (headlines ≤30, descriptions ≤90,
+  * text char-limit + count validation (headlines ≤40, descriptions ≤90,
     business_name ≤25) and the all-channels-off rejection
   * pre-flight rejection of an off-aspect pre-uploaded Google image asset
   * rollback on a partial failure (campaign + budget removed)
@@ -210,9 +210,18 @@ class ValidationTests(unittest.TestCase):
 
     def test_headline_too_long(self):
         with self.assertRaises(DemandGenValidationError) as cm:
-            _validate_bundle(_valid_bundle(headlines=["x" * 31, "ok"]))
+            _validate_bundle(_valid_bundle(headlines=["x" * 41, "ok"]))
         self.assertIn("headlines[0]", "; ".join(cm.exception.errors))
-        self.assertIn("max 30", "; ".join(cm.exception.errors))
+        self.assertIn("max 40", "; ".join(cm.exception.errors))
+
+    def test_headline_40_passes_41_fails(self):
+        # DG headline limit is 40 (Google spec, verified 2026-08-03) — 40 chars
+        # is valid, 41 is rejected.
+        _validate_bundle(_valid_bundle(headlines=["x" * 40, "ok"]))  # no raise
+        with self.assertRaises(DemandGenValidationError) as cm:
+            _validate_bundle(_valid_bundle(headlines=["x" * 41, "ok"]))
+        self.assertIn("headlines[0]", "; ".join(cm.exception.errors))
+        self.assertIn("max 40", "; ".join(cm.exception.errors))
 
     def test_description_too_long(self):
         with self.assertRaises(DemandGenValidationError) as cm:

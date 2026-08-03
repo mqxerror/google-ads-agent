@@ -67,7 +67,7 @@ class DGDraftInner(unittest.TestCase):
         self.assertLessEqual(len(resp.business_name), 25)
         # over-length headline DROPPED (not truncated) — 2 valid remain, in order
         self.assertEqual(resp.headlines, ["Invest in Panama", "Second residency"])
-        self.assertTrue(all(len(h) <= 30 for h in resp.headlines))
+        self.assertTrue(all(len(h) <= 40 for h in resp.headlines))
         self.assertEqual(resp.descriptions, ["Panama investor visa, done right.", "x"])
 
     def test_business_name_falls_back_to_operator_entry(self):
@@ -76,7 +76,7 @@ class DGDraftInner(unittest.TestCase):
         self.assertEqual(resp.business_name, "Mercan")
 
     def test_too_few_valid_headlines_raises_502(self):
-        # every headline is over 30 chars → all dropped → 0 valid < min 1
+        # every headline is over 40 chars → all dropped → 0 valid < min 1
         self._patch(
             '{"business_name": "Mercan",'
             ' "headlines": ["this one is way over the thirty character maximum limit"],'

@@ -115,7 +115,7 @@ _locate_local_image = creative_images.locate_local_image
 # char count pre-flight, same conservative approach as PMax). Counts: ≥1 and
 # ≤5 each for headlines/descriptions; business_name ≤25.
 TEXT_RULES = {
-    "headlines":    {"min_count": 1, "max_count": 5, "max_chars": 30},
+    "headlines":    {"min_count": 1, "max_count": 5, "max_chars": 40},
     "descriptions": {"min_count": 1, "max_count": 5, "max_chars": 90},
 }
 BUSINESS_NAME_MAX_CHARS = 25
@@ -1316,7 +1316,7 @@ def create_demand_gen_orchestrator_tools(
         defaults to OFF and `enable_display` to ON, and each channel is
         toggleable — an all-off selection is rejected pre-flight.
 
-        Validates against Google's Demand Gen minimums (1-5 headlines ≤30
+        Validates against Google's Demand Gen minimums (1-5 headlines ≤40
         chars, 1-5 descriptions ≤90 chars, business_name ≤25 chars, ≥1 logo,
         ≥1 marketing image [landscape 1.91:1 OR square 1:1]) and rolls back on
         partial failure. The campaign is created PAUSED so the user reviews
@@ -1328,7 +1328,7 @@ def create_demand_gen_orchestrator_tools(
             budget_micros: Daily budget in micros (1_000_000 = $1).
             final_urls: At least one landing URL (set on the ad).
             business_name: Advertiser/brand name shown in the ad (≤25 chars).
-            headlines: 1-5 headlines, each ≤30 chars.
+            headlines: 1-5 headlines, each ≤40 chars.
             descriptions: 1-5 descriptions, each ≤90 chars.
             logos: ≥1 logo image ref (1:1) — a Google Ads asset resource name
                 (customers/<cid>/assets/<id>), a bare numeric asset id, OR a

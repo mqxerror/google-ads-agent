@@ -11,7 +11,7 @@
  * can't reach Submit with an invalid bundle:
  *   1. Brief & budget  — name, $/day, final URL, business name, bidding.
  *   2. Targeting       — geo include / exclude ids, language ids.
- *   3. Text assets     — headlines (≥1, ≤5, ≤30c), descriptions (≥1, ≤5, ≤90c),
+ *   3. Text assets     — headlines (≥1, ≤5, ≤40c), descriptions (≥1, ≤5, ≤90c),
  *                        optional call-to-action text.
  *   4. Image assets    — logos (≥1), landscape 1.91:1 / square 1:1 (≥1 of the
  *                        two), optional portrait 4:5 + tall 9:16. Picked from
@@ -54,7 +54,7 @@ const STEPS = [
 // Google's Demand Gen hard minimums — the orchestrator validates these too;
 // this is the client-side mirror so Next/Submit stays disabled until satisfied.
 const RULES = {
-  headlines:    { min: 1, max: 5, maxChars: 30 },
+  headlines:    { min: 1, max: 5, maxChars: 40 },
   descriptions: { min: 1, max: 5, maxChars: 90 },
   businessNameMaxChars: 25,
   logos:        { min: 1, max: 5 },
@@ -169,7 +169,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       const d = bundle.descriptions.filter(s => s.trim());
       if (h.length < RULES.headlines.min) missing.push(`${RULES.headlines.min - h.length} more headline`);
       if (d.length < RULES.descriptions.min) missing.push(`${RULES.descriptions.min - d.length} more description`);
-      if (h.some(s => s.length > RULES.headlines.maxChars)) missing.push('a headline is over 30 chars');
+      if (h.some(s => s.length > RULES.headlines.maxChars)) missing.push('a headline is over 40 chars');
       if (d.some(s => s.length > RULES.descriptions.maxChars)) missing.push('a description is over 90 chars');
     } else if (stepId === 'images') {
       if (bundle.logos.length < RULES.logos.min) missing.push('a logo');

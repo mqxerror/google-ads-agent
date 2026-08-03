@@ -76,7 +76,7 @@ class DemandGenChannels(BaseModel):
 class DemandGenCreateRequest(BaseModel):
     """Wizard submit payload. Every field is validated server-side too — the
     wizard's client-side validation is a UX nicety; the orchestrator rejects
-    anything that doesn't meet Google's hard minimums (headlines ≤5/≤30c,
+    anything that doesn't meet Google's hard minimums (headlines ≤5/≤40c,
     descriptions ≤5/≤90c, business_name ≤25c, at least one channel ON)."""
 
     name: str
@@ -194,7 +194,7 @@ async def create_demand_gen(
 # (`stream_agent_response` with the creative_director role, no Google Ads
 # tools). It differs from PMax only in the OUTPUT shape: Demand Gen has NO long
 # headlines and DOES carry a business_name, and its hard limits are DG's
-# (headlines ≤5/≤30c, descriptions ≤5/≤90c, business_name ≤25c) — so a draft
+# (headlines ≤5/≤40c, descriptions ≤5/≤90c, business_name ≤25c) — so a draft
 # can never exceed what `_validate_bundle` will later accept.
 #
 # Same job+poll shape as PMax: a single 1-3 min HTTP request kept dying when the
@@ -218,7 +218,7 @@ class DGDraftResponse(BaseModel):
 # (min_count, max_count, max_chars) — enforced server-side on whatever the
 # model returns. Mirrors demand_gen_orchestrator._TEXT_RULES + BUSINESS_NAME_MAX.
 _DG_DRAFT_LIMITS = {
-    "headlines": (1, 5, 30),
+    "headlines": (1, 5, 40),
     "descriptions": (1, 5, 90),
 }
 _DG_BUSINESS_NAME_MAX = 25
@@ -278,7 +278,7 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
         f"Campaign name: {body.campaign_name or '-'}\n"
         f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
         "HARD LIMITS (Google rejects violations): business_name ≤25 chars, "
-        "headlines ≤30 chars each, descriptions ≤90 chars each. Provide up to 5 "
+        "headlines ≤40 chars each, descriptions ≤90 chars each. Provide up to 5 "
         "headlines and up to 5 descriptions.\n"
         "DEMAND GEN POLICY: NO prices or discounts in the copy · NO citizenship "
         "or guaranteed-approval promises · avoid the symbols ~ | + (flagged as "
@@ -288,7 +288,7 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
         "keep it the real brand (≤25 chars), not a slogan.\n\n"
         "Respond with ONLY this JSON, no prose:\n"
         '{"business_name": "<brand, ≤25 chars>", '
-        '"headlines": [3-5 strings ≤30 chars], '
+        '"headlines": [3-5 strings ≤40 chars], '
         '"descriptions": [3-5 strings ≤90 chars]}'
     )
 
