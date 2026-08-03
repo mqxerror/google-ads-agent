@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import DraftManager from '@/components/creative/DraftManager';
+import TextWorkbench from '@/components/creative/TextWorkbench';
 import {
   isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
   clearCacheMeta, touchCacheTs, shouldOfferRestore,
@@ -617,7 +618,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         onDraftCopy={draftForPanel}
         onUseCopy={applyDraft}
       />
-      <TextList
+      <TextWorkbench
         label="Headlines"
         hint={`≥${rules.headlines.min}, each ≤${rules.headlines.maxChars} chars · up to ${rules.headlines.max}`}
         items={bundle.headlines}
@@ -626,7 +627,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         minItems={rules.headlines.min}
         maxItems={rules.headlines.max}
       />
-      <TextList
+      <TextWorkbench
         label="Long headlines"
         hint={`≥${rules.longHeadlines.min}, each ≤${rules.longHeadlines.maxChars} chars · up to ${rules.longHeadlines.max}`}
         items={bundle.longHeadlines}
@@ -635,7 +636,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         minItems={rules.longHeadlines.min}
         maxItems={rules.longHeadlines.max}
       />
-      <TextList
+      <TextWorkbench
         label="Descriptions"
         hint={`≥${rules.descriptions.min}, each ≤${rules.descriptions.maxChars} chars · up to ${rules.descriptions.max}`}
         items={bundle.descriptions}
@@ -1591,7 +1592,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         <code>?v=</code> in the YouTube URL) — or use the panel above to create
         and upload one.
       </p>
-      <TextList
+      <TextWorkbench
         label="YouTube video IDs"
         hint="optional"
         items={bundle.videoIds}
@@ -1740,7 +1741,7 @@ function StepSignals({ bundle, setField }: { bundle: PMaxBundle; setField: <K ex
         body="Audience signals tell Google's algorithm who to target initially. Optional — skip to let PMax explore from scratch. Custom-segment wiring layered in the next phase."
       />
       <p className="text-xs text-muted-foreground">Skip this step or add free-text signal hints. Each hint is attached to the asset group as a search-theme signal; structured custom-segment wiring is a follow-up.</p>
-      <TextList
+      <TextWorkbench
         label="Signal hints (optional)"
         hint="One per row — e.g. 'high-net-worth investors', 'second-passport seekers'"
         items={bundle.audienceSignals.length ? bundle.audienceSignals : ['']}
@@ -1802,72 +1803,8 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 }
 
 // ── Reusable building blocks ────────────────────────────────────────
-
-function TextList({
-  label, hint, items, onChange, maxChars, minItems, maxItems, placeholder,
-}: {
-  label: string; hint: string; items: string[]; onChange: (v: string[]) => void;
-  maxChars: number; minItems: number; maxItems: number; placeholder?: string;
-}) {
-  const setAt = (i: number, val: string) => {
-    const next = [...items];
-    next[i] = val;
-    onChange(next);
-  };
-  const addRow = () => onChange([...items, '']);
-  const removeRow = (i: number) => {
-    const next = [...items];
-    next.splice(i, 1);
-    onChange(next.length ? next : ['']);
-  };
-  const filled = items.filter(Boolean).length;
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-1.5">
-        <label className="text-xs font-medium">{label}</label>
-        <span className={cn(
-          'text-[10px]',
-          filled < minItems ? 'text-amber-500' : 'text-muted-foreground'
-        )}>
-          {filled}/{minItems} min · {hint}
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        {items.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              value={item}
-              onChange={e => setAt(i, e.target.value.slice(0, maxChars))}
-              placeholder={placeholder || `${label} ${i + 1}`}
-              className={cn('flex-1 text-sm', item.length > maxChars && 'border-red-500')}
-            />
-            <span className={cn(
-              'text-[10px] tabular-nums w-12 text-right',
-              item.length > maxChars * 0.9 ? 'text-amber-500' : 'text-muted-foreground'
-            )}>
-              {item.length}/{maxChars}
-            </span>
-            <button
-              onClick={() => removeRow(i)}
-              className="p-1 hover:bg-secondary rounded text-muted-foreground"
-              aria-label="Remove"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-        {items.length < maxItems && (
-          <button
-            onClick={addRow}
-            className="text-xs text-primary hover:underline flex items-center gap-1"
-          >
-            <Plus className="h-3 w-3" /> Add another
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+// TextList was extracted to the shared creative/TextWorkbench (story 15.6) —
+// both wizards now import it (paste-split + near-dup badge live there).
 
 function ImageGroup({
   label, spec, slotAspect, googleAspect, googleAspectLabel,

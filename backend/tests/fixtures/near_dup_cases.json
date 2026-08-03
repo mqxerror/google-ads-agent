@@ -1,0 +1,61 @@
+{
+  "_doc": "Golden parity fixture for the near-duplicate detector (Epic 15/16, FR1.10). BOTH the TypeScript detector (frontend/src/lib/nearDup.ts, story 15.6) and the Python twin (backend/app/services/near_dup.py, story 16.4) load THIS SAME file and must assert IDENTICAL flag sets on every case (fence F5). The stopword list ships HERE (not inline) so the two runtimes cannot drift. expected_pairs are [i, j] index tuples (i < j), ascending.",
+  "threshold": 0.65,
+  "stopwords": [
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+    "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
+    "was", "were", "with", "you", "your", "we", "our", "my", "i", "but"
+  ],
+  "cases": [
+    {
+      "name": "identical",
+      "texts": ["Buy property in Panama", "Buy property in Panama"],
+      "expected_pairs": [[0, 1]]
+    },
+    {
+      "name": "containment-today",
+      "texts": ["Move to Panama", "Move to Panama today", "Retire in Greece"],
+      "expected_pairs": [[0, 1]]
+    },
+    {
+      "name": "word-order-and-suffix-fold",
+      "texts": ["Panama residency programs", "Programs for Panama residency"],
+      "expected_pairs": [[0, 1]]
+    },
+    {
+      "name": "all-distinct",
+      "texts": [
+        "Panama investor visa",
+        "Greece golden visa",
+        "Portugal residency program"
+      ],
+      "expected_pairs": []
+    },
+    {
+      "name": "empty-and-stopword-rows-never-flag",
+      "texts": ["", "the and of", "Panama investor visa"],
+      "expected_pairs": []
+    },
+    {
+      "name": "fifteen-rows-two-dupes",
+      "texts": [
+        "Second passport through investment",
+        "Panama residency for families",
+        "Golden visa consultation booked",
+        "Invest in Panama",
+        "Retire in the Caribbean sun",
+        "Fast track European residency",
+        "European citizenship options explained",
+        "Tax benefits living abroad",
+        "Move your family safely",
+        "Trusted immigration advisors worldwide",
+        "Book a free strategy call",
+        "Invest in Panama now",
+        "Live and work in Greece",
+        "Portugal D7 visa guide",
+        "Your new life starts here"
+      ],
+      "expected_pairs": [[3, 11]]
+    }
+  ]
+}

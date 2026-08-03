@@ -109,6 +109,12 @@ register_scan_file(_WIZ / "DemandGenWizard.tsx", "tsx", 0)
 # `spec-ok` reasons in PMaxWizard.tsx. Snapshot so any new one is visible in review.
 register_scan_file(_WIZ / "PMaxWizard.tsx", "tsx", 4)
 
+# ── Story 15.6 — TextList extracted to the shared TextWorkbench; it joins the
+# sentinel scan the moment it exists (per 14.2's accretion plan). Limits arrive
+# as props from the provider — zero baked creative-limit literals. ──
+_CREATIVE = _FRONTEND / "src" / "components" / "creative"
+register_scan_file(_CREATIVE / "TextWorkbench.tsx", "tsx", 0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2
