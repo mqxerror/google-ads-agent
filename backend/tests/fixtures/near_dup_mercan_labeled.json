@@ -1,0 +1,19 @@
+{
+  "_doc": "Labeled near-duplicate set built from REAL Mercan campaign copy patterns (Panama QIP / Greece Golden Visa immigration ads). Ground-truth `labeled_dup_pairs` are the human-judged near-duplicate headline pairs (i<j, ascending). Story 16.4 tunes ENGINE.near_dup_threshold against this set before P2 exit (Risk R1) and records precision/recall in the feature-log. Paraphrase-only duplicates (different words, same idea) are deliberately NOT labeled dup — token similarity cannot catch them (R1 accepted ceiling; an LLM scorer can be added behind the same flag shape later).",
+  "threshold": 0.65,
+  "texts": [
+    "Get your Panama residency",
+    "Get your Panama residency today",
+    "Invest in Panama, live anywhere",
+    "Panama investor visa made simple",
+    "Simple Panama investor visa",
+    "Greece Golden Visa from 250k euros",
+    "Greece Golden Visa starting at 250k",
+    "Second passport through investment",
+    "European citizenship options explained",
+    "Book a free strategy call",
+    "Retire on a Caribbean beach",
+    "Your new life abroad starts now"
+  ],
+  "labeled_dup_pairs": [[0, 1], [3, 4], [5, 6]]
+}

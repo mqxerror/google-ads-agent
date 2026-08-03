@@ -120,6 +120,11 @@ register_scan_file(_CREATIVE / "TextWorkbench.tsx", "tsx", 0)
 # joins the sentinel scan the moment it owns the contract (14.2's accretion). ──
 register_scan_file(_BACKEND / "app" / "services" / "creative_copy.py", "py", 0)
 
+# ── Story 16.4 — near_dup.py reads its threshold from ENGINE.near_dup_threshold
+# (no baked constant); the suffix-fold length guards (1-4) are below the sentinel
+# set, so it stays literal-free under the scan. ──
+register_scan_file(_BACKEND / "app" / "services" / "near_dup.py", "py", 0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2
