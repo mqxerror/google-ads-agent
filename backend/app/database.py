@@ -1352,6 +1352,17 @@ async def init_db() -> None:
 
         if version >= 28:
             logger.info("Database schema is V28 (up to date).")
+
+        # Config seed (Epic 18, story 18.4 · FR3.5): the ownership allowlist for
+        # the page scraper. INSERT OR IGNORE so it is created once and never
+        # overwrites an operator edit — widening beyond owned properties stays a
+        # review of THIS row, not a code change (R4). Not a migration (no schema
+        # change), so it runs idempotently every boot.
+        await db.execute(
+            "INSERT OR IGNORE INTO config (key, value) VALUES ('creative.owned_domains', ?)",
+            ('["mercan.com"]',),
+        )
+        await db.commit()
     finally:
         await db.close()
 

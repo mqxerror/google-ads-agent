@@ -776,7 +776,24 @@ async def load_brand_kit_by_hash(account_id: Optional[str], research_hash_val: s
         return None
 
 
-# ── Ownership guard (minimal for 18.2; robots + config seeding land in 18.4) ──
+# ── Ownership allowlist + robots posture (FR3.5 · R4) ─────────────────────────
+#
+# Fail-closed by design: a URL whose registrable domain is NOT on the
+# `creative.owned_domains` config allowlist is REFUSED unless the caller passes
+# `confirm_ownership=true`; every URL (owned or confirmed) must also pass
+# robots.txt. Widening beyond owned properties stays a REVIEW, not a config flip
+# (R4) — the allowlist is seeded (mercan.com), the confirm flag is per-request,
+# and there is no code path that scrapes an unowned, unconfirmed URL.
+
+# Seed fallback when the config row is absent (init_db seeds the row idempotently;
+# this keeps the guard fail-closed even before the first boot writes it).
+_DEFAULT_OWNED_DOMAINS = ("mercan.com",)
+_OWNED_DOMAINS_KEY = "creative.owned_domains"
+
+# robots.txt is fetched ONCE per host (cached) — a subordinate fetch, not an HTML
+# document fetch (the FR3.3 spy is unaffected). Value None ⇒ no robots / fetch
+# failed ⇒ allowed (fail-open on robots, fail-CLOSED on ownership).
+_ROBOTS_CACHE: dict[str, Any] = {}
 
 
 class ScrapeRefused(RuntimeError):
@@ -789,16 +806,96 @@ class ScrapeRefused(RuntimeError):
         self.status_code = status_code
 
 
+async def _owned_domains() -> list[str]:
+    """The ``creative.owned_domains`` allowlist from the config table (JSON list),
+    falling back to the seed default if the row is missing/malformed."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT value FROM config WHERE key = ?", (_OWNED_DOMAINS_KEY,))
+        row = await cur.fetchone()
+    finally:
+        await db.close()
+    if row and row["value"]:
+        try:
+            val = json.loads(row["value"])
+            if isinstance(val, list) and val:
+                return [str(d).strip().lower() for d in val if str(d).strip()]
+        except (ValueError, TypeError):
+            pass
+    return list(_DEFAULT_OWNED_DOMAINS)
+
+
+def _registrable_match(host: str, domain: str) -> bool:
+    """True when ``host`` is ``domain`` or a subdomain of it (www.mercan.com and
+    goldenvisas.mercan.com both match ``mercan.com``)."""
+    host = (host or "").lower().rstrip(".")
+    domain = (domain or "").lower().rstrip(".")
+    return bool(domain) and (host == domain or host.endswith("." + domain))
+
+
+async def _is_owned(url: str) -> bool:
+    host = urlparse(url).hostname or ""
+    domains = await _owned_domains()
+    return any(_registrable_match(host, d) for d in domains)
+
+
+async def _fetch_robots_txt(base_url: str) -> Optional[str]:
+    """Fetch a host's robots.txt text (subordinate fetch). Returns None on any
+    failure — robots is fail-OPEN, ownership is the fail-CLOSED gate."""
+    parts = urlparse(base_url)
+    robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
+    try:
+        async with httpx.AsyncClient(
+            timeout=_ASSET_FETCH_TIMEOUT_S, follow_redirects=True,
+            headers={"User-Agent": _ASSET_USER_AGENT},
+        ) as client:
+            r = await client.get(robots_url)
+            if r.status_code >= 400:
+                return None
+            return r.text
+    except httpx.RequestError:
+        return None
+
+
+async def _robots_allows(url: str) -> tuple[bool, str]:
+    """Evaluate robots.txt with ``urllib.robotparser`` (fetched once per host,
+    cached). Returns ``(allowed, reason)``."""
+    from urllib.robotparser import RobotFileParser
+
+    parts = urlparse(url)
+    host = parts.netloc
+    if host not in _ROBOTS_CACHE:
+        text = await _fetch_robots_txt(url)
+        if text is None:
+            _ROBOTS_CACHE[host] = None
+        else:
+            rp = RobotFileParser()
+            rp.parse(text.splitlines())
+            _ROBOTS_CACHE[host] = rp
+    rp = _ROBOTS_CACHE[host]
+    if rp is None:
+        return True, ""
+    if rp.can_fetch(_ASSET_USER_AGENT, url) or rp.can_fetch("*", url):
+        return True, ""
+    return False, f"robots.txt disallows fetching {parts.path or '/'} for this agent"
+
+
 async def assert_scrapable(url: str, *, confirm_ownership: bool) -> None:
-    """Fail-closed ownership check (FR3.5). In 18.2 this requires an explicit
-    ``confirm_ownership`` for ANY URL; story 18.4 adds the ``creative.owned_domains``
-    allowlist (owned properties skip the confirm) + robots.txt respect."""
-    if not confirm_ownership:
+    """Fail-closed ownership + robots gate (FR3.5). A URL off the owned-domains
+    allowlist requires ``confirm_ownership=true`` or is refused (422); a
+    robots-disallowed URL is refused (403). Widening beyond owned properties is a
+    review, not a flag flip (R4)."""
+    if not (await _is_owned(url) or confirm_ownership):
         raise ScrapeRefused(
-            "ownership not confirmed — the scraper runs only against operator-owned "
-            "properties; pass confirm_ownership=true for a URL you own",
+            "ownership not confirmed — this URL is not on the owned-properties "
+            "allowlist (creative.owned_domains); pass confirm_ownership=true for a "
+            "URL you own, or add its domain to the allowlist (a review, not a flag)",
             status_code=422,
         )
+    allowed, reason = await _robots_allows(url)
+    if not allowed:
+        raise ScrapeRefused(reason, status_code=403)
 
 
 # ── Claim seed gate (FR3.4 · Honesty ledger #5) ───────────────────────────────

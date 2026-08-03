@@ -100,19 +100,25 @@ class BrandKitEndpoint(unittest.TestCase):
         async def fake_css(page_arg, *, client=None):
             return []
 
+        async def fake_robots(url):
+            return True, ""      # network-free: no live robots.txt fetch
+
         import app.services.page_fetcher as pf
         self._orig_fetch = pf.fetch
         self._orig_dl = brand_kit._download_image
         self._orig_css = brand_kit.fetch_linked_css
+        self._orig_robots = brand_kit._robots_allows
         pf.fetch = fake_fetch
         brand_kit._download_image = fake_download
         brand_kit.fetch_linked_css = fake_css
+        brand_kit._robots_allows = fake_robots
 
     def _unpatch(self):
         import app.services.page_fetcher as pf
         pf.fetch = self._orig_fetch
         brand_kit._download_image = self._orig_dl
         brand_kit.fetch_linked_css = self._orig_css
+        brand_kit._robots_allows = self._orig_robots
 
     def test_endpoint_persists_assets_and_returns_kit(self):
         self._patch()
@@ -218,6 +224,42 @@ class ExtractBriefUnification(unittest.TestCase):
         # identity token the copy drafter records on its job row.
         expected = brand_kit.research_hash(brand_kit.research_object(page))
         self.assertEqual(body["research_hash"], expected)
+
+
+class OwnedDomainsConfigSeed(unittest.TestCase):
+    """Story 18.4 — the ownership allowlist lives in the config table, seeded
+    idempotently by init_db (FR3.5). Owned domains + subdomains resolve; the
+    scrape guard reads it."""
+
+    def test_config_seed_present_and_read(self):
+        async def _run():
+            db = await get_db()
+            try:
+                cur = await db.execute(
+                    "SELECT value FROM config WHERE key='creative.owned_domains'")
+                row = await cur.fetchone()
+            finally:
+                await db.close()
+            domains = await brand_kit._owned_domains()
+            return row, domains
+        row, domains = asyncio.run(_run())
+        self.assertIsNotNone(row)                     # init_db seeded the row
+        self.assertIn("mercan.com", domains)
+
+    def test_owned_subdomain_resolves_without_confirm(self):
+        # www + goldenvisas subdomains both match mercan.com; robots stubbed open.
+        orig = brand_kit._robots_allows
+
+        async def fake_robots(url):
+            return True, ""
+        brand_kit._robots_allows = fake_robots
+        try:
+            async def _run():
+                await brand_kit.assert_scrapable(
+                    "https://goldenvisas.mercan.com/lp", confirm_ownership=False)
+            asyncio.run(_run())  # no raise = owned subdomain allowed
+        finally:
+            brand_kit._robots_allows = orig
 
 
 class CopyJobResearchHash(unittest.TestCase):
