@@ -124,6 +124,10 @@ export interface PMaxRules {
   square: SlotRule;
   videos: SlotRule;
   imageMax: number;
+  businessNameMaxChars: number;
+  searchThemes: { maxCount: number; maxChars: number } | null;
+  finalUrlMax: number;
+  shortDescriptionMaxChars: number | null;   // soft (verified:false) — warn only
   ready: boolean;
 }
 
@@ -155,6 +159,7 @@ export function dgRulesFromSpecs(specs: SpecsResponse | null): DemandGenRules {
 
 export function pmaxRulesFromSpecs(specs: SpecsResponse | null): PMaxRules {
   const s = specs?.campaign_types?.pmax;
+  const st = s?.search_themes ?? null;
   return {
     headlines: fieldRule(s?.text?.headlines),
     longHeadlines: fieldRule(s?.text?.long_headlines),
@@ -164,6 +169,10 @@ export function pmaxRulesFromSpecs(specs: SpecsResponse | null): PMaxRules {
     square: slotRule(s?.images?.square),
     videos: { min: 0, max: s?.video?.max_per_orientation ?? Infinity },
     imageMax: s?.total_image_cap ?? Infinity,
+    businessNameMaxChars: s?.business_name_max ?? Infinity,
+    searchThemes: st ? { maxCount: st[0], maxChars: st[1] } : null,
+    finalUrlMax: s?.final_url_max ?? Infinity,
+    shortDescriptionMaxChars: s?.short_description?.max_chars ?? null,
     ready: specs !== null,
   };
 }
