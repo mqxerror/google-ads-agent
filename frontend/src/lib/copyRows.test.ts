@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   distributeRows, toRows, regenerateTargets, buildDiversifyBody, spliceMeta,
-  textCoverage, type CopyRow,
+  textCoverage, imageCoverage, type CopyRow,
 } from './copyRows';
 
 describe('distributeRows — rows → per-field text + angle arrays (FR1.7)', () => {
@@ -100,5 +100,35 @@ describe('textCoverage — honest completeness numbers (FR5.1)', () => {
       ['a', 'b', 'c'], ['benefit', 'urgency', null], 15, [], 5, 0,
     );
     expect(cov.distinctAngles).toBe(2);
+  });
+});
+
+describe('imageCoverage — image-slot completeness numbers (FR5.1 image scope, 17.7)', () => {
+  it('sums images across ALL slots against the cross-slot cap', () => {
+    const cov = imageCoverage([
+      { slot: 'landscape', label: 'Landscape', count: 3 },
+      { slot: 'square', label: 'Square', count: 2 },
+      { slot: 'portrait', label: 'Portrait', count: 0 },
+      { slot: 'logos', label: 'Logo', count: 1 },
+    ], 20);
+    expect(cov.totalFilled).toBe(6);
+    expect(cov.totalCap).toBe(20);
+  });
+
+  it('reports per-aspect slot fill (filled/empty)', () => {
+    const cov = imageCoverage([
+      { slot: 'landscape', label: 'Landscape', count: 2 },
+      { slot: 'portrait', label: 'Portrait', count: 0 },
+    ], null);
+    const bySlot = Object.fromEntries(cov.slots.map(s => [s.slot, s.filled]));
+    expect(bySlot.landscape).toBe(2);
+    expect(bySlot.portrait).toBe(0);
+    expect(cov.totalCap).toBeNull();
+  });
+
+  it('clamps negative counts to zero (defensive)', () => {
+    const cov = imageCoverage([{ slot: 'square', label: 'Square', count: -1 }], 20);
+    expect(cov.totalFilled).toBe(0);
+    expect(cov.slots[0].filled).toBe(0);
   });
 });

@@ -117,6 +117,35 @@ export interface TextCoverage {
 /** Compute the text-coverage numbers. `nearDupCount` is passed in (the caller
  * runs the near-dup detector with the registry threshold) so this stays a pure
  * arithmetic function. Distinct angles counts non-null headline angles. */
+export interface ImageSlotCoverage {
+  slot: string;
+  label: string;
+  filled: number;
+}
+
+export interface ImageCoverage {
+  /** Total images across ALL slots (the cross-slot count — Honesty Ledger #8). */
+  totalFilled: number;
+  /** Cross-slot cap (spec.total_image_cap); null ⇒ per-slot only. */
+  totalCap: number | null;
+  /** Per-aspect slot fill (label + filled). */
+  slots: ImageSlotCoverage[];
+}
+
+/** Compute image coverage: the cross-slot total (against total_image_cap) plus
+ * per-aspect slot fill. Pure arithmetic over the wizard's slot arrays and the
+ * registry slot specs — zero network (FR5.1 image scope). */
+export function imageCoverage(
+  slots: { slot: string; label: string; count: number }[],
+  totalCap: number | null,
+): ImageCoverage {
+  return {
+    totalFilled: slots.reduce((n, s) => n + Math.max(0, s.count), 0),
+    totalCap,
+    slots: slots.map(s => ({ slot: s.slot, label: s.label, filled: Math.max(0, s.count) })),
+  };
+}
+
 export function textCoverage(
   headlines: string[],
   headlineAngles: (string | null)[],

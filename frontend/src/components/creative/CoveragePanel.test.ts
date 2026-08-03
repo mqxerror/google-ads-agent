@@ -37,3 +37,24 @@ describe('CoveragePanel copy invariant (FR5.1)', () => {
     expect(code).toContain('Near-dupes');
   });
 });
+
+describe('CoveragePanel image-slot scope (story 17.7 · FR5.1)', () => {
+  const code = strippedSource(SRC);
+
+  it('computes image coverage from the registry-driven imageCoverage helper', () => {
+    expect(SRC).toContain('imageCoverage');
+    expect(SRC).toContain('totalImageCap');
+    expect(SRC).toContain('imageSlots');
+  });
+
+  it('shows cross-slot images n/cap and per-aspect slot fill', () => {
+    expect(code).toContain('Images');
+    expect(code).toContain('img.totalFilled');
+    expect(code).toContain('img.totalCap');
+    expect(code).toContain('img.slots');
+  });
+
+  it('never chases an "Excellent" label in the image section either', () => {
+    expect(code.toLowerCase()).not.toContain('excellent');
+  });
+});

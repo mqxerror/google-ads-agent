@@ -11,16 +11,22 @@ import { CheckCircle2, Circle, Copy, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCreativeSpecs } from '@/lib/creativeSpecs';
 import { flaggedRowIndices } from '@/lib/nearDup';
-import { textCoverage } from '@/lib/copyRows';
+import { textCoverage, imageCoverage } from '@/lib/copyRows';
+
+export interface CoverageImageSlot { slot: string; label: string; count: number }
 
 export default function CoveragePanel({
   headlines, headlineAngles, headlinesMax, descriptions, descriptionsMax,
+  imageSlots, totalImageCap,
 }: {
   headlines: string[];
   headlineAngles: (string | null)[];
   headlinesMax: number;
   descriptions: string[];
   descriptionsMax: number;
+  /** Image-slot scope (story 17.7 · FR5.1). Omit for text-only coverage. */
+  imageSlots?: CoverageImageSlot[];
+  totalImageCap?: number | null;
 }) {
   const { specs } = useCreativeSpecs();
   const threshold = specs?.engine?.near_dup_threshold;
@@ -31,6 +37,9 @@ export default function CoveragePanel({
   const cov = textCoverage(
     headlines, headlineAngles, headlinesMax, descriptions, descriptionsMax, nearDupCount,
   );
+  const img = imageSlots && imageSlots.length
+    ? imageCoverage(imageSlots, totalImageCap ?? null)
+    : null;
 
   return (
     <div className="border border-border rounded-md bg-secondary/20 p-3">
@@ -62,6 +71,28 @@ export default function CoveragePanel({
           tone={cov.nearDupCount ? 'warn' : 'ok'}
         />
       </div>
+
+      {img && (
+        <div className="mt-3 border-t border-border pt-2">
+          <div className="mb-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <Metric
+              icon={img.totalFilled >= 1 ? CheckCircle2 : Circle}
+              label="Images"
+              value={`${img.totalFilled}/${img.totalCap ?? '—'}`}
+              hint="fill more slots"
+            />
+            {img.slots.map(s => (
+              <Metric
+                key={s.slot}
+                icon={s.filled >= 1 ? CheckCircle2 : Circle}
+                label={s.label}
+                value={s.filled ? `${s.filled} filled` : 'empty'}
+                hint="fill more slots"
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
