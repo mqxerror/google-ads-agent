@@ -1314,6 +1314,7 @@ async def init_db() -> None:
                     id TEXT PRIMARY KEY,
                     account_id TEXT NOT NULL,
                     campaign_id TEXT,
+                    campaign_type TEXT NOT NULL DEFAULT 'pmax',  -- pmax | demand_gen | rda (policy key)
                     art_direction TEXT NOT NULL,           -- the approved Enhance prompt
                     model TEXT NOT NULL,
                     mode TEXT NOT NULL,                    -- with_logo | without_logo | asset_anchored

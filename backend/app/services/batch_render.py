@@ -90,6 +90,7 @@ async def create_batch(
     model: str,
     slots: list[dict[str, Any]],
     mode: str = "without_logo",
+    campaign_type: str = "pmax",
     campaign_id: Optional[str] = None,
     logo_asset_id: Optional[str] = None,
     reference_asset_ids: Optional[list[str]] = None,
@@ -135,13 +136,13 @@ async def create_batch(
     try:
         await db.execute(
             """INSERT INTO creative_batches
-               (id, account_id, campaign_id, art_direction, model, mode,
-                logo_asset_id, reference_asset_ids_json, slots_json, status,
+               (id, account_id, campaign_id, campaign_type, art_direction, model,
+                mode, logo_asset_id, reference_asset_ids_json, slots_json, status,
                 est_credits, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', ?, datetime('now'))""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', ?, datetime('now'))""",
             (
-                batch_id, account_id, campaign_id, art_direction, model, mode,
-                logo_asset_id,
+                batch_id, account_id, campaign_id, campaign_type, art_direction,
+                model, mode, logo_asset_id,
                 json.dumps(reference_asset_ids) if reference_asset_ids else None,
                 json.dumps(slots), est,
             ),
@@ -242,10 +243,123 @@ async def _render_tile(
 
 
 async def _post_complete(batch: dict[str, Any], row: dict[str, Any]) -> None:
-    """Per-tile completion hook. 17.5 adds the safe-zone flag write; 17.2 adds
-    the with_logo compositor. Kept as one seam so both plug in without touching
-    the scheduler."""
-    return None
+    """Per-tile completion hook — one seam so every mode/flag plugs in without
+    touching the scheduler. 17.2: the with_logo compositor (policy-gated). 17.5
+    adds the safe-zone flag write beside it."""
+    if (batch.get("mode") == "with_logo") and batch.get("logo_asset_id"):
+        await _apply_logo(batch, row)
+
+
+def _logo_overlay_policy(campaign_type: str) -> str:
+    """Resolve the logo-overlay policy from the registry — table-driven, never a
+    code branch on campaign type (NFR-C1). 'forbid' | 'allow_warned'."""
+    from app.services import creative_specs as cs
+
+    try:
+        return cs.get(campaign_type).policy.logo_overlay
+    except Exception:
+        return "forbid"  # safest default: never overlay when the type is unknown
+
+
+def composite_logo(base_path: "Path", logo_path: "Path", out_path: "Path") -> tuple[int, int, int]:
+    """Paste ``logo`` onto ``base`` bottom-right (AdCreative/Flair overlay layer)
+    and write ``out_path``. Returns ``(width, height, size_bytes)``. Pure Pillow;
+    the logo is composited, NEVER re-prompted into the model (FR2.1). Shared by
+    17.3's supervisor."""
+    from PIL import Image
+
+    base = Image.open(base_path).convert("RGBA")
+    logo = Image.open(logo_path).convert("RGBA")
+    bw, bh = base.size
+    target_w = max(1, int(bw * 0.18))                # logo ~18% of base width
+    scale = target_w / max(1, logo.width)
+    target_h = max(1, int(logo.height * scale))
+    logo = logo.resize((target_w, target_h), Image.LANCZOS)
+    pad = int(bw * 0.04)
+    base.alpha_composite(logo, (bw - target_w - pad, bh - target_h - pad))
+    out = base.convert("RGB")
+    out.save(out_path, "PNG")
+    return (bw, bh, out_path.stat().st_size)
+
+
+async def _apply_logo(batch: dict[str, Any], base_row: dict[str, Any]) -> None:
+    """with_logo: composite the logo onto the base as a SECOND ad_asset row
+    linked by ``parent_asset_id`` (base stays recoverable — FR2.1). Policy from
+    the registry (FR2.2): ``forbid`` → no overlay, route the logo to its dedicated
+    slot, warning attached to the base; ``allow_warned`` → composite proceeds,
+    warning attached to the composite record."""
+    from app.routers.assets import ASSETS_DIR
+    from google_ads.services.campaign.creative_images import locate_local_image
+
+    policy = _logo_overlay_policy(batch.get("campaign_type") or "pmax")
+    if policy == "forbid":
+        await _attach_meta(base_row["id"], {
+            "logo_overlay": "routed_to_logo_slot",
+            "warning": (
+                "Logo overlay is not allowed for this campaign type — the logo "
+                "ships in its dedicated logo slot, never overlaid on the photo "
+                "(research #8). Base image left un-composited."
+            ),
+        })
+        return
+
+    # allow_warned → composite.
+    try:
+        base_path, _ = await locate_local_image(base_row["id"])
+        logo_path, _ = await locate_local_image(batch["logo_asset_id"])
+    except LookupError as e:
+        await _attach_meta(base_row["id"], {"logo_overlay": "skipped", "warning": str(e)})
+        return
+
+    composite_id = str(uuid.uuid4())
+    filename = f"{composite_id}.png"
+    out_path = ASSETS_DIR / filename
+    try:
+        w, h, size_bytes = composite_logo(base_path, logo_path, out_path)
+    except Exception as e:  # never lose the base tile to a compositor error
+        await _attach_meta(base_row["id"], {"logo_overlay": "failed", "warning": str(e)[:200]})
+        return
+
+    warning = (
+        "Logo composited onto the photo as a removable overlay layer. Overlay is "
+        "allowed for this campaign type but reduces flexibility — the base render "
+        "is kept as a separate asset so you can revert to the logo-free image."
+    )
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO ad_assets
+               (id, account_id, campaign_id, type, filename, url, source,
+                status, higgsfield_model, prompt, aspect_ratio,
+                width, height, size_bytes,
+                batch_id, slot, variant_index, parent_asset_id, meta_json,
+                created_at)
+               VALUES (?, ?, ?, 'image', ?, ?, 'higgsfield',
+                       'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+            (
+                composite_id, base_row.get("account_id"), base_row.get("campaign_id"),
+                filename, f"/api/assets/file/{filename}",
+                base_row.get("higgsfield_model"), base_row.get("prompt"),
+                base_row.get("aspect_ratio"), w, h, size_bytes,
+                base_row.get("batch_id"), base_row.get("slot"),
+                base_row.get("variant_index"), base_row["id"],
+                json.dumps({"logo_overlay": "composited", "warning": warning}),
+            ),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def _attach_meta(asset_id: str, meta: dict[str, Any]) -> None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE ad_assets SET meta_json=? WHERE id=?", (json.dumps(meta), asset_id)
+        )
+        await db.commit()
+    finally:
+        await db.close()
 
 
 # ── retry ──────────────────────────────────────────────────────────────────
@@ -305,6 +419,7 @@ async def get_batch(batch_id: str) -> Optional[dict[str, Any]]:
     if batch is None:
         return None
     children = await _read_children(batch_id)
+    composites = await _read_composites(batch_id)
     tiles = []
     for c in children:
         safe_zone = None
@@ -314,6 +429,7 @@ async def get_batch(batch_id: str) -> Optional[dict[str, Any]]:
                 safe_zone = json.loads(raw)
             except (TypeError, ValueError):
                 safe_zone = None
+        comp = composites.get(c["id"])
         tiles.append({
             "asset_id": c["id"],
             "slot": c.get("slot"),
@@ -324,6 +440,10 @@ async def get_batch(batch_id: str) -> Optional[dict[str, Any]]:
             "parent_asset_id": c.get("parent_asset_id"),
             "error_message": c.get("error_message"),
             "safe_zone": safe_zone,
+            # with_logo: the composited image that fills the slot; the base
+            # (this row) stays recoverable (FR2.1).
+            "composite_asset_id": comp["id"] if comp else None,
+            "composite_url": (comp.get("url") if comp else None),
         })
     return {
         "batch_id": batch_id,
@@ -369,13 +489,30 @@ async def _read_batch(batch_id: str) -> Optional[dict[str, Any]]:
 
 
 async def _read_children(batch_id: str) -> list[dict[str, Any]]:
+    """The BASE tiles = the requested set (parent_asset_id IS NULL). with_logo
+    composite rows share the batch_id but are excluded here so progress /
+    finalize count the requested tiles exactly, never inflated by overlays."""
     db = await get_db()
     try:
         cur = await db.execute(
-            "SELECT * FROM ad_assets WHERE batch_id=? ORDER BY variant_index, slot",
+            "SELECT * FROM ad_assets WHERE batch_id=? AND parent_asset_id IS NULL "
+            "ORDER BY variant_index, slot",
             (batch_id,),
         )
         return [dict(r) for r in await cur.fetchall()]
+    finally:
+        await db.close()
+
+
+async def _read_composites(batch_id: str) -> dict[str, dict[str, Any]]:
+    """with_logo composite rows keyed by their ``parent_asset_id`` (base id)."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM ad_assets WHERE batch_id=? AND parent_asset_id IS NOT NULL",
+            (batch_id,),
+        )
+        return {r["parent_asset_id"]: dict(r) for r in await cur.fetchall()}
     finally:
         await db.close()
 

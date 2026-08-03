@@ -96,6 +96,8 @@ class BatchRenderRequest(BaseModel):
     # prompt convention (FR2.1). Policy for the logo overlay resolves from the
     # registry, never a code branch (FR2.2).
     mode: str = "without_logo"
+    # Policy key for the registry (logo-overlay etc.) — the wizard knows it.
+    campaign_type: str = "pmax"
     campaign_id: Optional[str] = None
     logo_asset_id: Optional[str] = None
     reference_asset_ids: Optional[list[str]] = None
@@ -390,6 +392,7 @@ async def batch_render(body: BatchRenderRequest) -> BatchRenderResponse:
             model=body.model,
             slots=[s.model_dump() for s in body.slots],
             mode=body.mode,
+            campaign_type=body.campaign_type,
             campaign_id=body.campaign_id,
             logo_asset_id=body.logo_asset_id,
             reference_asset_ids=body.reference_asset_ids,
