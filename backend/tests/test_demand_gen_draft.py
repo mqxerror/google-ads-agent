@@ -8,7 +8,9 @@ DROPPED (never truncated into garbage), business_name is clipped to 25 / falls
 back to the operator's own entry, too-few valid lines fail so the operator
 regenerates, and the job-store start/poll lifecycle returns the result.
 
-No DB, no live Google or Claude calls.
+No live Google or Claude calls. As of story 15.3 the draft-job store is a
+`creative_jobs` DB row (not an in-memory dict), so this module inits a throwaway
+temp SQLite; the pure inner-function tests ignore it.
 
 Run: cd backend && .venv/bin/python -m unittest tests.test_demand_gen_draft -v
 """
@@ -16,12 +18,31 @@ Run: cd backend && .venv/bin/python -m unittest tests.test_demand_gen_draft -v
 from __future__ import annotations
 
 import asyncio
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict
 
 from fastapi import HTTPException
 
-from app.routers import demand_gen as dgr
+from app.config import settings
+
+# Throwaway data dir BEFORE importing the router (job store is DB-backed now).
+_TMP = Path(tempfile.mkdtemp(prefix="dg-draft-test-"))
+settings.DATA_DIR = _TMP
+
+from app.database import init_db  # noqa: E402
+from app.routers import demand_gen as dgr  # noqa: E402
+
+
+def setUpModule():
+    _TMP.mkdir(parents=True, exist_ok=True)
+    asyncio.run(init_db())
+
+
+def tearDownModule():
+    shutil.rmtree(_TMP, ignore_errors=True)
 
 
 def _run(coro):

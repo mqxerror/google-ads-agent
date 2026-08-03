@@ -121,42 +121,45 @@ def _pmax_draft_prompt(body: "PMaxDraftRequest", spec) -> str:
     )
 
 
-# Draft jobs run in the background and the wizard POLLS for the result —
-# a single 1-3 minute HTTP request kept dying when the Vite dev proxy or
-# either server blipped mid-draft (hit live 2026-06-10). In-memory store is
-# fine: drafts are ephemeral and single-process.
-_draft_jobs: Dict[str, Dict[str, Any]] = {}
+# Draft jobs run in the background and the wizard POLLS for the result — a single
+# 1-3 minute HTTP request kept dying when the Vite dev proxy or either server
+# blipped mid-draft (hit live 2026-06-10). Jobs are now `creative_jobs` DB rows
+# (story 15.3, fence F6) — no in-memory store — so a restart yields a recoverable
+# `interrupted` status (one-click re-run), never a lost job.
 
 
 async def _run_draft_job(job_id: str, account_id: str, body: PMaxDraftRequest) -> None:
+    from app.services import creative_copy
     try:
         result = await _draft_pmax_copy_inner(account_id, body)
-        _draft_jobs[job_id] = {"status": "done", "result": result.model_dump()}
+        await creative_copy.complete_job(job_id, result.model_dump())
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
-        _draft_jobs[job_id] = {"status": "error", "message": detail.get("message", "draft failed")}
+        await creative_copy.fail_job(job_id, detail.get("message", "draft failed"))
     except Exception as e:
         logger.exception("PMax draft job %s failed", job_id)
-        _draft_jobs[job_id] = {"status": "error", "message": str(e)[:300]}
+        await creative_copy.fail_job(job_id, str(e)[:300])
 
 
 @router.post("/accounts/{account_id}/pmax/draft-copy")
 async def start_draft_pmax_copy(account_id: str, body: PMaxDraftRequest) -> Dict[str, str]:
     """Start a Creative Director draft job; poll GET .../draft-copy/{id}."""
     import asyncio
-    import uuid as _uuid
 
-    job_id = str(_uuid.uuid4())
-    _draft_jobs[job_id] = {"status": "running"}
+    from app.services import creative_copy
+
+    job_id = await creative_copy.create_job("draft", account_id, "pmax", body.model_dump())
     asyncio.create_task(_run_draft_job(job_id, account_id, body))
     return {"draft_id": job_id, "status": "running"}
 
 
 @router.get("/pmax/draft-copy/{draft_id}")
 async def get_draft_pmax_copy(draft_id: str) -> Dict[str, Any]:
-    job = _draft_jobs.get(draft_id)
+    from app.services import creative_copy
+
+    job = await creative_copy.get_job(draft_id)
     if not job:
-        return {"status": "error", "message": "unknown draft id (server restarted?) — start a new draft"}
+        return {"status": "error", "message": "unknown draft id — start a new draft"}
     return job
 
 

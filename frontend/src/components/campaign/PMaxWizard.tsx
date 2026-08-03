@@ -466,6 +466,13 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
           localStorage.removeItem('pmax-draft-id');
           throw new Error(job.message || 'draft failed');
         }
+        if (job.status === 'interrupted') {
+          // A backend restart killed the in-flight job (story 15.3). No
+          // transparent resume — surface it so the operator re-runs one-click
+          // (the Draft button below is the re-run).
+          localStorage.removeItem('pmax-draft-id');
+          throw new Error(job.message || 'Draft was interrupted by a restart — click Draft again to re-run.');
+        }
         // still running — keep polling (transient fetch errors just retry)
       } catch (e) {
         if (e instanceof Error && e.message !== 'Failed to fetch') throw e;

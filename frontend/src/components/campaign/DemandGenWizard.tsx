@@ -610,6 +610,12 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
           localStorage.removeItem('demandgen-draft-id');
           throw new Error(job.message || 'draft failed');
         }
+        if (job.status === 'interrupted') {
+          // A backend restart killed the in-flight job (story 15.3). No
+          // transparent resume — surface it so the operator re-runs one-click.
+          localStorage.removeItem('demandgen-draft-id');
+          throw new Error(job.message || 'Draft was interrupted by a restart — click Draft again to re-run.');
+        }
       } catch (e) {
         if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
       }
