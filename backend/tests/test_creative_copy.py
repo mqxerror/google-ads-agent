@@ -131,6 +131,39 @@ class BuildPrompt(unittest.TestCase):
         self.assertNotIn("long_headline", p)
 
 
+class PMaxPromptParity(unittest.TestCase):
+    """Story 16.6 (FR1.13) — the PMax draft prompt reaches DG parity: the SAME
+    policy block + a drafted ≤25-char business_name. Snapshot-pinned."""
+
+    # The policy block, lifted from the old DG prompt (demand_gen.py:283-287).
+    _POLICY_MARKERS = (
+        "NO prices or discounts",
+        "guaranteed-approval",
+        "~ | +",
+        "No em dashes",
+        "No third-party brand names",
+    )
+
+    def test_pmax_prompt_carries_full_policy_block(self):
+        p = cc.build_draft_prompt("pmax")
+        for marker in self._POLICY_MARKERS:
+            self.assertIn(marker, p, f"PMax prompt missing policy marker {marker!r}")
+
+    def test_pmax_and_dg_share_the_policy_block(self):
+        # The policy block is identical across types (one unified prompt) — the
+        # concrete meaning of "PMax reaches DG parity".
+        pmax = cc.build_draft_prompt("pmax")
+        dg = cc.build_draft_prompt("demand_gen")
+        for marker in self._POLICY_MARKERS:
+            self.assertIn(marker, pmax)
+            self.assertIn(marker, dg)
+
+    def test_pmax_prompt_requests_a_capped_business_name(self):
+        p = cc.build_draft_prompt("pmax")
+        self.assertIn("business_name", p)
+        self.assertIn(f"≤{cs.get('pmax').business_name_max} chars", p)
+
+
 class DraftCopy(unittest.TestCase):
     def setUp(self):
         import app.services.agent as agent_mod
