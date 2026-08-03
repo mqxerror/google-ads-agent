@@ -103,6 +103,10 @@ from google_ads.services.campaign.campaign_criterion_service import (
 from google_ads.services.campaign.pmax_orchestrator import ApiCtx  # noqa: F401 (re-export)
 from google_ads.utils import format_customer_id, get_logger, serialize_proto_message
 
+# Creative Spec Registry — DG limits are read from here, not a local table (F1).
+from app.services import creative_specs
+from app.services.creative_specs import CampaignSpec, ValidationReport  # noqa: F401
+
 logger = get_logger(__name__)
 
 # `_locate_local_image` kept as a module global (not a direct import) so unit
@@ -111,15 +115,10 @@ logger = get_logger(__name__)
 # into the shared resolver so the patch takes effect.
 _locate_local_image = creative_images.locate_local_image
 
-# Google's Demand Gen multi-asset ad text limits (display width; validated by
-# char count pre-flight, same conservative approach as PMax). Counts: ≥1 and
-# ≤5 each for headlines/descriptions; business_name ≤25.
-TEXT_RULES = {
-    "headlines":    {"min_count": 1, "max_count": 5, "max_chars": 40},
-    "descriptions": {"min_count": 1, "max_count": 5, "max_chars": 90},
-}
-BUSINESS_NAME_MAX_CHARS = 25
-MAX_LOGOS = 5
+# Demand Gen creative limits (counts, char caps, business-name + logo caps) now
+# come from the Creative Spec Registry (creative_specs.get("demand_gen")), not a
+# local constant table (Epic 14, fence F1). The DG headline cap is 40 chars
+# [research §3-Q1 DEFINITIVE] — served from ONE place so it can never drift.
 
 # Slot → DemandGenMultiAssetAdInfo repeated-field name. Each slot's images are
 # AdImageAsset references pointing at uploaded image assets.
@@ -239,70 +238,51 @@ def _normalize_channels(raw: Optional[Dict[str, Any]]) -> Dict[str, bool]:
     return channels
 
 
-def _validate_bundle(bundle: Dict[str, Any]) -> None:
-    """Pre-flight validation before any Google API call.
+def _validate_bundle(bundle: Dict[str, Any], spec: CampaignSpec) -> ValidationReport:
+    """Pre-flight validation against the Creative Spec Registry (FR1.1).
 
-    Covers the text minimums/limits, the business name, the required
-    logo + marketing-image presence, and the channel-controls invariant
-    (at least one channel must stay ON — an all-OFF `selected_channels`
-    is rejected by Google). Image aspect/size is handled separately by
-    `_resolve_image_plan`.
-    """
-    errs: List[str] = []
+    Returns a ``ValidationReport``: verified-limit violations are ``errors``
+    (the create path raises), unverified (soft) ones are ``warnings``. Covers
+    text counts/limits, business name, required logo + marketing-image presence,
+    logo cap, and the channel-controls invariant (at least one channel ON — an
+    all-OFF `selected_channels` is rejected by Google). Every limit is read from
+    ``spec`` (fence F1). Image aspect/size is handled separately by
+    `_resolve_image_plan`."""
+    report = ValidationReport()
 
     if not bundle.get("name"):
-        errs.append("campaign 'name' is required")
+        report.errors.append("campaign 'name' is required")
     if not bundle.get("budget_micros"):
-        errs.append("'budget_micros' is required (1_000_000 micros = $1)")
+        report.errors.append("'budget_micros' is required (1_000_000 micros = $1)")
     if not bundle.get("final_urls"):
-        errs.append("'final_urls' is required (at least one URL)")
+        report.errors.append("'final_urls' is required (at least one URL)")
 
-    business_name = bundle.get("business_name")
-    if not business_name:
-        errs.append("'business_name' is required for the Demand Gen ad")
-    elif len(str(business_name)) > BUSINESS_NAME_MAX_CHARS:
-        errs.append(
-            f"business_name is {len(str(business_name))} chars "
-            f"(max {BUSINESS_NAME_MAX_CHARS})"
-        )
+    creative_specs.check_business_name(bundle, spec, report)
+    creative_specs.check_text_fields(bundle, spec, report)
 
-    for field, rule in TEXT_RULES.items():
-        items = bundle.get(field) or []
-        if len(items) < rule["min_count"]:
-            errs.append(f"need ≥{rule['min_count']} {field} (got {len(items)})")
-        if len(items) > rule["max_count"]:
-            errs.append(f"too many {field}: {len(items)} (max {rule['max_count']})")
-        for i, txt in enumerate(items):
-            if not isinstance(txt, str) or not txt.strip():
-                errs.append(f"{field}[{i}] is empty")
-            elif len(txt) > rule["max_chars"]:
-                errs.append(
-                    f"{field}[{i}] is {len(txt)} chars (max {rule['max_chars']})"
-                )
-
+    logo_spec = spec.logos["logos"]
     logos = bundle.get("logos") or []
     if not logos:
-        errs.append("need ≥1 logo image (asset_id or upload)")
-    elif len(logos) > MAX_LOGOS:
-        errs.append(f"too many logos: {len(logos)} (max {MAX_LOGOS})")
+        report.errors.append("need ≥1 logo image (asset_id or upload)")
+    elif len(logos) > logo_spec.max_count:
+        report.errors.append(f"too many logos: {len(logos)} (max {logo_spec.max_count})")
 
     mi = bundle.get("marketing_images") or {}
     if not (mi.get("landscape") or mi.get("square")):
-        errs.append(
+        report.errors.append(
             "need ≥1 marketing image — at least one of landscape (1.91:1) "
             "or square (1:1) is required"
         )
 
     channels = _normalize_channels(bundle.get("channels"))
     if not any(channels.values()):
-        errs.append(
+        report.errors.append(
             "at least one channel must be enabled (all of gmail/display/"
             "discover/youtube_* are off) — an empty channel selection is "
             "rejected by Google"
         )
 
-    if errs:
-        raise DemandGenValidationError(errs)
+    return report
 
 
 def _validate_update_bundle(bundle: Dict[str, Any]) -> None:
@@ -343,8 +323,9 @@ def _validate_update_bundle(bundle: Dict[str, Any]) -> None:
             "provide at least one image ref in a slot (logos / landscape / "
             "square / portrait / tall_portrait) — nothing to update otherwise"
         )
-    if len(logos) > MAX_LOGOS:
-        errs.append(f"too many logos: {len(logos)} (max {MAX_LOGOS})")
+    logo_max = creative_specs.get("demand_gen").logos["logos"].max_count
+    if len(logos) > logo_max:
+        errs.append(f"too many logos: {len(logos)} (max {logo_max})")
 
     if errs:
         raise DemandGenValidationError(errs)
@@ -769,7 +750,10 @@ class DemandGenOrchestrator:
         Raises DemandGenValidationError pre-flight; DemandGenStepError on any
         Google API failure (with prior creations rolled back).
         """
-        _validate_bundle(bundle)
+        spec = creative_specs.get("demand_gen")
+        report = _validate_bundle(bundle, spec)
+        if report.errors:
+            raise DemandGenValidationError(report.errors)
         customer_id = format_customer_id(customer_id)
         channels = _normalize_channels(bundle.get("channels"))
 
@@ -779,7 +763,8 @@ class DemandGenOrchestrator:
 
         created_budget_rn: Optional[str] = None
         created_campaign_rn: Optional[str] = None
-        warnings: List[str] = []
+        # Soft-limit (verified:false) violations surface as warnings, never block.
+        warnings: List[str] = list(report.warnings)
         failed_step = "pre-flight"
 
         try:

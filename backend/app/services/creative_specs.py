@@ -44,8 +44,9 @@ IMPORTANT — count minimums are Google-verified (2026-08-03):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+import re
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 from google_ads.services.campaign.creative_images import IMAGE_SLOT_SPECS
 
@@ -371,3 +372,157 @@ def deserialize_registry(data: Dict[str, dict]) -> Dict[str, CampaignSpec]:
     equals ``REGISTRY`` (frozen-dataclass ``__eq__``; geometry is a derived
     property, excluded from equality)."""
     return {k: _spec_from_dict(v) for k, v in data.items()}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Validation — the shared, registry-driven checks the orchestrators call. All
+# limits come from the passed ``spec`` (no literals here either); ``verified=
+# False`` violations land in ``warnings`` (soft), verified ones in ``errors``
+# (hard). ValidationReport lives beside the registry per story 14.3.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class ValidationReport:
+    """Accumulates the outcome of validating a bundle against a ``CampaignSpec``.
+
+    ``errors`` block the create (the caller raises); ``warnings`` ride the create
+    response's existing ``warnings`` field and never block (FR1.3)."""
+
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+_URL_RE = re.compile(r"^https?://[^\s/]+\.[^\s]+$", re.IGNORECASE)
+
+
+def is_malformed_url(url: str) -> bool:
+    """True if ``url`` is not a plausible absolute http(s) URL (FR1.4)."""
+    return not bool(_URL_RE.match((url or "").strip()))
+
+
+def extract_search_themes(audience_signals: Optional[List[Any]]) -> List[str]:
+    """Pull the search-theme strings out of a bundle's ``audience_signals`` list.
+
+    Mirrors ``pmax_orchestrator._signal_operation``: a signal is a search theme
+    when it is a non-empty string, or a dict carrying ``search_theme``/``text``
+    that is NOT a saved audience (``audience``/``audience_resource_name``)."""
+    themes: List[str] = []
+    for sig in audience_signals or []:
+        if isinstance(sig, str):
+            t = sig.strip()
+            if t:
+                themes.append(t)
+        elif isinstance(sig, dict):
+            if sig.get("audience_resource_name") or sig.get("audience"):
+                continue
+            t = str(sig.get("search_theme") or sig.get("text") or "").strip()
+            if t:
+                themes.append(t)
+    return themes
+
+
+def check_text_fields(bundle: Dict[str, Any], spec: CampaignSpec,
+                      report: ValidationReport) -> None:
+    """Count + char-length checks for every text field in ``spec.text``.
+    Verified fields → errors; unverified → warnings. Empty entries are always
+    errors."""
+    for name, fs in spec.text.items():
+        items = bundle.get(name) or []
+        channel = report.errors if fs.verified else report.warnings
+        n = len(items)
+        if n < fs.min_count:
+            channel.append(f"need ≥{fs.min_count} {name} (got {n})")
+        if n > fs.max_count:
+            channel.append(f"too many {name}: {n} (max {fs.max_count})")
+        for i, txt in enumerate(items):
+            if not isinstance(txt, str) or not txt.strip():
+                report.errors.append(f"{name}[{i}] is empty")
+            elif len(txt) > fs.max_chars:
+                channel.append(f"{name}[{i}] is {len(txt)} chars (max {fs.max_chars})")
+
+
+def check_short_description(bundle: Dict[str, Any], spec: CampaignSpec,
+                           report: ValidationReport) -> None:
+    """PMax "≥N descriptions ≤ short.max_chars" soft rule (FR1.4/D6). Always a
+    warning (short_description.verified is False — not in current Google docs)."""
+    sd = spec.short_description
+    if sd is None:
+        return
+    descriptions = bundle.get("descriptions") or []
+    short = sum(1 for d in descriptions if isinstance(d, str) and len(d) <= sd.max_chars)
+    if short < sd.min_count:
+        channel = report.errors if sd.verified else report.warnings
+        channel.append(
+            f"need ≥{sd.min_count} description ≤{sd.max_chars} chars "
+            f"(a short description); found {short}"
+        )
+
+
+def check_business_name(bundle: Dict[str, Any], spec: CampaignSpec,
+                        report: ValidationReport, *, required: bool = True) -> None:
+    name = bundle.get("business_name")
+    if not name:
+        if required:
+            report.errors.append("'business_name' is required")
+        return
+    if len(str(name)) > spec.business_name_max:
+        report.errors.append(
+            f"business_name is {len(str(name))} chars (max {spec.business_name_max})"
+        )
+
+
+def check_image_caps(bundle: Dict[str, Any], spec: CampaignSpec,
+                     report: ValidationReport) -> None:
+    """Cross-slot marketing-image total (FR1.4 honesty #8) + logo cap. Reads the
+    caps from the registry (``total_image_cap``, ``logos['logos'].max_count``)."""
+    marketing = bundle.get("marketing_images") or {}
+    if spec.total_image_cap is not None:
+        total = sum(len(marketing.get(slot) or []) for slot in spec.images)
+        if total > spec.total_image_cap:
+            report.errors.append(
+                f"too many images: {total} across ratios "
+                f"(max {spec.total_image_cap} per asset group)"
+            )
+    logo_spec = spec.logos.get("logos")
+    if logo_spec is not None:
+        logos = bundle.get("logos") or []
+        if len(logos) > logo_spec.max_count:
+            report.errors.append(f"too many logos: {len(logos)} (max {logo_spec.max_count})")
+
+
+def check_search_themes(bundle: Dict[str, Any], spec: CampaignSpec,
+                        report: ValidationReport) -> None:
+    """≤max_count search themes × ≤max_chars each (FR1.4). No-op when the type
+    has no search themes (search_themes is None)."""
+    if spec.search_themes is None:
+        return
+    max_count, max_chars = spec.search_themes
+    themes = extract_search_themes(bundle.get("audience_signals"))
+    if len(themes) > max_count:
+        report.errors.append(f"too many search themes: {len(themes)} (max {max_count})")
+    for t in themes:
+        if len(t) > max_chars:
+            report.errors.append(
+                f"search theme is {len(t)} chars (max {max_chars}): {t[:30]!r}"
+            )
+
+
+def check_final_urls(bundle: Dict[str, Any], spec: CampaignSpec,
+                     report: ValidationReport) -> None:
+    """Final-URL presence + format + length (FR1.4). Presence is a hard error;
+    a malformed or over-length URL is a hard error."""
+    urls = bundle.get("final_urls") or []
+    if not urls:
+        report.errors.append("'final_urls' is required (at least one URL)")
+        return
+    for u in urls:
+        if is_malformed_url(str(u)):
+            report.errors.append(f"malformed final URL: {str(u)[:60]!r}")
+        elif len(str(u)) > spec.final_url_max:
+            report.errors.append(
+                f"final URL is {len(str(u))} chars (max {spec.final_url_max})"
+            )

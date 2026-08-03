@@ -53,6 +53,7 @@ from google.ads.googleads.v23.services.types.campaign_service import (
     MutateCampaignsResponse,
 )
 
+from app.services import creative_specs
 from google_ads.services.campaign import demand_gen_orchestrator as dg
 from google_ads.services.campaign.demand_gen_orchestrator import (
     ApiCtx,
@@ -60,11 +61,21 @@ from google_ads.services.campaign.demand_gen_orchestrator import (
     DemandGenOrchestrator,
     DemandGenStepError,
     DemandGenValidationError,
-    _validate_bundle,
     _validate_update_bundle,
     create_demand_gen_ad_image_tools,
     create_demand_gen_orchestrator_tools,
 )
+
+
+def _validate_bundle(bundle):
+    """Test adapter for the Epic-14 signature change (story 14.3): the real
+    `_validate_bundle` now takes a spec and RETURNS a ValidationReport. This
+    keeps the pre-14.3 raising contract these tests assert against."""
+    report = dg._validate_bundle(bundle, creative_specs.get("demand_gen"))
+    if report.errors:
+        raise DemandGenValidationError(report.errors)
+    return report
+
 
 CUSTOMER = "1234567890"
 

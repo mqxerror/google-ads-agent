@@ -82,6 +82,16 @@ def register_scan_file(path: Path, kind: str, expected_pragmas: int) -> None:
     _SENTINEL_SCAN_FILES.append((path, kind, expected_pragmas))
 
 
+# ── Story 14.3 — orchestrator validators read the registry (local tables gone) ─
+_ORCH = _BACKEND / "google_ads" / "services" / "campaign"
+register_tombstone("TEXT_RULES", _ORCH / "pmax_orchestrator.py", "py")
+register_tombstone("TEXT_RULES", _ORCH / "demand_gen_orchestrator.py", "py")
+register_tombstone("BUSINESS_NAME_MAX_CHARS", _ORCH / "demand_gen_orchestrator.py", "py")
+register_tombstone("MAX_LOGOS", _ORCH / "demand_gen_orchestrator.py", "py")
+register_scan_file(_ORCH / "pmax_orchestrator.py", "py", 0)
+register_scan_file(_ORCH / "demand_gen_orchestrator.py", "py", 0)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2
 # even while the real file lists accrete).

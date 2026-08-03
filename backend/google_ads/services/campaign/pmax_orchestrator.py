@@ -71,6 +71,12 @@ from google_ads.services.campaign.creative_images import (
 )
 from google_ads.utils import format_customer_id, get_logger
 
+# The Creative Spec Registry (backend/app/services). The orchestrator reads its
+# limits from here instead of a local constant table (Epic 14, fence F1). Safe
+# import: creative_specs pulls in creative_images (a leaf), never this module.
+from app.services import creative_specs
+from app.services.creative_specs import CampaignSpec, ValidationReport  # noqa: F401
+
 # The image-creative helpers live in `creative_images` (shared with the Demand
 # Gen orchestrator). They are re-exported above under their historical
 # single-underscore names so nothing that imported them from this module
@@ -105,12 +111,14 @@ class ApiCtx:
         logger.log(lvl, message)
 
 
-# Google's hard minimums for PMax. Bundle is rejected pre-flight if any
-# of these fail so we don't waste a round-trip on a doomed request.
-TEXT_RULES = {
-    "headlines":      {"min_count": 3, "max_chars": 30,  "field_type": AssetFieldTypeEnum.AssetFieldType.HEADLINE},
-    "long_headlines": {"min_count": 1, "max_chars": 90,  "field_type": AssetFieldTypeEnum.AssetFieldType.LONG_HEADLINE},
-    "descriptions":   {"min_count": 2, "max_chars": 90,  "field_type": AssetFieldTypeEnum.AssetFieldType.DESCRIPTION},
+# Text field → Google AssetFieldType. This is API PLUMBING (which proto field a
+# given text list links as), NOT a limit table — the counts/char caps that used
+# to live here now come from the Creative Spec Registry (creative_specs). The
+# order also fixes the create-path asset-creation/linking order.
+TEXT_FIELD_TYPES = {
+    "headlines":      AssetFieldTypeEnum.AssetFieldType.HEADLINE,
+    "long_headlines": AssetFieldTypeEnum.AssetFieldType.LONG_HEADLINE,
+    "descriptions":   AssetFieldTypeEnum.AssetFieldType.DESCRIPTION,
 }
 
 IMAGE_FIELD_TYPES = {
@@ -162,35 +170,43 @@ class PMaxStepError(Exception):
         )
 
 
-def _validate_bundle(bundle: Dict[str, Any]) -> None:
-    """Pre-flight validation before any Google API call."""
-    errs: List[str] = []
+def _validate_bundle(bundle: Dict[str, Any], spec: CampaignSpec) -> ValidationReport:
+    """Pre-flight validation against the Creative Spec Registry (FR1.1/FR1.4).
+
+    Returns a ``ValidationReport``: verified-limit violations are ``errors``
+    (the create path raises), unverified (soft) ones are ``warnings`` that ride
+    the create response. Every limit is read from ``spec`` — there is no local
+    limit constant (fence F1)."""
+    report = ValidationReport()
 
     if not bundle.get("name"):
-        errs.append("campaign 'name' is required")
+        report.errors.append("campaign 'name' is required")
     if not bundle.get("budget_micros"):
-        errs.append("'budget_micros' is required (1_000_000 micros = $1)")
-    if not bundle.get("final_urls"):
-        errs.append("'final_urls' is required (at least one URL)")
-    if not bundle.get("business_name"):
-        errs.append("'business_name' is required for the asset group")
+        report.errors.append("'budget_micros' is required (1_000_000 micros = $1)")
 
-    for field, rule in TEXT_RULES.items():
-        items = bundle.get(field) or []
-        if len(items) < rule["min_count"]:
-            errs.append(f"need ≥{rule['min_count']} {field} (got {len(items)})")
-        for i, txt in enumerate(items):
-            if not isinstance(txt, str) or not txt.strip():
-                errs.append(f"{field}[{i}] is empty")
-            elif len(txt) > rule["max_chars"]:
-                errs.append(f"{field}[{i}] is {len(txt)} chars (max {rule['max_chars']})")
+    # final URL: presence + format + length (FR1.4 gap closure)
+    creative_specs.check_final_urls(bundle, spec, report)
 
+    # business name: presence + ≤ business_name_max (FR1.4 gap closure)
+    creative_specs.check_business_name(bundle, spec, report)
+
+    # text fields: count (min AND max — the max closes the FR1.4 gap) + char caps
+    creative_specs.check_text_fields(bundle, spec, report)
+    # soft: ≥1 short (≤60) description — warns, never blocks (verified:false)
+    creative_specs.check_short_description(bundle, spec, report)
+
+    # required images (presence) + cross-slot total cap + logo cap (FR1.4)
     imgs = bundle.get("marketing_images") or {}
     if not (bundle.get("logos") or []):
-        errs.append("need ≥1 logo image (asset_id or upload)")
-    for kind in ("landscape", "square"):
-        if not (imgs.get(kind) or []):
-            errs.append(f"need ≥1 {kind} marketing image")
+        report.errors.append("need ≥1 logo image (asset_id or upload)")
+    for slot, slot_spec in spec.images.items():
+        if slot_spec.required and not (imgs.get(slot) or []):
+            report.errors.append(f"need ≥1 {slot} marketing image")
+    creative_specs.check_image_caps(bundle, spec, report)
+
+    # search themes: ≤max_count × ≤max_chars (FR1.4 gap closure)
+    creative_specs.check_search_themes(bundle, spec, report)
+
     # Video is OPTIONAL for a PMax asset group: when none is supplied Google
     # auto-generates one from the image + text assets. Do NOT hard-gate on it —
     # requiring ≥1 YouTube id was stricter than Google and blocked every
@@ -198,8 +214,7 @@ def _validate_bundle(bundle: Dict[str, Any]) -> None:
     # 14528532 — verified 2026-08-03.) The wizard still nudges the operator to
     # supply their own video for control / 'Excellent' Ad Strength.
 
-    if errs:
-        raise PMaxValidationError(errs)
+    return report
 
 
 def _extract_resource_name(mutate_response: Dict[str, Any]) -> str:
@@ -361,7 +376,10 @@ class PMaxOrchestrator:
         Raises PMaxValidationError pre-flight, Exception on any Google
         API failure (with prior creations rolled back).
         """
-        _validate_bundle(bundle)
+        spec = creative_specs.get("pmax")
+        report = _validate_bundle(bundle, spec)
+        if report.errors:
+            raise PMaxValidationError(report.errors)
         customer_id = format_customer_id(customer_id)
 
         # Pre-flight: classify every image ref (Google asset ref vs local
@@ -373,7 +391,8 @@ class PMaxOrchestrator:
 
         created_budget_rn: Optional[str] = None
         created_campaign_rn: Optional[str] = None
-        warnings: List[str] = []
+        # Soft-limit (verified:false) violations surface as warnings, never block.
+        warnings: List[str] = list(report.warnings)
         failed_step = "pre-flight"
 
         try:
@@ -413,7 +432,7 @@ class PMaxOrchestrator:
             # ── Step 3 — Text assets ──────────────────────────────────
             failed_step = "text asset creation"
             asset_ids: Dict[str, List[str]] = {}
-            for field, rule in TEXT_RULES.items():
+            for field, _field_type in TEXT_FIELD_TYPES.items():
                 rns = []
                 for text in bundle[field]:
                     ar = await self._asset.create_text_asset(
@@ -523,9 +542,9 @@ class PMaxOrchestrator:
                 link.field_type = field_type
                 return op
 
-            for field, rule in TEXT_RULES.items():
+            for field, field_type in TEXT_FIELD_TYPES.items():
                 for rn in asset_ids[field]:
-                    mutate_ops.append(_link_op(rn, rule["field_type"]))
+                    mutate_ops.append(_link_op(rn, field_type))
 
             # business name uses its own field type
             for rn in asset_ids["business_name"]:

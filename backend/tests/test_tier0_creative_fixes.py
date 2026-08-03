@@ -147,20 +147,26 @@ def _pmax_bundle(with_video: bool) -> Dict[str, Any]:
 
 
 class PMaxVideoOptionalTests(unittest.TestCase):
+    # Story 14.3: `_validate_bundle` now takes a spec and RETURNS a
+    # ValidationReport (no raise). `_errs()` restores the pre-14.3 raising
+    # contract these assertions target.
+    @staticmethod
+    def _errs(bundle) -> List[str]:
+        from app.services import creative_specs
+        return po._validate_bundle(bundle, creative_specs.get("pmax")).errors
+
     def test_bundle_without_video_passes_validation(self):
         """No YouTube id must NOT raise — Google auto-generates a video."""
-        po._validate_bundle(_pmax_bundle(with_video=False))  # no raise
+        self.assertEqual(self._errs(_pmax_bundle(with_video=False)), [])
 
     def test_bundle_with_video_still_passes(self):
-        po._validate_bundle(_pmax_bundle(with_video=True))  # no raise
+        self.assertEqual(self._errs(_pmax_bundle(with_video=True)), [])
 
     def test_missing_images_still_rejected(self):
         """Sanity: dropping the video gate did not weaken the image gate."""
         bad = _pmax_bundle(with_video=False)
         bad["marketing_images"] = {"landscape": [], "square": [], "portrait": []}
-        with self.assertRaises(PMaxValidationError) as cm:
-            po._validate_bundle(bad)
-        errs: List[str] = cm.exception.errors
+        errs = self._errs(bad)
         # The image errors are present; NO YouTube-video error is emitted.
         self.assertTrue(any("landscape" in e for e in errs))
         self.assertFalse(any("YouTube" in e for e in errs))
