@@ -224,30 +224,17 @@ class DGDraftResponse(BaseModel):
 
 
 def _dg_draft_prompt(body: "DGDraftRequest", spec) -> str:
-    """Build the Creative Director draft prompt from the registry spec (FR1.5).
+    """Thin shim over ``creative_copy.build_draft_prompt`` (Epic 16, story 16.1).
 
-    Pure + module-level so it can be snapshot-tested. The HARD-LIMITS block and
-    the deliberate-40-char instruction both derive from ``spec`` — flipping a
-    registry value changes the prompt with zero code change here."""
-    return (
-        "Draft Google Demand Gen ad copy for this campaign. First fetch the "
-        "landing page to ground every claim — never invent offers or numbers.\n\n"
-        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
-        f"Business name (brand): {body.business_name or '-'}\n"
-        f"Campaign name: {body.campaign_name or '-'}\n"
-        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
-        f"{creative_specs.hard_limits_prompt(spec)}\n"
-        f"{creative_specs.deliberate_length_note(spec, 'headlines')}\n"
-        "DEMAND GEN POLICY: NO prices or discounts in the copy · NO citizenship "
-        "or guaranteed-approval promises · avoid the symbols ~ | + (flagged as "
-        "gimmicky). No em dashes. No third-party brand names. Vary the angles: "
-        "benefit, aspiration, social proof, specificity.\n"
-        "business_name is the advertiser's SHORT brand label shown on the ad — "
-        f"keep it the real brand (≤{spec.business_name_max} chars), not a slogan.\n\n"
-        "Respond with ONLY this JSON, no prose:\n"
-        '{"business_name": "<brand, short>", '
-        '"headlines": [several distinct strings], '
-        '"descriptions": [several distinct strings]}'
+    The unified drafting prompt now lives in ``creative_copy`` (routers are thin);
+    this delegates so the DG draft route + its prompt tests keep passing until the
+    route is deleted at the P2 exit (16.8). HARD-LIMITS / deliberate-length still
+    derive from ``spec``."""
+    from app.services import creative_copy
+
+    return creative_copy.build_draft_prompt(
+        "demand_gen", brief=body.brief, final_url=body.final_url,
+        business_name=body.business_name, campaign_name=body.campaign_name, spec=spec,
     )
 
 
@@ -287,54 +274,33 @@ async def get_draft_demand_gen_copy(draft_id: str) -> Dict[str, Any]:
 
 
 async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraftResponse:
-    """Draft Demand Gen text assets with the Creative Director role from the
-    campaign brief + landing page. Analysis-only (no Google Ads tools); the
-    agent may fetch the landing page to ground the copy. DG's hard limits are
-    re-enforced here so the wizard never receives an over-length or over-count
-    bundle — over-length lines are DROPPED (never truncated into garbage) and a
-    draft that yields too few valid lines fails so the operator regenerates."""
-    import json as _json
-    import re as _re
-
-    from app.services.agent import stream_agent_response
+    """Draft Demand Gen text assets — thin shim over the unified copy contract
+    (Epic 16, story 16.1). ``creative_copy.draft_copy`` produces angle-tagged
+    ``[{text, angle, tier}]`` rows; this shim maps them back to DG's legacy
+    ``{business_name, headlines, descriptions}`` shape and re-enforces DG's count
+    minimums (too few valid lines → 502 so the operator regenerates). Deleted at
+    the P2 exit (16.8) once the wizard is on copy-jobs."""
+    from app.services import creative_copy
 
     spec = creative_specs.get("demand_gen")
-    prompt = _dg_draft_prompt(body, spec)
-
-    parts: list[str] = []
-    async for ev in stream_agent_response(
-        user_message=prompt,
-        account_id=account_id,
-        active_role="creative_director",
-        tool_allowlist=[],  # no Google Ads tools; built-in web fetch still works
-    ):
-        if ev.get("type") in ("text", "text_delta"):
-            parts.append(ev.get("content", ""))
-    raw = "".join(parts)
-
-    m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-    if not m:
-        raise HTTPException(
-            status_code=502,
-            detail={"error": "DRAFT_FAILED", "message": "Creative Director returned no JSON — try again."},
-        )
     try:
-        parsed = _json.loads(m.group(0))
-    except Exception:
+        result = await creative_copy.draft_copy(
+            account_id, "demand_gen",
+            brief=body.brief, final_url=body.final_url,
+            business_name=body.business_name, campaign_name=body.campaign_name,
+        )
+    except ValueError as e:
         raise HTTPException(
             status_code=502,
-            detail={"error": "DRAFT_FAILED", "message": "Could not parse the draft — try again."},
+            detail={"error": "DRAFT_FAILED", "message": str(e)},
         )
 
-    out: Dict[str, List[str]] = {}
+    legacy = creative_copy.rows_to_legacy(result["rows"])
     clamps = creative_specs.draft_clamps(spec)
+    out: Dict[str, List[str]] = {}
     for field in ("headlines", "descriptions"):
-        min_n, max_n, max_chars = clamps[field]
-        items = [
-            s.strip() for s in (parsed.get(field) or [])
-            if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars
-        ]
-        out[field] = items[:max_n]
+        min_n, max_n, _ = clamps[field]
+        out[field] = legacy[field][:max_n]
         if len(out[field]) < min_n:
             raise HTTPException(
                 status_code=502,
@@ -345,14 +311,7 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
                 },
             )
 
-    # business_name: the brand is a proper noun (unlikely to exceed the cap), so
-    # clip defensively rather than fail; fall back to the operator's own entry
-    # from the brief step if the model omitted it or returned an empty value.
-    bn = str(parsed.get("business_name") or "").strip()
-    if not bn:
-        bn = (body.business_name or "").strip()
-    bn = bn[:spec.business_name_max]
-
+    bn = (result.get("business_name") or (body.business_name or "").strip())[:spec.business_name_max]
     return DGDraftResponse(business_name=bn, **out)
 
 

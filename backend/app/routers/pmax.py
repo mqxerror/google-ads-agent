@@ -93,6 +93,8 @@ class PMaxDraftResponse(BaseModel):
     headlines: List[str]
     long_headlines: List[str]
     descriptions: List[str]
+    # PMax now drafts a business_name too — DG parity (Epic 16, FR1.13). ≤25 chars.
+    business_name: str = ""
 
 
 # Draft clamps + prompt limits are derived from the Creative Spec Registry
@@ -100,24 +102,15 @@ class PMaxDraftResponse(BaseModel):
 
 
 def _pmax_draft_prompt(body: "PMaxDraftRequest", spec) -> str:
-    """Build the Creative Director draft prompt from the registry spec (FR1.5).
+    """Thin shim over ``creative_copy.build_draft_prompt`` (Epic 16, story 16.1 /
+    16.6). PMax now reaches DG prompt parity — the same policy block + a drafted
+    business_name — because both types build ONE unified prompt. Deleted at the
+    P2 exit (16.8)."""
+    from app.services import creative_copy
 
-    Pure + module-level for snapshot testing; the HARD-LIMITS block derives from
-    ``spec`` so the prompt can never promise a cap the validator would reject."""
-    return (
-        "Draft Performance Max ad copy for this campaign. First fetch the "
-        "landing page to ground every claim — never invent offers or numbers.\n\n"
-        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
-        f"Business name: {body.business_name or '-'}\n"
-        f"Campaign name: {body.campaign_name or '-'}\n"
-        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
-        f"{creative_specs.hard_limits_prompt(spec)} No em dashes. No third-party "
-        "brand names. Vary the angles: benefit, urgency, social proof, "
-        "question, specificity.\n\n"
-        "Respond with ONLY this JSON, no prose:\n"
-        '{"headlines": [several distinct strings], '
-        '"long_headlines": [several distinct strings], '
-        '"descriptions": [several distinct strings]}'
+    return creative_copy.build_draft_prompt(
+        "pmax", brief=body.brief, final_url=body.final_url,
+        business_name=body.business_name, campaign_name=body.campaign_name, spec=spec,
     )
 
 
@@ -164,52 +157,31 @@ async def get_draft_pmax_copy(draft_id: str) -> Dict[str, Any]:
 
 
 async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMaxDraftResponse:
-    """Draft PMax text assets with the Creative Director role from the
-    campaign brief + landing page. Analysis-only (no Google Ads tools);
-    the agent may fetch the landing page to ground the copy. Limits are
-    re-enforced here so the wizard never receives over-length lines."""
-    import json as _json
-    import re as _re
-
-    from app.services.agent import stream_agent_response
+    """Draft PMax text assets — thin shim over the unified copy contract (Epic 16,
+    story 16.1 / 16.6). ``creative_copy.draft_copy`` yields angle-tagged rows +
+    a business_name; this maps them back to PMax's legacy shape and re-enforces
+    PMax's count minimums. Deleted at the P2 exit (16.8)."""
+    from app.services import creative_copy
 
     spec = creative_specs.get("pmax")
-    prompt = _pmax_draft_prompt(body, spec)
-
-    parts: list[str] = []
-    async for ev in stream_agent_response(
-        user_message=prompt,
-        account_id=account_id,
-        active_role="creative_director",
-        tool_allowlist=[],  # no Google Ads tools; built-in web fetch still works
-    ):
-        if ev.get("type") in ("text", "text_delta"):  # text_delta = token-level (story 1.4)
-            parts.append(ev.get("content", ""))
-    raw = "".join(parts)
-
-    m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-    if not m:
-        raise HTTPException(
-            status_code=502,
-            detail={"error": "DRAFT_FAILED", "message": "Creative Director returned no JSON — try again."},
-        )
     try:
-        parsed = _json.loads(m.group(0))
-    except Exception:
+        result = await creative_copy.draft_copy(
+            account_id, "pmax",
+            brief=body.brief, final_url=body.final_url,
+            business_name=body.business_name, campaign_name=body.campaign_name,
+        )
+    except ValueError as e:
         raise HTTPException(
             status_code=502,
-            detail={"error": "DRAFT_FAILED", "message": "Could not parse the draft — try again."},
+            detail={"error": "DRAFT_FAILED", "message": str(e)},
         )
 
-    out: Dict[str, List[str]] = {}
+    legacy = creative_copy.rows_to_legacy(result["rows"])
     clamps = creative_specs.draft_clamps(spec)
+    out: Dict[str, List[str]] = {}
     for field in ("headlines", "long_headlines", "descriptions"):
-        min_n, max_n, max_chars = clamps[field]
-        items = [
-            s.strip() for s in (parsed.get(field) or [])
-            if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars
-        ]
-        out[field] = items[:max_n]
+        min_n, max_n, _ = clamps[field]
+        out[field] = legacy[field][:max_n]
         if len(out[field]) < min_n:
             raise HTTPException(
                 status_code=502,
@@ -219,7 +191,8 @@ async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMa
                                f"({len(out[field])}/{min_n}) — try again.",
                 },
             )
-    return PMaxDraftResponse(**out)
+    bn = (result.get("business_name") or (body.business_name or "").strip())[:spec.business_name_max]
+    return PMaxDraftResponse(business_name=bn, **out)
 
 
 @router.post(

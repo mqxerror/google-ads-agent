@@ -34,6 +34,12 @@ def get_creative_specs() -> Dict[str, Any]:
             "batch_tile_cap": creative_specs.ENGINE.batch_tile_cap,
             "batch_retry_max": creative_specs.ENGINE.batch_retry_max,
         },
+        # Copy-Workbench angle/tier vocabulary (Epic 16, AD-2) — the frontend
+        # reads its angle list from here, never a baked component constant.
+        "taxonomy": {
+            "angles": list(creative_specs.ANGLES),
+            "tiers": list(creative_specs.TIERS),
+        },
         "version": creative_specs.VERSION,
     }
 
@@ -50,6 +56,68 @@ def get_creative_specs() -> Dict[str, Any]:
 drafts_router = APIRouter(prefix="/api/accounts", tags=["creative-drafts"])
 
 _VALID_TYPES = tuple(creative_specs.REGISTRY.keys())  # pmax | demand_gen | rda
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy-jobs — the unified drafting contract (Epic 16, story 16.1 · FR1.7/1.9/1.10).
+# ONE endpoint pair for draft / rewrite_row / diversify across every campaign
+# type. Jobs are `creative_jobs` DB rows (fence F6) so they survive restart as a
+# recoverable `interrupted`, never a 404. The result is always typed rows
+# `[{text, angle, tier}]`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_COPY_MODES = {"draft", "rewrite_row", "diversify"}
+
+
+class CopyJobBody(BaseModel):
+    campaign_type: str
+    mode: str = "draft"                       # draft | rewrite_row | diversify
+    brief: str = ""
+    final_url: str = ""
+    business_name: str = ""
+    campaign_name: str = ""
+    rows: Optional[List[Dict[str, Any]]] = None       # current set (rewrite/diversify)
+    row_index: Optional[int] = None                   # rewrite_row
+    target_angle: Optional[str] = None                # rewrite_row
+    locked_rows: Optional[List[int]] = None           # diversify — never regenerated
+    flagged_rows: Optional[List[int]] = None          # diversify — the near-dups to replace
+    dismissed_dup_pairs: Optional[List[List[int]]] = None  # R1 escape hatch
+    research_hash: Optional[str] = None
+
+
+@drafts_router.post("/{account_id}/creative/copy-jobs")
+async def start_copy_job(account_id: str, body: CopyJobBody) -> Dict[str, str]:
+    """Start a copy job; poll GET /api/creative/copy-jobs/{job_id}."""
+    import asyncio
+
+    from app.services import creative_copy
+
+    _require_type(body.campaign_type)
+    if body.mode not in _COPY_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "BAD_MODE", "message": f"mode must be one of {sorted(_COPY_MODES)}"},
+        )
+    request = body.model_dump()
+    job_id = await creative_copy.create_job(
+        body.mode, account_id, body.campaign_type, request,
+    )
+    asyncio.create_task(
+        creative_copy.run_copy_job(job_id, body.mode, account_id, body.campaign_type, request)
+    )
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.get("/copy-jobs/{job_id}")
+async def get_copy_job(job_id: str) -> Dict[str, Any]:
+    """Poll a copy job. Returns ``{status, result?, message?, request?}`` — the
+    same poll shape the draft routes use; `interrupted` after a restart."""
+    from app.services import creative_copy
+
+    job = await creative_copy.get_job(job_id)
+    if not job:
+        return {"status": "error", "message": "unknown job id — start a new job"}
+    return job
 
 
 class DraftCreateBody(BaseModel):

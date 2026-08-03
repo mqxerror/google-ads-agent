@@ -251,6 +251,42 @@ REGISTRY: Dict[str, CampaignSpec] = {
 
 ENGINE = EngineConfig(near_dup_threshold=0.65, batch_tile_cap=20, batch_retry_max=2)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy-Workbench taxonomy (Epic 16, AD-2). ONE source of truth for the angle +
+# tier vocabulary — served over the specs endpoint so the frontend never bakes
+# its own list (the string analogue of the numeric-literal fence). ``creative_
+# copy.py`` imports these for row validation; the wizards read them from the
+# served ``taxonomy`` block.
+#   angle = the persuasion strategy a copy row uses (FR1.7).
+#   tier  = which Google-native slot the row targets (FR1.7).
+# ─────────────────────────────────────────────────────────────────────────────
+
+ANGLES: Tuple[str, ...] = (
+    "promotional", "feature", "benefit", "urgency",
+    "social_proof", "aspiration", "specificity",
+)
+
+TIERS: Tuple[str, ...] = (
+    "headline", "long_headline", "description", "short_description",
+)
+
+# tier → the ``spec.text`` field whose char cap governs it (short_description
+# shares the descriptions slot but is capped by ``spec.short_description``).
+TIER_TEXTKEY: Dict[str, str] = {
+    "headline": "headlines",
+    "long_headline": "long_headlines",
+    "description": "descriptions",
+    "short_description": "descriptions",
+}
+
+# ``spec.text`` field → the tier a legacy (bare-string-list) draft maps its rows
+# to. Taxonomy constants live beside ANGLES/TIERS (their single source, AD-2).
+FIELD_TIER: Dict[str, str] = {
+    "headlines": "headline",
+    "long_headlines": "long_headline",
+    "descriptions": "description",
+}
+
 # Bump when the shape or any value changes (surfaced by the endpoint + guard).
 VERSION = "2026-08-03"
 

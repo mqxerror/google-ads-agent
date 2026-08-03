@@ -115,6 +115,11 @@ register_scan_file(_WIZ / "PMaxWizard.tsx", "tsx", 4)
 _CREATIVE = _FRONTEND / "src" / "components" / "creative"
 register_scan_file(_CREATIVE / "TextWorkbench.tsx", "tsx", 0)
 
+# ── Story 16.1 — creative_copy.py becomes the unified drafting service; every
+# clamp/char-cap derives from CampaignSpec (no baked creative-limit literal). It
+# joins the sentinel scan the moment it owns the contract (14.2's accretion). ──
+register_scan_file(_BACKEND / "app" / "services" / "creative_copy.py", "py", 0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2

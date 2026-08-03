@@ -168,9 +168,12 @@ def test_endpoint_shape(client):
     r = client.get("/api/creative/specs")
     assert r.status_code == 200
     body = r.json()
-    assert set(body.keys()) == {"campaign_types", "engine", "version"}
+    assert set(body.keys()) == {"campaign_types", "engine", "taxonomy", "version"}
     assert set(body["campaign_types"].keys()) == {"pmax", "demand_gen", "rda"}
     assert body["engine"]["near_dup_threshold"] == 0.65
+    # Copy-Workbench taxonomy served for the frontend (Epic 16, AD-2).
+    assert body["taxonomy"]["angles"] == list(cs.ANGLES)
+    assert body["taxonomy"]["tiers"] == list(cs.TIERS)
     assert body["version"] == cs.VERSION
 
 
