@@ -58,6 +58,9 @@ export interface CampaignSpec {
 export interface SpecsResponse {
   campaign_types: Record<string, CampaignSpec>;
   engine: { near_dup_threshold: number; batch_tile_cap: number; batch_retry_max: number };
+  // Copy-Workbench angle/tier vocabulary (Epic 16, AD-2) — the single source the
+  // frontend reads its angle list from, never a baked component constant.
+  taxonomy?: { angles: string[]; tiers: string[] };
   version: string;
 }
 

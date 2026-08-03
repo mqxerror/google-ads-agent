@@ -82,6 +82,10 @@ export interface CopyDraftResult {
   headlines?: string[];
   long_headlines?: string[];
   descriptions?: string[];
+  // Epic 16 — the angle-tagged rows behind the legacy field lists. Present when
+  // the draft came from the copy-jobs contract; the host distributes these into
+  // per-field text + angle arrays (the legacy fields drive the panel preview).
+  rows?: { text: string; angle: string | null; tier: string }[];
 }
 
 /** Host-pushed prefill: a preset prompt (Marketing Studio hooks), a
