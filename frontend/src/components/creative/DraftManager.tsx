@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNamedDrafts, type DraftRecord } from './useNamedDrafts';
+import { writeServerRef } from './crashCache';
 
 interface DraftManagerProps<B> {
   accountId: string | null;
@@ -19,10 +20,14 @@ interface DraftManagerProps<B> {
   bundle: B;
   /** Replace the wizard's whole bundle with a loaded draft's bundle. */
   onLoad: (bundle: B) => void;
+  /** The wizard's crash-cache localStorage key (story 15.4). When given, a
+   * save/load records the server ref so the restore banner can tell a stale
+   * cache from genuinely-newer local edits. */
+  storageKey?: string;
 }
 
 export default function DraftManager<B extends object>({
-  accountId, campaignType, bundle, onLoad,
+  accountId, campaignType, bundle, onLoad, storageKey,
 }: DraftManagerProps<B>) {
   const dm = useNamedDrafts<B>(accountId, campaignType);
   const [name, setName] = useState('');
@@ -49,7 +54,8 @@ export default function DraftManager<B extends object>({
     setBusy('save');
     try {
       const existed = dm.drafts.some(d => d.name === name.trim());
-      await dm.save(name.trim(), bundle);
+      const row = await dm.save(name.trim(), bundle);
+      if (storageKey) writeServerRef(storageKey, { id: row.id, updatedAt: row.updated_at, name: row.name });
       setFlash({ kind: 'ok', msg: existed ? `Updated “${name.trim()}”.` : `Saved “${name.trim()}”.` });
     } catch (e) {
       setFlash({ kind: 'err', msg: e instanceof Error ? e.message : String(e) });
@@ -61,6 +67,7 @@ export default function DraftManager<B extends object>({
     try {
       const row = await dm.load(d.id);
       onLoad(row.bundle);
+      if (storageKey) writeServerRef(storageKey, { id: row.id, updatedAt: row.updated_at, name: row.name });
       setName(row.name);
       setFlash({ kind: 'ok', msg: `Loaded “${row.name}”.` });
     } catch (e) {

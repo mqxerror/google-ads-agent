@@ -38,6 +38,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import DraftManager from '@/components/creative/DraftManager';
+import {
+  isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
+  clearCacheMeta, touchCacheTs, shouldOfferRestore,
+} from '@/components/creative/crashCache';
+import { apiGetDraft } from '@/components/creative/useNamedDrafts';
 import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
@@ -124,17 +129,16 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       parsed.channels = { ...EMPTY_BUNDLE.channels, ...(parsed.channels || {}) };
       // Only LOCAL asset ids (upload / generate / library) survive a reload —
       // a Google resource name or bare numeric id leaking back in would bypass
-      // the server-side aspect crop on resubmit, so drop those (same guard as
-      // PMaxWizard).
-      const isLocalRef = (r: string) => !!r && !/^\d+$/.test(r) && !r.includes('/');
-      parsed.logos = (parsed.logos || []).filter(isLocalRef);
-      parsed.landscape = (parsed.landscape || []).filter(isLocalRef);
-      parsed.square = (parsed.square || []).filter(isLocalRef);
-      parsed.portrait = (parsed.portrait || []).filter(isLocalRef);
-      parsed.tallPortrait = (parsed.tallPortrait || []).filter(isLocalRef);
+      // the server-side aspect crop on resubmit, so drop those. The predicate is
+      // the shared, test-pinned `isLocalAssetRef` (story 15.4, behavior unchanged).
+      parsed.logos = (parsed.logos || []).filter(isLocalAssetRef);
+      parsed.landscape = (parsed.landscape || []).filter(isLocalAssetRef);
+      parsed.square = (parsed.square || []).filter(isLocalAssetRef);
+      parsed.portrait = (parsed.portrait || []).filter(isLocalAssetRef);
+      parsed.tallPortrait = (parsed.tallPortrait || []).filter(isLocalAssetRef);
       // Reference photos are library ids too — keep only local refs so a leaked
       // Google resource name can't ride back in as a bogus reference.
-      parsed.referenceAssetIds = (parsed.referenceAssetIds || []).filter(isLocalRef);
+      parsed.referenceAssetIds = (parsed.referenceAssetIds || []).filter(isLocalAssetRef);
       return parsed;
     } catch { return EMPTY_BUNDLE; }
   });
@@ -143,10 +147,16 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; message: string; campaignId?: string } | null>(null);
   const rules = useDemandGenRules();
 
+  const [restore, setRestore] = useState<{ bundle: DGBundle; name: string; id: string; updatedAt: string } | null>(null);
+
   const setField = useCallback(<K extends keyof DGBundle>(key: K, value: DGBundle[K]) => {
     setBundle(prev => {
       const next = { ...prev, [key]: value };
+      // Crash cache only (story 15.4): the server row is the source of truth;
+      // this write-through just recovers unsaved edits after a crash. The `.ts`
+      // sidecar lets the restore banner tell a stale cache from newer edits.
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      touchCacheTs(STORAGE_KEY);
       return next;
     });
   }, []);
@@ -159,7 +169,32 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
     merged.channels = { ...EMPTY_BUNDLE.channels, ...(next.channels || {}) };
     setBundle(merged);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
+    touchCacheTs(STORAGE_KEY);
   }, []);
+
+  // Restore banner (FR4.4): if the crash cache is NEWER than the named draft it
+  // descends from AND differs, offer local-vs-server on open.
+  useEffect(() => {
+    if (!accountId) return;
+    const ref = readServerRef(STORAGE_KEY);
+    if (!ref) return;
+    let cancelled = false;
+    apiGetDraft<DGBundle>(accountId, ref.id)
+      .then(row => {
+        if (cancelled) return;
+        const serverMerged: DGBundle = {
+          ...EMPTY_BUNDLE, ...row.bundle,
+          channels: { ...EMPTY_BUNDLE.channels, ...(row.bundle.channels || {}) },
+        };
+        const differs = JSON.stringify(bundle) !== JSON.stringify(serverMerged);
+        if (shouldOfferRestore(readCacheTs(STORAGE_KEY), row.updated_at, differs)) {
+          setRestore({ bundle: serverMerged, name: row.name, id: row.id, updatedAt: row.updated_at });
+        }
+      })
+      .catch(() => { /* ref stale / draft deleted — no banner */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
 
   const stepId = STEPS[stepIdx].id;
 
@@ -294,6 +329,33 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
         </div>
       </div>
 
+      {/* Restore banner (story 15.4 / FR4.4) — local crash cache newer than the
+          saved draft it descends from. Choosing server discards the local cache. */}
+      {restore && (
+        <div className="border border-amber-500/40 bg-amber-500/10 rounded-md p-3 mb-4 text-xs flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-foreground font-medium">Unsaved local edits recovered</p>
+            <p className="text-muted-foreground">
+              You have local changes newer than the saved draft “{restore.name}”. Keep your recovered
+              edits, or load the saved version (discards local).
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => { clearCacheMeta(STORAGE_KEY); setRestore(null); }}>
+              Keep my edits
+            </Button>
+            <Button size="sm" onClick={() => {
+              loadBundle(restore.bundle);
+              writeServerRef(STORAGE_KEY, { id: restore.id, updatedAt: restore.updatedAt, name: restore.name });
+              setRestore(null);
+            }}>
+              Load saved
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-6 text-[10px]">
         {STEPS.map((s, i) => (
@@ -320,7 +382,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
         {stepId === 'channels'  && <StepChannels  bundle={bundle} setField={setField} />}
         {stepId === 'review'    && (
           <div className="space-y-4">
-            <DraftManager<DGBundle> accountId={accountId} campaignType="demand_gen" bundle={bundle} onLoad={loadBundle} />
+            <DraftManager<DGBundle> accountId={accountId} campaignType="demand_gen" bundle={bundle} onLoad={loadBundle} storageKey={STORAGE_KEY} />
             <StepReview bundle={bundle} submitResult={submitResult} submitting={submitting} />
           </div>
         )}

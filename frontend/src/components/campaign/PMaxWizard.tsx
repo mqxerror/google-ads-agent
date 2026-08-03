@@ -35,6 +35,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import DraftManager from '@/components/creative/DraftManager';
+import {
+  isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
+  clearCacheMeta, touchCacheTs, shouldOfferRestore,
+} from '@/components/creative/crashCache';
+import { apiGetDraft } from '@/components/creative/useNamedDrafts';
 import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
@@ -95,6 +100,8 @@ const EMPTY_BUNDLE: PMaxBundle = {
   videoIds: [''], audienceSignals: [],
 };
 
+const STORAGE_KEY = 'pmax-wizard-bundle';
+
 interface PMaxWizardProps {
   onClose: () => void;
   onBackToTypePicker: () => void;
@@ -118,21 +125,25 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       // swap leaked into localStorage — those refs bypass the server's
       // aspect crop on resubmit (the live ASPECT_RATIO_NOT_ALLOWED), so
       // drop them and let the operator re-pick from local sources.
-      const isLocalRef = (r: string) => !!r && !/^\d+$/.test(r) && !r.includes('/');
-      parsed.logos = (parsed.logos || []).filter(isLocalRef);
-      parsed.landscape = (parsed.landscape || []).filter(isLocalRef);
-      parsed.square = (parsed.square || []).filter(isLocalRef);
-      parsed.portrait = (parsed.portrait || []).filter(isLocalRef);
+      // Shared, test-pinned predicate (story 15.4, behavior unchanged).
+      parsed.logos = (parsed.logos || []).filter(isLocalAssetRef);
+      parsed.landscape = (parsed.landscape || []).filter(isLocalAssetRef);
+      parsed.square = (parsed.square || []).filter(isLocalAssetRef);
+      parsed.portrait = (parsed.portrait || []).filter(isLocalAssetRef);
       return parsed;
     } catch { return EMPTY_BUNDLE; }
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; message: string; campaignId?: string } | null>(null);
 
+  const [restore, setRestore] = useState<{ bundle: PMaxBundle; name: string; id: string; updatedAt: string } | null>(null);
+
   const setField = useCallback(<K extends keyof PMaxBundle>(key: K, value: PMaxBundle[K]) => {
     setBundle(prev => {
       const next = { ...prev, [key]: value };
-      try { localStorage.setItem('pmax-wizard-bundle', JSON.stringify(next)); } catch {}
+      // Crash cache only (story 15.4): the server row is the source of truth.
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      touchCacheTs(STORAGE_KEY);
       return next;
     });
   }, []);
@@ -142,8 +153,30 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
   const loadBundle = useCallback((next: PMaxBundle) => {
     const merged: PMaxBundle = { ...EMPTY_BUNDLE, ...next };
     setBundle(merged);
-    try { localStorage.setItem('pmax-wizard-bundle', JSON.stringify(merged)); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
+    touchCacheTs(STORAGE_KEY);
   }, []);
+
+  // Restore banner (FR4.4): crash cache newer than the named draft it descends
+  // from AND differs → offer local-vs-server on open.
+  useEffect(() => {
+    if (!accountId) return;
+    const ref = readServerRef(STORAGE_KEY);
+    if (!ref) return;
+    let cancelled = false;
+    apiGetDraft<PMaxBundle>(accountId, ref.id)
+      .then(row => {
+        if (cancelled) return;
+        const serverMerged: PMaxBundle = { ...EMPTY_BUNDLE, ...row.bundle };
+        const differs = JSON.stringify(bundle) !== JSON.stringify(serverMerged);
+        if (shouldOfferRestore(readCacheTs(STORAGE_KEY), row.updated_at, differs)) {
+          setRestore({ bundle: serverMerged, name: row.name, id: row.id, updatedAt: row.updated_at });
+        }
+      })
+      .catch(() => { /* ref stale / draft deleted — no banner */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
 
   const stepId = STEPS[stepIdx].id;
 
@@ -303,6 +336,33 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         </div>
       </div>
 
+      {/* Restore banner (story 15.4 / FR4.4) — local crash cache newer than the
+          saved draft it descends from. Choosing server discards the local cache. */}
+      {restore && (
+        <div className="border border-amber-500/40 bg-amber-500/10 rounded-md p-3 mb-4 text-xs flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-foreground font-medium">Unsaved local edits recovered</p>
+            <p className="text-muted-foreground">
+              You have local changes newer than the saved draft “{restore.name}”. Keep your recovered
+              edits, or load the saved version (discards local).
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => { clearCacheMeta(STORAGE_KEY); setRestore(null); }}>
+              Keep my edits
+            </Button>
+            <Button size="sm" onClick={() => {
+              loadBundle(restore.bundle);
+              writeServerRef(STORAGE_KEY, { id: restore.id, updatedAt: restore.updatedAt, name: restore.name });
+              setRestore(null);
+            }}>
+              Load saved
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-6 text-[10px]">
         {STEPS.map((s, i) => (
@@ -332,7 +392,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         {stepId === 'signals'  && <StepSignals  bundle={bundle} setField={setField} />}
         {stepId === 'review'   && (
           <div className="space-y-4">
-            <DraftManager<PMaxBundle> accountId={accountId} campaignType="pmax" bundle={bundle} onLoad={loadBundle} />
+            <DraftManager<PMaxBundle> accountId={accountId} campaignType="pmax" bundle={bundle} onLoad={loadBundle} storageKey={STORAGE_KEY} />
             <StepReview bundle={bundle} submitResult={submitResult} submitting={submitting} />
           </div>
         )}
