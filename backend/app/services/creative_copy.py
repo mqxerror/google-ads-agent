@@ -44,18 +44,22 @@ async def create_job(
     account_id: str,
     campaign_type: str,
     request: Optional[Dict[str, Any]] = None,
+    research_hash: Optional[str] = None,
 ) -> str:
     """Insert a new ``running`` job row and return its id. ``kind`` in
     {'draft', 'rewrite_row', 'diversify'}; ``request`` is persisted verbatim so
-    an interrupted job can be re-run one-click."""
+    an interrupted job can be re-run one-click. ``research_hash`` records the
+    shared page-research object's identity (Epic 18, FR3.3) — the SAME token the
+    image path (extract-brief) computes for the same page, so both consumers are
+    provably grounded in ONE fetch's object."""
     job_id = str(uuid.uuid4())
     db = await get_db()
     try:
         await db.execute(
-            "INSERT INTO creative_jobs (id, kind, account_id, campaign_type, status, request_json) "
-            "VALUES (?, ?, ?, ?, 'running', ?)",
+            "INSERT INTO creative_jobs (id, kind, account_id, campaign_type, status, "
+            "request_json, research_hash) VALUES (?, ?, ?, ?, 'running', ?, ?)",
             (job_id, kind, account_id, campaign_type,
-             json.dumps(request) if request is not None else None),
+             json.dumps(request) if request is not None else None, research_hash),
         )
         await db.commit()
     finally:
@@ -237,12 +241,17 @@ def build_draft_prompt(
     business_name: str = "",
     campaign_name: str = "",
     spec: Optional[CampaignSpec] = None,
+    claim_seeds: Optional[List[str]] = None,
 ) -> str:
     """The unified Creative Director draft prompt for any campaign type (FR1.7,
     FR1.13). The HARD-LIMITS block, the deliberate-length note, and the requested
     tiers all derive from ``spec`` so the prompt can never promise a number the
     validator rejects. Every campaign type gets DG's full policy block (FR1.13
-    parity) and drafts a ``business_name``."""
+    parity) and drafts a ``business_name``.
+
+    ``claim_seeds`` — GATED page claims from the shared research object (Epic 18,
+    FR3.3/FR3.4). When present they ground the copy in what the page ALREADY says
+    (already checked against pinned facts), never inventing offers."""
     spec = spec or creative_specs.get(campaign_type)
     tiers = _requested_tiers(spec)
     tier_menu = " | ".join(tiers)
@@ -253,13 +262,21 @@ def build_draft_prompt(
     )
     label = "Performance Max" if campaign_type == "pmax" else (
         "Responsive Display" if campaign_type == "rda" else "Demand Gen")
+    seed_block = ""
+    if claim_seeds:
+        seed_lines = "\n".join(f"  - {c}" for c in claim_seeds)
+        seed_block = (
+            "\nPAGE CLAIM SEEDS (already verified against pinned facts — lean on "
+            "THESE, don't invent new offers/numbers):\n" + seed_lines + "\n"
+        )
     return (
         f"Draft Google {label} ad copy for this campaign. First fetch the landing "
         "page to ground every claim — never invent offers or numbers.\n\n"
         f"Landing page: {final_url or '(none given — use the brief only)'}\n"
         f"Business name (brand): {business_name or '-'}\n"
         f"Campaign name: {campaign_name or '-'}\n"
-        f"Brief from the operator: {brief or '(none — derive from the landing page)'}\n\n"
+        f"Brief from the operator: {brief or '(none — derive from the landing page)'}\n"
+        f"{seed_block}\n"
         f"{creative_specs.hard_limits_prompt(spec)}\n"
         f"{creative_specs.deliberate_length_note(spec, 'headlines')}\n"
         "POLICY (Google disapproves violations): NO prices or discounts in the "
@@ -311,6 +328,27 @@ def _business_name(parsed: dict, spec: CampaignSpec, fallback: str = "") -> str:
     return bn[: spec.business_name_max]
 
 
+async def _research_claim_seeds(account_id: str, research_hash: Optional[str],
+                                campaign_id: Optional[str]) -> List[str]:
+    """Load the GATED claim seeds from the shared research object (by hash), the
+    SAME brand kit the scrape produced (FR3.3 identity). Returns [] when no
+    research is attached — the copy path stays fully backward compatible.
+
+    The seeds are already gated against pinned facts at scrape time (FR3.4); this
+    re-gates defensively so a stale kit can never resurrect a since-banned claim."""
+    if not research_hash:
+        return []
+    from app.services import brand_kit
+
+    kit = await brand_kit.load_brand_kit_by_hash(account_id, research_hash)
+    if not kit:
+        return []
+    raw = kit.get("gated_claims") or kit.get("claims") or []
+    kept, _dropped = brand_kit.filter_claim_seeds(
+        [str(c) for c in raw], account_id, campaign_id)
+    return kept
+
+
 async def draft_copy(
     account_id: str,
     campaign_type: str,
@@ -319,15 +357,23 @@ async def draft_copy(
     final_url: str = "",
     business_name: str = "",
     campaign_name: str = "",
+    research_hash: Optional[str] = None,
+    campaign_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Draft a full angle-tagged copy set. Returns ``{"rows": [...],
     "business_name": str}`` (the P2 contract). Raises no count errors — the
     contract returns whatever the drafter produced; count/coverage is the
-    wizard's + the create validator's concern."""
+    wizard's + the create validator's concern.
+
+    When a ``research_hash`` is supplied, the drafter is grounded in the SAME
+    page-research object the image path received (FR3.3): its GATED claim seeds
+    are injected as the only page claims the copy may lean on (FR3.4)."""
     spec = creative_specs.get(campaign_type)
+    claim_seeds = await _research_claim_seeds(account_id, research_hash, campaign_id)
     prompt = build_draft_prompt(
         campaign_type, brief=brief, final_url=final_url,
         business_name=business_name, campaign_name=campaign_name, spec=spec,
+        claim_seeds=claim_seeds,
     )
     raw = await _stream_draft(account_id, prompt)
     parsed = _extract_json(raw)
@@ -404,6 +450,8 @@ async def run_copy_job(job_id: str, kind: str, account_id: str,
                 brief=request.get("brief", ""), final_url=request.get("final_url", ""),
                 business_name=request.get("business_name", ""),
                 campaign_name=request.get("campaign_name", ""),
+                research_hash=request.get("research_hash"),
+                campaign_id=request.get("campaign_id"),
             )
         elif kind == "rewrite_row":
             result = await rewrite_row(

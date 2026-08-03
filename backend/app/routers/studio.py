@@ -885,6 +885,9 @@ class ExtractBriefResponse(BaseModel):
     brief: Optional[DecomposedBrief] = None
     variants: list[BriefVariant] = Field(default_factory=list)
     pinned_claims_used: list[str] = Field(default_factory=list)
+    # Shared research-object identity (Epic 18, FR3.3). Same page → same hash the
+    # copy drafter records on its job row; proves both consumed ONE object.
+    research_hash: Optional[str] = None
     # Back-compat alias: first variant's prompt. Old FE callers that
     # haven't switched to the variants[] picker still get a usable
     # single prompt.
@@ -905,18 +908,25 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
     The single-shot `drafted_prompt` field is kept as a back-compat
     alias for the first variant so older FE callers don't break.
     """
+    from app.services import brand_kit
     from app.services.page_fetcher import fetch, PageFetchError
     from app.services.prompt_drafter import draft_variants, PromptDrafterError
 
     # Step 1 — fetch + parse (URL mode), or synthesize a page-shaped
     # input from inline context (context mode — PMax wizard slots pass
     # a rough idea + campaign brief without a fetchable page).
+    research_hash: Optional[str] = None
     if body.url and body.url.strip():
         try:
             page = await fetch(body.url)
         except PageFetchError as e:
             raise HTTPException(status_code=400, detail={"code": "fetch_failed", "message": str(e)})
-        page_dict = page.to_dict()
+        # Consume the SHARED research object (FR3.3 · strangler step 9): the SAME
+        # one fetch, same object the copy drafter + brand-kit path use. Its fields
+        # are exactly the Stage-1 signals, so this is behavior-stable for the
+        # existing extract-brief consumers; the research_hash is the identity token.
+        page_dict = brand_kit.research_object(page)
+        research_hash = brand_kit.research_hash(page_dict)
     elif body.context and body.context.strip():
         page_dict = {
             "url": "",
@@ -969,6 +979,7 @@ async def extract_brief(body: ExtractBriefRequest) -> ExtractBriefResponse:
         brief=brief_obj,
         variants=variant_objs,
         pinned_claims_used=package.get("pinned_claims_used", []),
+        research_hash=research_hash,
         drafted_prompt=fallback,
     )
 

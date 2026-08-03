@@ -24,13 +24,22 @@ Playwright / Chromium anywhere in the v1 manifest (FR3.2, asserted by a test).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
+import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
+import httpx
 from bs4 import BeautifulSoup
+
+from app.config import settings
+from app.database import get_db
+from google_ads.services.campaign.creative_images import MAX_GOOGLE_IMAGE_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +54,19 @@ _MAX_FONTS = 6                   # distinct font families returned
 _MAX_CLAIMS = 8                  # copy claim/headline seeds returned
 _MAX_HERO_IMAGES = 6             # hero/product image candidates returned
 _HERO_MIN_DIM = 200             # px floor for an <img> to count as a hero by size
+
+# Subordinate asset fetches (linked stylesheets, image downloads) — these are
+# NOT HTML-document fetches and are counted separately by FR3.3's fetch-count spy
+# (the spy watches page_fetcher.fetch). Kept tight because the source URL is
+# operator-supplied → public.
+_ASSET_FETCH_TIMEOUT_S = 8.0
+_MAX_STYLESHEET_BYTES = 2 * 1024 * 1024     # 2MB per linked stylesheet
+# Download cap BEFORE transcode = 3× Google's 5MB post-transcode ceiling, so a
+# large source can still be compressed down. Derived from the imported cap (no
+# baked byte literal — creative-limit numbers live in creative_images / registry).
+_MAX_IMAGE_BYTES = 3 * MAX_GOOGLE_IMAGE_BYTES
+_BRAND_LABEL_MAX = 48                        # brand-kit row filename label length
+_ASSET_USER_AGENT = "google-ads-agent/0.1 (+studio brand-kit fetcher)"
 
 # The field groups reported in `missing_fields` when empty (FR3.2). Named so the
 # partial-extraction warning lists EXACTLY which parts of the contract came back
@@ -462,3 +484,329 @@ def extract(page: Any, *, linked_css: Optional[list[str]] = None) -> BrandKit:
         partial=bool(missing),
         missing_fields=missing,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Story 18.2 — the shared research object (ONE fetch, two consumers) + persistence
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def research_object(page: Any) -> dict[str, Any]:
+    """The SHARED, deterministic, LLM-free research object that BOTH the image
+    path (extract-brief Stage-1) and the copy drafter consume (FR3.3). It is the
+    page signals Stage-1 already reads — so refactoring extract-brief onto this is
+    behavior-stable — never a second fetch. ``research_hash`` over this object is
+    the identity both consumers assert on their job row."""
+    return {
+        "url": getattr(page, "url", "") or "",
+        "final_url": getattr(page, "final_url", "") or "",
+        "title": getattr(page, "title", None),
+        "description": getattr(page, "description", None),
+        "og": dict(getattr(page, "og", {}) or {}),
+        "h1": getattr(page, "h1", None),
+        "body_excerpt": getattr(page, "body_excerpt", "") or "",
+    }
+
+
+def research_hash(obj: dict[str, Any]) -> str:
+    """Stable content hash of a research object — the FR3.3 identity token. Same
+    page content → same hash on every consumer, so the image path and the copy
+    drafter can be PROVEN to have received the same object (job-row assert)."""
+    canonical = json.dumps(obj, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+# ── Subordinate asset fetches (NOT HTML-document fetches — FR3.3 spy) ──────────
+
+
+def _same_origin(base: str, url: str) -> bool:
+    try:
+        b, u = urlparse(base), urlparse(url)
+        return (b.scheme, b.netloc) == (u.scheme, u.netloc) or b.netloc == u.netloc
+    except Exception:
+        return False
+
+
+async def fetch_linked_css(page: Any, *, client: Optional[httpx.AsyncClient] = None) -> list[str]:
+    """Fetch up to ``_STYLESHEET_SUBFETCH_MAX`` linked SAME-ORIGIN stylesheets so
+    ``extract`` can harvest their declared colors/fonts (honesty #3). These are
+    subordinate ASSET fetches — the FR3.3 fetch-count spy watches
+    ``page_fetcher.fetch`` (HTML documents), which these deliberately are not."""
+    raw_html = getattr(page, "raw_html", "") or ""
+    base = getattr(page, "final_url", "") or getattr(page, "url", "") or ""
+    soup = BeautifulSoup(raw_html, "html.parser")
+    hrefs: list[str] = []
+    for link in soup.find_all("link", rel=True):
+        rels = " ".join(link.get("rel") or []).lower()
+        if "stylesheet" in rels:
+            abs_u = _abs_url(base, link.get("href"))
+            if abs_u and _same_origin(base, abs_u):
+                hrefs.append(abs_u)
+        if len(hrefs) >= _STYLESHEET_SUBFETCH_MAX:
+            break
+
+    if not hrefs:
+        return []
+    out: list[str] = []
+    owns_client = client is None
+    client = client or httpx.AsyncClient(
+        timeout=_ASSET_FETCH_TIMEOUT_S, follow_redirects=True,
+        headers={"User-Agent": _ASSET_USER_AGENT},
+    )
+    try:
+        for href in hrefs:
+            try:
+                r = await client.get(href)
+                if r.status_code < 400 and len(r.content) <= _MAX_STYLESHEET_BYTES:
+                    out.append(r.text)
+            except httpx.RequestError as e:
+                logger.info("brand_kit: stylesheet sub-fetch failed %s: %s", href, e)
+    finally:
+        if owns_client:
+            await client.aclose()
+    return out
+
+
+async def _download_image(url: str, *, client: Optional[httpx.AsyncClient] = None
+                          ) -> Optional[tuple[bytes, str]]:
+    """Download an image (subordinate asset fetch). Returns ``(bytes, content_type)``
+    or ``None`` on failure / over-cap."""
+    owns_client = client is None
+    client = client or httpx.AsyncClient(
+        timeout=_ASSET_FETCH_TIMEOUT_S, follow_redirects=True,
+        headers={"User-Agent": _ASSET_USER_AGENT},
+    )
+    try:
+        r = await client.get(url)
+        if r.status_code >= 400 or len(r.content) > _MAX_IMAGE_BYTES:
+            return None
+        return r.content, (r.headers.get("content-type") or "").split(";")[0].strip()
+    except httpx.RequestError as e:
+        logger.info("brand_kit: image download failed %s: %s", url, e)
+        return None
+    finally:
+        if owns_client:
+            await client.aclose()
+
+
+def _min_dims_for(kind: str) -> tuple[int, int]:
+    """Min-size floor for a scraped image, IMPORTED from creative_images (never a
+    baked literal — fence F2). Logos use the 1:1 logo minimum; heroes/products
+    use the square marketing minimum so tracking pixels / tiny icons are rejected
+    before they enter the library."""
+    from google_ads.services.campaign.creative_images import IMAGE_SLOT_SPECS
+    slot = "logos" if kind in ("logo", "favicon") else "square"
+    spec = IMAGE_SLOT_SPECS[slot]
+    return spec["min_w"], spec["min_h"]
+
+
+def validate_scraped_image(raw: bytes, kind: str) -> Optional[tuple[bytes, str, int, int]]:
+    """Run a downloaded image through the EXISTING creative_images validation:
+    open with Pillow (reject non-images), enforce the imported min-size floor
+    (reject tiny junk), and transcode under Google's 5MB cap via
+    ``encode_for_google``. Returns ``(bytes, mime, w, h)`` or ``None`` (rejected).
+
+    SVG is handled by the caller (store-with-flag) — Pillow can't rasterize it
+    without a heavy dep we don't ship."""
+    from io import BytesIO
+
+    from PIL import Image
+    from google_ads.services.campaign.creative_images import encode_for_google
+
+    try:
+        with Image.open(BytesIO(raw)) as opened:
+            opened.load()
+            w, h = opened.size
+            if not w or not h:
+                return None
+            min_w, min_h = _min_dims_for(kind)
+            if w < min_w or h < min_h:
+                logger.info("brand_kit: rejected %s image %dx%d (below %dx%d floor)",
+                            kind, w, h, min_w, min_h)
+                return None
+            encoded = encode_for_google(opened)
+            if encoded is None:
+                logger.info("brand_kit: %s image can't compress under the 5MB cap", kind)
+                return None
+            data, mime = encoded
+            return data, mime, w, h
+    except Exception as e:  # noqa: BLE001 — a bad image is a rejection, not a crash
+        logger.info("brand_kit: image validation failed (%s): %s", kind, e)
+        return None
+
+
+# ── Persistence (ad_assets, source='scraped' — no new table) ──────────────────
+
+_ASSETS_DIR = settings.DATA_DIR / "ad_assets"
+_MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif",
+             "image/webp": ".webp", "image/svg+xml": ".svg"}
+
+
+async def _persist_image(*, account_id: Optional[str], campaign_id: Optional[str],
+                         img: BrandImage, client: httpx.AsyncClient) -> Optional[str]:
+    """Download + validate + store ONE scraped image as an ``ad_assets`` row
+    (``source='scraped'``, pickable in LibraryPicker unchanged). Returns the new
+    asset id, or ``None`` when the image was rejected / undownloadable.
+
+    SVG logos are STORED-WITH-FLAG (``meta_json.svg=true``): kept in the library
+    and referenced by the brand kit, but flagged as needing rasterization before
+    use in Google raster image slots (no heavy SVG dep shipped)."""
+    if not img.url:
+        return None
+    dl = await _download_image(img.url, client=client)
+    if dl is None:
+        return None
+    raw, content_type = dl
+    _ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    asset_id = str(uuid.uuid4())
+
+    if img.is_svg or content_type == "image/svg+xml":
+        # store-with-flag: no Pillow validation (can't rasterize without a heavy dep)
+        if len(raw) > _MAX_IMAGE_BYTES:
+            return None
+        ext = ".svg"
+        data = raw
+        width = height = None
+        meta = {"svg": True, "rasterized": False, "found_via": img.found_via,
+                "note": "SVG asset — rasterize before use in Google raster image slots"}
+    else:
+        validated = validate_scraped_image(raw, img.kind)
+        if validated is None:
+            return None
+        data, mime, width, height = validated
+        ext = _MIME_EXT.get(mime, ".png")
+        meta = {"found_via": img.found_via}
+
+    stored_name = f"{asset_id}{ext}"
+    (_ASSETS_DIR / stored_name).write_bytes(data)
+    public_url = f"/api/assets/file/{stored_name}"
+    filename = Path(urlparse(img.url).path).name or f"scraped{ext}"
+
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT INTO ad_assets (id, account_id, campaign_id, type, filename, url, "
+            "width, height, size_bytes, source, meta_json) "
+            "VALUES (?, ?, ?, 'image', ?, ?, ?, ?, ?, 'scraped', ?)",
+            (asset_id, account_id, campaign_id, filename, public_url, width, height,
+             len(data), json.dumps(meta)),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+    return asset_id
+
+
+async def persist_brand_kit(
+    *, account_id: Optional[str], campaign_id: Optional[str], kit: BrandKit,
+    gated_claims: list[str], research_hash_val: str,
+) -> dict[str, Any]:
+    """Persist a brand kit into the library (FR3.3): each downloadable logo/hero
+    image becomes an ``ad_assets`` row (``source='scraped'``); the non-file fields
+    (brand_name, colors, fonts, RAW claims) persist as ONE ``ad_assets`` row of
+    ``type='brand_kit'`` whose ``meta_json`` carries the kit + its sibling image
+    ids — account-scoped, no new table. Returns the persisted ids + counts."""
+    logo_asset_id: Optional[str] = None
+    hero_asset_ids: list[str] = []
+    async with httpx.AsyncClient(
+        timeout=_ASSET_FETCH_TIMEOUT_S, follow_redirects=True,
+        headers={"User-Agent": _ASSET_USER_AGENT},
+    ) as client:
+        if kit.logo is not None:
+            logo_asset_id = await _persist_image(
+                account_id=account_id, campaign_id=campaign_id, img=kit.logo, client=client)
+        for hero in kit.hero_images:
+            hid = await _persist_image(
+                account_id=account_id, campaign_id=campaign_id, img=hero, client=client)
+            if hid:
+                hero_asset_ids.append(hid)
+
+    kit_asset_id = str(uuid.uuid4())
+    # RAW claims live on the brand-kit row (so a claim "appears in the raw brand
+    # kit" — FR3.4); the GATED seed set is what feeds copy (story 18.3).
+    meta = {
+        **kit.to_dict(),
+        "gated_claims": gated_claims,
+        "logo_asset_id": logo_asset_id,
+        "hero_asset_ids": hero_asset_ids,
+        "research_hash": research_hash_val,
+    }
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT INTO ad_assets (id, account_id, campaign_id, type, filename, url, "
+            "source, meta_json) VALUES (?, ?, ?, 'brand_kit', ?, '', 'scraped', ?)",
+            (kit_asset_id, account_id, campaign_id,
+             f"brand-kit-{(kit.brand_name or 'site')[:_BRAND_LABEL_MAX]}", json.dumps(meta)),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+    return {
+        "kit_asset_id": kit_asset_id,
+        "logo_asset_id": logo_asset_id,
+        "hero_asset_ids": hero_asset_ids,
+        "hero_images": hero_asset_ids,
+    }
+
+
+async def load_brand_kit_by_hash(account_id: Optional[str], research_hash_val: str
+                                 ) -> Optional[dict[str, Any]]:
+    """Load a persisted brand-kit row's ``meta_json`` by its ``research_hash`` —
+    how a copy-job receives the SAME research object the scrape produced (FR3.3
+    identity). Account-scoped."""
+    if not research_hash_val:
+        return None
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT meta_json FROM ad_assets WHERE type='brand_kit' AND account_id IS ? "
+            "AND meta_json LIKE ? ORDER BY created_at DESC LIMIT 1",
+            (account_id, f'%"research_hash": "{research_hash_val}"%'),
+        )
+        row = await cur.fetchone()
+    finally:
+        await db.close()
+    if not row or not row["meta_json"]:
+        return None
+    try:
+        return json.loads(row["meta_json"])
+    except (ValueError, TypeError):
+        return None
+
+
+# ── Ownership guard (minimal for 18.2; robots + config seeding land in 18.4) ──
+
+
+class ScrapeRefused(RuntimeError):
+    """Raised when a scrape is refused by the ownership / robots posture (FR3.5).
+    ``reason`` names the posture so the router can surface it verbatim."""
+
+    def __init__(self, reason: str, status_code: int = 422):
+        super().__init__(reason)
+        self.reason = reason
+        self.status_code = status_code
+
+
+async def assert_scrapable(url: str, *, confirm_ownership: bool) -> None:
+    """Fail-closed ownership check (FR3.5). In 18.2 this requires an explicit
+    ``confirm_ownership`` for ANY URL; story 18.4 adds the ``creative.owned_domains``
+    allowlist (owned properties skip the confirm) + robots.txt respect."""
+    if not confirm_ownership:
+        raise ScrapeRefused(
+            "ownership not confirmed — the scraper runs only against operator-owned "
+            "properties; pass confirm_ownership=true for a URL you own",
+            status_code=422,
+        )
+
+
+# ── Claim seed gate (passthrough in 18.2; real gate lands in 18.3) ────────────
+
+
+def filter_claim_seeds(claims: list[str], account_id: Optional[str],
+                       campaign_id: Optional[str]) -> tuple[list[str], list[dict]]:
+    """Filter scraped claim seeds against pinned facts (FR3.4). Story 18.2 ships
+    the passthrough; story 18.3 replaces the body with the real pinned-fact gate
+    (reusing claim_gate primitives). Returns ``(kept_claims, dropped)``."""
+    return list(claims), []

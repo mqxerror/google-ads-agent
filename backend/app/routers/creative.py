@@ -45,6 +45,86 @@ def get_creative_specs() -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Page Asset Scraper (Epic 18, story 18.2 · FR3.1–FR3.5). ONE fetch → brand-kit
+# assets in the library + the shared research object (research_hash) both the
+# image path and the copy drafter consume. Ownership/robots posture is fail-closed
+# (story 18.4); scraped claims are gated against pinned facts (story 18.3).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class BrandKitBody(BaseModel):
+    url: str
+    account_id: Optional[str] = None
+    # Optional campaign context so scraped claims can be gated against THIS
+    # campaign's pinned facts (FR3.4). Absent → account-level pass-through.
+    campaign_id: Optional[str] = None
+    confirm_ownership: bool = False
+
+
+@router.post("/brand-kit")
+async def create_brand_kit(body: BrandKitBody) -> Dict[str, Any]:
+    """Scrape an operator-owned landing page → persist brand-kit assets to the
+    library + return the kit and its shared research object (FR3.1–FR3.5).
+
+    ONE HTML document fetch per URL (linked stylesheets + image downloads are
+    subordinate asset fetches). Refuses non-owned / robots-disallowed URLs
+    (FR3.5); scraped claims are gated against pinned facts before they can seed
+    copy (FR3.4)."""
+    from app.services import brand_kit
+    from app.services.page_fetcher import PageFetchError, fetch
+
+    if not body.url or not body.url.strip():
+        raise HTTPException(status_code=422,
+                            detail={"code": "missing_url", "message": "url is required"})
+
+    # Fail-closed ownership + robots posture (FR3.5).
+    try:
+        await brand_kit.assert_scrapable(body.url, confirm_ownership=body.confirm_ownership)
+    except brand_kit.ScrapeRefused as e:
+        raise HTTPException(status_code=e.status_code,
+                            detail={"code": "scrape_refused", "message": e.reason})
+
+    # ONE HTML document fetch (the fetch-count spy watches this call).
+    try:
+        page = await fetch(body.url)
+    except PageFetchError as e:
+        raise HTTPException(status_code=400,
+                            detail={"code": "fetch_failed", "message": str(e)})
+
+    linked_css = await brand_kit.fetch_linked_css(page)
+    kit = brand_kit.extract(page, linked_css=linked_css)
+    ro = brand_kit.research_object(page)
+    rh = brand_kit.research_hash(ro)
+
+    # Gate scraped claims against pinned facts BEFORE they can seed copy (FR3.4).
+    gated_claims, dropped = brand_kit.filter_claim_seeds(
+        kit.claims, body.account_id, body.campaign_id)
+
+    persisted = await brand_kit.persist_brand_kit(
+        account_id=body.account_id, campaign_id=body.campaign_id, kit=kit,
+        gated_claims=gated_claims, research_hash_val=rh,
+    )
+
+    kd = kit.to_dict()
+    return {
+        "brand_name": kd["brand_name"],
+        "logo_url": kd["logo_url"],
+        "logo_is_svg": kd["logo_is_svg"],
+        "favicon_url": kd["favicon_url"],
+        "colors": kd["colors"],
+        "fonts": kd["fonts"],
+        "hero_images": persisted["hero_asset_ids"],   # asset ids (FR3.3)
+        "logo_asset_id": persisted["logo_asset_id"],
+        "claims": gated_claims,                        # gated seed set (FR3.4)
+        "claims_dropped": dropped,
+        "partial": kd["partial"],
+        "missing_fields": kd["missing_fields"],
+        "kit_asset_id": persisted["kit_asset_id"],
+        "research_hash": rh,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Named drafts CRUD (story 15.2, FR4.1/FR4.2/D4). Per-account, per-campaign-type
 # named rows — a second draft NEVER destroys the first because a name is a ROW,
 # not a singleton key. Backed by the V27 `creative_drafts` table. Draft state has
@@ -101,6 +181,7 @@ async def start_copy_job(account_id: str, body: CopyJobBody) -> Dict[str, str]:
     request = body.model_dump()
     job_id = await creative_copy.create_job(
         body.mode, account_id, body.campaign_type, request,
+        research_hash=body.research_hash,
     )
     asyncio.create_task(
         creative_copy.run_copy_job(job_id, body.mode, account_id, body.campaign_type, request)
