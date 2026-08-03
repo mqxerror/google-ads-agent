@@ -39,6 +39,16 @@ import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import DraftManager from '@/components/creative/DraftManager';
 import TextWorkbench from '@/components/creative/TextWorkbench';
+import { useDraftJob, type CopyJobResult } from '@/components/creative/useDraftJob';
+import { useAngles } from '@/lib/angles';
+import { distributeRows, toRows, buildDiversifyBody, type CopyRow } from '@/lib/copyRows';
+import { findNearDupPairs } from '@/lib/nearDup';
+import CoveragePanel from '@/components/creative/CoveragePanel';
+import PolicyHintCard from '@/components/creative/PolicyHintCard';
+import BusinessNameField from '@/components/creative/BusinessNameField';
+import BrandPresetToggle from '@/components/creative/BrandPresetToggle';
+import ReferencePhotosPicker from '@/components/creative/ReferencePhotosPicker';
+import ConfirmCreateModal from '@/components/creative/ConfirmCreateModal';
 import {
   isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
   clearCacheMeta, touchCacheTs, shouldOfferRestore,
@@ -91,6 +101,13 @@ interface DGBundle {
   languageIds: string;         // comma-separated language constant ids
   headlines: string[];
   descriptions: string[];
+  // Epic 16 — angle + lock metadata parallel to the text rows (optional; absent
+  // in pre-16 drafts, which still load). Angle chips + per-row rewrite + Diversify.
+  headlineAngles: (string | null)[];
+  headlineLocks: boolean[];
+  descriptionAngles: (string | null)[];
+  descriptionLocks: boolean[];
+  dismissedDupPairs: [number, number][];
   ctaText: string;
   logos: string[];             // local ad_asset ids
   landscape: string[];
@@ -104,7 +121,10 @@ const EMPTY_BUNDLE: DGBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   corporateBrand: true, referenceAssetIds: [],
   targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '',
-  headlines: [''], descriptions: [''], ctaText: '',
+  headlines: [''], descriptions: [''],
+  headlineAngles: [], headlineLocks: [], descriptionAngles: [], descriptionLocks: [],
+  dismissedDupPairs: [],
+  ctaText: '',
   logos: [], landscape: [], square: [], portrait: [], tallPortrait: [],
   channels: {
     youtube_in_stream: true, youtube_in_feed: true, youtube_shorts: true,
@@ -420,27 +440,16 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
         )}
       </div>
 
-      {/* Confirm-before-create modal */}
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md border border-border rounded-lg bg-card p-6 shadow-lg">
-            <h3 className="text-base font-semibold flex items-center gap-2 mb-2">
-              <Megaphone className="h-4 w-4 text-primary" /> Create this Demand Gen campaign?
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              <strong className="text-foreground">“{bundle.name}”</strong> will be created in Google Ads at
-              {' '}<strong className="text-foreground">${parseFloat(bundle.dailyBudget || '0').toFixed(2)}/day</strong>.
-              It will start <strong className="text-foreground">PAUSED</strong> — no spend until you enable it in the Google Ads UI.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-              <Button size="sm" onClick={doSubmit} className="gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" /> Yes, create (PAUSED)
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirm-before-create modal (shared component, story 16.5) */}
+      <ConfirmCreateModal
+        open={confirmOpen}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={doSubmit}
+        campaignType="Demand Gen"
+        campaignName={bundle.name}
+        dailyBudget={bundle.dailyBudget}
+        icon={<Megaphone className="h-4 w-4 text-primary" />}
+      />
     </div>
   );
 }
@@ -451,35 +460,6 @@ type SetField = <K extends keyof DGBundle>(k: K, v: DGBundle[K]) => void;
 
 function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
   const rules = useDemandGenRules();
-  const nameOver = bundle.businessName.length > rules.businessNameMaxChars;
-  const [showRefLib, setShowRefLib] = useState(false);
-  // Preview meta for the attached reference chips (id → url/filename), sourced
-  // from the same ad_assets library the picker reads.
-  const [refMeta, setRefMeta] = useState<Record<string, SlotAssetMeta>>({});
-  useEffect(() => {
-    let cancelled = false;
-    const qs = new URLSearchParams({ asset_type: 'image', limit: '500' });
-    if (accountId) qs.set('account_id', accountId);
-    fetch(`/api/assets?${qs}`)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((rows: { id: string; url: string; filename: string }[]) => {
-        if (cancelled) return;
-        setRefMeta(prev => {
-          const next = { ...prev };
-          rows.forEach(r => { next[r.id] = { url: r.url, filename: r.filename }; });
-          return next;
-        });
-      })
-      .catch(() => { /* chips degrade to placeholder tiles */ });
-    return () => { cancelled = true; };
-  }, [accountId]);
-
-  const toggleRef = (id: string, asset?: LibraryAsset) => {
-    if (asset?.url) setRefMeta(prev => ({ ...prev, [id]: { url: asset.url, filename: asset.filename } }));
-    const cur = bundle.referenceAssetIds;
-    setField('referenceAssetIds', cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
-  };
-
   return (
     <div className="space-y-4">
       <div>
@@ -495,21 +475,13 @@ function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField
         <label className="text-xs font-medium mb-1.5 block">Final URL *</label>
         <Input value={bundle.finalUrl} onChange={e => setField('finalUrl', e.target.value)} placeholder="https://goldenvisas.mercan.com/panama" />
       </div>
-      <div>
-        <div className="flex items-baseline justify-between mb-1.5">
-          <label className="text-xs font-medium">Business name *</label>
-          <span className={cn('text-[10px] tabular-nums', nameOver ? 'text-red-500' : 'text-muted-foreground')}>
-            {bundle.businessName.length}/{rules.businessNameMaxChars}
-          </span>
-        </div>
-        <Input
-          value={bundle.businessName}
-          onChange={e => setField('businessName', e.target.value.slice(0, rules.businessNameMaxChars))}
-          placeholder="Mercan"
-          className={cn(nameOver && 'border-red-500')}
-        />
-        <p className="text-[10px] text-muted-foreground mt-1">Shown on the ad; keep it short and brand-faithful (≤{rules.businessNameMaxChars} chars).</p>
-      </div>
+
+      {/* Shared assist components (story 16.5) — consumed by BOTH wizards. */}
+      <BusinessNameField
+        value={bundle.businessName}
+        onChange={v => setField('businessName', v)}
+        max={rules.businessNameMaxChars}
+      />
 
       {/* Campaign brief — fuels the assisted copy + image drafts */}
       <div>
@@ -523,76 +495,13 @@ function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField
         />
       </div>
 
-      {/* Corporate-brand toggle — drives the demand_gen image preset */}
-      <label className="flex items-start gap-2 cursor-pointer select-none border border-border rounded-md p-3 bg-secondary/20">
-        <input
-          type="checkbox"
-          checked={bundle.corporateBrand}
-          onChange={e => setField('corporateBrand', e.target.checked)}
-          className="mt-0.5"
-        />
-        <span>
-          <span className="text-xs font-medium">Corporate-brand images</span>
-          <span className="block text-[10px] text-muted-foreground mt-0.5">
-            Generated images use the Demand Gen preset — premium, editorial, text-free (Google renders the headline itself, so baked-in text gets disapproved). Turn off for a looser creative style.
-          </span>
-        </span>
-      </label>
+      <BrandPresetToggle checked={bundle.corporateBrand} onChange={v => setField('corporateBrand', v)} />
 
-      {/* Reference photos — anchor image generation to the operator's real assets */}
-      <div className="border border-border rounded-md p-3 bg-secondary/20 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start gap-2">
-            <ImageIcon className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-            <div>
-              <span className="text-xs font-medium">Reference photos (optional)</span>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Attach your OWN hotel / property photos from the library. Image generation in the Assets step anchors to these real subjects instead of inventing a generic scene.
-              </p>
-            </div>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => setShowRefLib(v => !v)} className="gap-1.5 shrink-0">
-            <FolderOpen className="h-3.5 w-3.5" />
-            {bundle.referenceAssetIds.length ? `${bundle.referenceAssetIds.length} attached` : 'Attach'}
-          </Button>
-        </div>
-        {bundle.referenceAssetIds.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {bundle.referenceAssetIds.map(id => {
-              const meta = refMeta[id];
-              return (
-                <span key={id} className="relative inline-flex">
-                  {meta ? (
-                    <img src={meta.url} alt={meta.filename} className="h-12 w-12 rounded border border-border object-cover" loading="lazy" />
-                  ) : (
-                    <span className="h-12 w-12 rounded border border-border bg-secondary/40 flex items-center justify-center">
-                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => toggleRef(id)}
-                    className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-secondary"
-                    aria-label="Remove reference"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-        )}
-        {showRefLib && (
-          <LibraryPicker
-            accountId={accountId}
-            items={bundle.referenceAssetIds}
-            onToggle={toggleRef}
-            targetLabel="reference"
-            maxItems={6}
-            onClose={() => setShowRefLib(false)}
-          />
-        )}
-      </div>
+      <ReferencePhotosPicker
+        accountId={accountId}
+        value={bundle.referenceAssetIds}
+        onChange={ids => setField('referenceAssetIds', ids)}
+      />
 
       {/* Bidding */}
       <div className="border border-border rounded-md p-3 bg-secondary/20">
@@ -644,83 +553,127 @@ function StepTargeting({ bundle, setField }: { bundle: DGBundle; setField: SetFi
 
 function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
   const rules = useDemandGenRules();
-  const [resuming, setResuming] = useState(false);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  const angleOptions = useAngles();
+  const { specs } = useCreativeSpecs();
+  const threshold = specs?.engine?.near_dup_threshold;
   const [panelOpen, setPanelOpen] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [rewritingHl, setRewritingHl] = useState<number | null>(null);
+  const [rewritingDesc, setRewritingDesc] = useState<number | null>(null);
+  const [diversifying, setDiversifying] = useState(false);
 
-  // A DG draft fills business_name (Brief step), headlines + descriptions.
-  const applyDraft = useCallback((result: CopyDraftResult) => {
-    if (result.business_name) setField('businessName', result.business_name.slice(0, rules.businessNameMaxChars));
-    if (result.headlines?.length) setField('headlines', result.headlines);
-    if (result.descriptions?.length) setField('descriptions', result.descriptions);
+  // Apply distributed rows into the field text + parallel angle arrays (locks
+  // reset — a fresh draft has no locks). business_name too (Brief step field).
+  const applyRows = useCallback((rows: CopyRow[], businessName?: string) => {
+    const d = distributeRows(rows);
+    if (businessName) setField('businessName', businessName.slice(0, rules.businessNameMaxChars));
+    setField('headlines', d.headlines.length ? d.headlines : ['']);
+    setField('headlineAngles', d.headlineAngles);
+    setField('headlineLocks', d.headlines.map(() => false));
+    setField('descriptions', d.descriptions.length ? d.descriptions : ['']);
+    setField('descriptionAngles', d.descriptionAngles);
+    setField('descriptionLocks', d.descriptions.map(() => false));
+    setField('dismissedDupPairs', []);
+  }, [setField, rules.businessNameMaxChars]);
+
+  const applyHeadlineRows = useCallback((rows: CopyRow[]) => {
+    setField('headlines', rows.map(r => r.text));
+    setField('headlineAngles', rows.map(r => r.angle ?? null));
+    setField('headlineLocks', rows.map(r => !!r.locked));
+  }, [setField]);
+  const applyDescriptionRows = useCallback((rows: CopyRow[]) => {
+    setField('descriptions', rows.map(r => r.text));
+    setField('descriptionAngles', rows.map(r => r.angle ?? null));
+    setField('descriptionLocks', rows.map(r => !!r.locked));
   }, [setField]);
 
-  // Poll-based (mirrors PMax): the draft takes 1-3 min and a single long
-  // request died whenever the dev proxy or a server blipped. The job id lives
-  // in localStorage so a page refresh resumes it.
-  const pollDraftResult = useCallback(async (draftId: string): Promise<CopyDraftResult> => {
-    const started = Date.now();
-    while (Date.now() - started < 6 * 60_000) {
-      await new Promise(r => setTimeout(r, 3000));
-      try {
-        const res = await fetch(`/api/demand-gen/draft-copy/${draftId}`);
-        const job = await res.json();
-        if (job.status === 'done') {
-          localStorage.removeItem('demandgen-draft-id');
-          return (job.result || {}) as CopyDraftResult;
-        }
-        if (job.status === 'error') {
-          localStorage.removeItem('demandgen-draft-id');
-          throw new Error(job.message || 'draft failed');
-        }
-        if (job.status === 'interrupted') {
-          // A backend restart killed the in-flight job (story 15.3). No
-          // transparent resume — surface it so the operator re-runs one-click.
-          localStorage.removeItem('demandgen-draft-id');
-          throw new Error(job.message || 'Draft was interrupted by a restart — click Draft again to re-run.');
-        }
-      } catch (e) {
-        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
-      }
-    }
-    throw new Error('Draft timed out after 6 minutes — try again.');
-  }, []);
+  // One copy-job hook per operation, each with its own resume key so a page
+  // refresh mid-job resumes and applies (FR1.9).
+  const draftJob = useDraftJob(accountId, 'demandgen-copy-draft-id',
+    (r: CopyJobResult) => applyRows(r.rows, r.business_name));
+  const hlRewriteJob = useDraftJob(accountId, 'demandgen-hl-rewrite-id',
+    (r: CopyJobResult) => applyHeadlineRows(r.rows));
+  const descRewriteJob = useDraftJob(accountId, 'demandgen-desc-rewrite-id',
+    (r: CopyJobResult) => applyDescriptionRows(r.rows));
+  const diversifyJob = useDraftJob(accountId, 'demandgen-diversify-id',
+    (r: CopyJobResult) => applyHeadlineRows(r.rows));
 
-  // Host-injected drafter for StudioPanel copy mode — the panel never calls a
-  // campaign-specific endpoint itself. The operator's extra intent from the
-  // panel's input rides along inside the brief.
+  // StudioPanel copy preview shows the legacy field lists; onUseCopy distributes
+  // the angle-tagged rows into the workbench.
+  const applyDraft = useCallback((result: CopyDraftResult) => {
+    if (result.rows?.length) applyRows(result.rows as CopyRow[], result.business_name);
+    else {
+      if (result.business_name) setField('businessName', result.business_name.slice(0, rules.businessNameMaxChars));
+      if (result.headlines?.length) setField('headlines', result.headlines);
+      if (result.descriptions?.length) setField('descriptions', result.descriptions);
+    }
+  }, [applyRows, setField, rules.businessNameMaxChars]);
+
   const draftForPanel = useCallback(async (intent: string): Promise<CopyDraftResult> => {
     const brief = intent.trim()
       ? `${bundle.brief}\n\nOperator emphasis for this draft: ${intent.trim()}`.trim()
       : bundle.brief;
-    const res = await fetch(`/api/accounts/${accountId}/demand-gen/draft-copy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brief,
-        final_url: bundle.finalUrl,
-        business_name: bundle.businessName,
-        campaign_name: bundle.name,
-      }),
+    const r = await draftJob.start({
+      campaign_type: 'demand_gen', mode: 'draft', brief,
+      final_url: bundle.finalUrl, business_name: bundle.businessName, campaign_name: bundle.name,
     });
-    const data = await res.json();
-    if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
-    localStorage.setItem('demandgen-draft-id', data.draft_id);
-    return pollDraftResult(data.draft_id);
-  }, [accountId, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name, pollDraftResult]);
+    const d = distributeRows(r.rows || []);
+    return { business_name: r.business_name, headlines: d.headlines, descriptions: d.descriptions, rows: r.rows };
+  }, [draftJob, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name]);
 
-  // Resume a draft that was in flight when the page was refreshed — applies
-  // directly (the panel may not be open).
-  useEffect(() => {
-    const pending = localStorage.getItem('demandgen-draft-id');
-    if (!pending) return;
-    setResuming(true);
-    pollDraftResult(pending)
-      .then(applyDraft)
-      .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setResuming(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const rewriteRow = useCallback(async (
+    field: 'headline' | 'description', index: number, targetAngle: string,
+  ) => {
+    const isHl = field === 'headline';
+    const rows = toRows(
+      isHl ? bundle.headlines : bundle.descriptions,
+      isHl ? bundle.headlineAngles : bundle.descriptionAngles,
+      isHl ? 'headline' : 'description',
+      isHl ? bundle.headlineLocks : bundle.descriptionLocks,
+    );
+    (isHl ? setRewritingHl : setRewritingDesc)(index);
+    setLocalError(null);
+    try {
+      const job = isHl ? hlRewriteJob : descRewriteJob;
+      const r = await job.start({
+        campaign_type: 'demand_gen', mode: 'rewrite_row', rows, row_index: index,
+        target_angle: targetAngle, brief: bundle.brief, final_url: bundle.finalUrl,
+        business_name: bundle.businessName,
+      });
+      (isHl ? applyHeadlineRows : applyDescriptionRows)(r.rows);
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      (isHl ? setRewritingHl : setRewritingDesc)(null);
+    }
+  }, [bundle, hlRewriteJob, descRewriteJob, applyHeadlineRows, applyDescriptionRows]);
+
+  const dupCount = threshold == null ? 0
+    : new Set(findNearDupPairs(bundle.headlines.filter(s => s.trim()), { threshold }).flat()).size;
+
+  const diversify = useCallback(async () => {
+    if (threshold == null) return;
+    const rows = toRows(bundle.headlines, bundle.headlineAngles, 'headline', bundle.headlineLocks);
+    const flagged = new Set(findNearDupPairs(bundle.headlines, { threshold }).flat());
+    const body = buildDiversifyBody(rows, flagged, bundle.dismissedDupPairs);
+    setDiversifying(true);
+    setLocalError(null);
+    try {
+      const r = await diversifyJob.start({
+        campaign_type: 'demand_gen', mode: 'diversify', ...body,
+        brief: bundle.brief, final_url: bundle.finalUrl, business_name: bundle.businessName,
+      });
+      applyHeadlineRows(r.rows);
+      if (r.dismissed_dup_pairs) setField('dismissedDupPairs', r.dismissed_dup_pairs);
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDiversifying(false);
+    }
+  }, [threshold, bundle, diversifyJob, applyHeadlineRows, setField]);
+
+  const resuming = draftJob.resuming;
+  const draftError = draftJob.error || localError;
 
   return (
     <div className="space-y-5">
@@ -733,7 +686,7 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
             <p className="text-muted-foreground leading-relaxed">
               Let the <b>Creative Director</b> draft the business name, headlines and descriptions from your
               brief and landing page ({bundle.finalUrl || 'set the Final URL in step 1'}).
-              You preview the draft before it replaces what's below.
+              Every drafted row wears its <b>angle</b>; you preview before it replaces what's below.
             </p>
           </div>
           <Button size="sm" onClick={() => setPanelOpen(true)} disabled={resuming || !bundle.finalUrl} className="gap-1.5 shrink-0">
@@ -763,7 +716,28 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
         onUseCopy={applyDraft}
       />
 
-      <PolicyHint />
+      <PolicyHintCard />
+
+      <CoveragePanel
+        headlines={bundle.headlines}
+        headlineAngles={bundle.headlineAngles}
+        headlinesMax={rules.headlines.max}
+        descriptions={bundle.descriptions}
+        descriptionsMax={rules.descriptions.max}
+      />
+
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium">Headlines</label>
+        <Button
+          size="sm" variant="outline" onClick={diversify}
+          disabled={diversifying || threshold == null || dupCount === 0}
+          className="gap-1.5 h-7"
+          title="Regenerate near-duplicate headlines toward missing angles (locked rows are kept)"
+        >
+          {diversifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {diversifying ? 'Diversifying…' : dupCount ? `Diversify (${dupCount} near-dup)` : 'Diversify'}
+        </Button>
+      </div>
       <TextWorkbench
         label="Headlines"
         hint={`≥${rules.headlines.min}, each ≤${rules.headlines.maxChars} chars · up to ${rules.headlines.max}`}
@@ -772,6 +746,12 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
         maxChars={rules.headlines.maxChars}
         minItems={rules.headlines.min}
         maxItems={rules.headlines.max}
+        angles={bundle.headlineAngles}
+        locked={bundle.headlineLocks}
+        onMetaChange={(a, l) => { setField('headlineAngles', a); setField('headlineLocks', l); }}
+        onRewriteRow={(i, a) => rewriteRow('headline', i, a)}
+        rewritingRow={rewritingHl}
+        angleOptions={angleOptions}
       />
       <TextWorkbench
         label="Descriptions"
@@ -781,6 +761,12 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
         maxChars={rules.descriptions.maxChars}
         minItems={rules.descriptions.min}
         maxItems={rules.descriptions.max}
+        angles={bundle.descriptionAngles}
+        locked={bundle.descriptionLocks}
+        onMetaChange={(a, l) => { setField('descriptionAngles', a); setField('descriptionLocks', l); }}
+        onRewriteRow={(i, a) => rewriteRow('description', i, a)}
+        rewritingRow={rewritingDesc}
+        angleOptions={angleOptions}
       />
       <div>
         <label className="text-xs font-medium mb-1.5 block">Call to action (optional)</label>
@@ -791,22 +777,8 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
   );
 }
 
-/** Compliance reminder near the copy fields — the same policy traps that get
- * Demand Gen ads disapproved. Not enforced client-side (the account's own
- * policy differs), just surfaced. */
-function PolicyHint() {
-  return (
-    <div className="border border-amber-500/30 bg-amber-500/5 rounded-md p-3 text-[11px] leading-relaxed">
-      <div className="flex items-start gap-2">
-        <ShieldAlert className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
-        <p className="text-muted-foreground">
-          <b className="text-foreground">Policy hints:</b> no prices or discounts in the copy · no citizenship / guaranteed-approval
-          {' '}promises · avoid the symbols <span className="font-mono">~ | +</span> (Google flags them as gimmicky punctuation).
-        </p>
-      </div>
-    </div>
-  );
-}
+// PolicyHint was extracted to the shared creative/PolicyHintCard (story 16.5) —
+// both wizards import it now.
 
 // ── Image assets ────────────────────────────────────────────────────
 

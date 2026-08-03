@@ -36,6 +36,16 @@ import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import DraftManager from '@/components/creative/DraftManager';
 import TextWorkbench from '@/components/creative/TextWorkbench';
+import { useDraftJob, type CopyJobResult } from '@/components/creative/useDraftJob';
+import { useAngles } from '@/lib/angles';
+import { distributeRows, toRows, buildDiversifyBody, type CopyRow } from '@/lib/copyRows';
+import { findNearDupPairs } from '@/lib/nearDup';
+import CoveragePanel from '@/components/creative/CoveragePanel';
+import PolicyHintCard from '@/components/creative/PolicyHintCard';
+import BusinessNameField from '@/components/creative/BusinessNameField';
+import BrandPresetToggle from '@/components/creative/BrandPresetToggle';
+import ReferencePhotosPicker from '@/components/creative/ReferencePhotosPicker';
+import ConfirmCreateModal from '@/components/creative/ConfirmCreateModal';
 import {
   isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
   clearCacheMeta, touchCacheTs, shouldOfferRestore,
@@ -83,9 +93,20 @@ interface PMaxBundle {
   finalUrl: string;
   businessName: string;
   brief: string;          // optional — fuel for the Creative Director draft
+  corporateBrand: boolean;     // assist-layer backport (16.5) — image preset
+  referenceAssetIds: string[]; // operator's own photos → baseContext (asset-anchored)
   headlines: string[];
   longHeadlines: string[];
   descriptions: string[];
+  // Epic 16 — angle + lock metadata parallel to the text rows (optional; pre-16
+  // drafts load fine). Angle chips + per-row rewrite + Diversify.
+  headlineAngles: (string | null)[];
+  headlineLocks: boolean[];
+  longHeadlineAngles: (string | null)[];
+  longHeadlineLocks: boolean[];
+  descriptionAngles: (string | null)[];
+  descriptionLocks: boolean[];
+  dismissedDupPairs: [number, number][];
   logos: string[];        // asset resource_names
   landscape: string[];
   square: string[];
@@ -96,7 +117,12 @@ interface PMaxBundle {
 
 const EMPTY_BUNDLE: PMaxBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
+  corporateBrand: true, referenceAssetIds: [],
   headlines: [''], longHeadlines: [''], descriptions: ['', ''],
+  headlineAngles: [], headlineLocks: [],
+  longHeadlineAngles: [], longHeadlineLocks: [],
+  descriptionAngles: [], descriptionLocks: [],
+  dismissedDupPairs: [],
   logos: [], landscape: [], square: [], portrait: [],
   videoIds: [''], audienceSignals: [],
 };
@@ -131,10 +157,13 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       parsed.landscape = (parsed.landscape || []).filter(isLocalAssetRef);
       parsed.square = (parsed.square || []).filter(isLocalAssetRef);
       parsed.portrait = (parsed.portrait || []).filter(isLocalAssetRef);
+      // Reference photos are library ids too — keep only local refs (16.5).
+      parsed.referenceAssetIds = (parsed.referenceAssetIds || []).filter(isLocalAssetRef);
       return parsed;
     } catch { return EMPTY_BUNDLE; }
   });
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; message: string; campaignId?: string } | null>(null);
 
   const [restore, setRestore] = useState<{ bundle: PMaxBundle; name: string; id: string; updatedAt: string } | null>(null);
@@ -271,6 +300,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
 
   const handleSubmit = useCallback(async () => {
     if (!accountId) return;
+    setConfirmOpen(false);
     setSubmitting(true);
     setSubmitResult(null);
     try {
@@ -386,7 +416,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       </div>
 
       <div className="border border-border rounded-lg p-6 bg-card mb-4">
-        {stepId === 'brief'    && <StepBrief    bundle={bundle} setField={setField} />}
+        {stepId === 'brief'    && <StepBrief    bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'text'     && <StepText     bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'images'   && <StepImages   bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'videos'   && <StepVideos   bundle={bundle} setField={setField} accountId={accountId} />}
@@ -445,7 +475,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           </Button>
         ) : (
           <Button
-            onClick={handleSubmit}
+            onClick={() => setConfirmOpen(true)}
             disabled={submitting || !rules.ready || clientIssues.errors.length > 0}
             className="gap-1.5"
           >
@@ -454,13 +484,25 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           </Button>
         )}
       </div>
+
+      {/* Confirm-before-create modal (shared component, story 16.5 · demo step 6) */}
+      <ConfirmCreateModal
+        open={confirmOpen}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleSubmit}
+        campaignType="Performance Max"
+        campaignName={bundle.name}
+        dailyBudget={bundle.dailyBudget}
+        icon={<Layers className="h-4 w-4 text-primary" />}
+      />
     </div>
   );
 }
 
 // ── Step components ─────────────────────────────────────────────────
 
-function StepBrief({ bundle, setField }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void }) {
+function StepBrief({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  const rules = usePMaxRules();
   return (
     <div className="space-y-4">
       <div>
@@ -476,107 +518,159 @@ function StepBrief({ bundle, setField }: { bundle: PMaxBundle; setField: <K exte
         <label className="text-xs font-medium mb-1.5 block">Final URL *</label>
         <Input value={bundle.finalUrl} onChange={e => setField('finalUrl', e.target.value)} placeholder="https://goldenvisas.mercan.com/panama" />
       </div>
-      <div>
-        <label className="text-xs font-medium mb-1.5 block">Business name *</label>
-        <Input value={bundle.businessName} onChange={e => setField('businessName', e.target.value)} placeholder="Mercan" />
-        <p className="text-[10px] text-muted-foreground mt-1">Shown in auto-generated layouts; keep it short and brand-faithful.</p>
-      </div>
+
+      {/* Assist layer backported from Demand Gen (story 16.5 · demo step 1) —
+          business-name counter, brief, brand preset, reference photos: the
+          DG-grade assist PMax never had, now the SAME shared components. */}
+      <BusinessNameField
+        value={bundle.businessName}
+        onChange={v => setField('businessName', v)}
+        max={rules.businessNameMaxChars}
+      />
       <div>
         <label className="text-xs font-medium mb-1.5 block">Campaign brief (optional)</label>
         <textarea
           value={bundle.brief}
           onChange={e => setField('brief', e.target.value)}
           rows={3}
-          placeholder="Who is this for, what's the offer, what makes it different? The Creative Director uses this (plus your landing page) to draft headlines and descriptions in the next step."
+          placeholder="Who is this for, what's the offer, what makes it different? The Creative Director uses this (plus your landing page) to draft the business name, headlines & descriptions in the Text step — and to generate on-brand images in the Assets step."
           className="w-full text-sm rounded-md border border-border bg-background p-2.5 resize-none placeholder:text-muted-foreground/60"
         />
       </div>
+      <BrandPresetToggle checked={bundle.corporateBrand} onChange={v => setField('corporateBrand', v)} />
+      <ReferencePhotosPicker
+        accountId={accountId}
+        value={bundle.referenceAssetIds}
+        onChange={ids => setField('referenceAssetIds', ids)}
+      />
     </div>
   );
 }
 
 function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
   const rules = usePMaxRules();
-  const [resuming, setResuming] = useState(false);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  const angleOptions = useAngles();
+  const { specs } = useCreativeSpecs();
+  const threshold = specs?.engine?.near_dup_threshold;
   const [panelOpen, setPanelOpen] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [rewriting, setRewriting] = useState<Record<string, number | null>>({});
+  const [diversifying, setDiversifying] = useState(false);
 
-  const applyDraft = useCallback((result: CopyDraftResult) => {
-    if (result.headlines?.length) setField('headlines', result.headlines);
-    if (result.long_headlines?.length) setField('longHeadlines', result.long_headlines);
-    if (result.descriptions?.length) setField('descriptions', result.descriptions);
+  // Apply a full drafted set: distribute rows into all three fields + angles,
+  // reset locks (fresh draft). business_name too (Brief-step field).
+  const applyRows = useCallback((rows: CopyRow[], businessName?: string) => {
+    const d = distributeRows(rows);
+    if (businessName) setField('businessName', businessName.slice(0, rules.businessNameMaxChars));
+    setField('headlines', d.headlines.length ? d.headlines : ['']);
+    setField('headlineAngles', d.headlineAngles);
+    setField('headlineLocks', d.headlines.map(() => false));
+    setField('longHeadlines', d.longHeadlines.length ? d.longHeadlines : ['']);
+    setField('longHeadlineAngles', d.longHeadlineAngles);
+    setField('longHeadlineLocks', d.longHeadlines.map(() => false));
+    setField('descriptions', d.descriptions.length ? d.descriptions : ['']);
+    setField('descriptionAngles', d.descriptionAngles);
+    setField('descriptionLocks', d.descriptions.map(() => false));
+    setField('dismissedDupPairs', []);
+  }, [setField, rules.businessNameMaxChars]);
+
+  const FIELD_KEYS = {
+    headline: { text: 'headlines', angles: 'headlineAngles', locks: 'headlineLocks' },
+    long_headline: { text: 'longHeadlines', angles: 'longHeadlineAngles', locks: 'longHeadlineLocks' },
+    description: { text: 'descriptions', angles: 'descriptionAngles', locks: 'descriptionLocks' },
+  } as const;
+
+  const applyFieldRows = useCallback((tier: keyof typeof FIELD_KEYS, rows: CopyRow[]) => {
+    const k = FIELD_KEYS[tier];
+    setField(k.text, rows.map(r => r.text) as never);
+    setField(k.angles, rows.map(r => r.angle ?? null) as never);
+    setField(k.locks, rows.map(r => !!r.locked) as never);
   }, [setField]);
 
-  // Poll-based: the draft takes 1-3 min and a single long request died
-  // whenever the dev proxy or a server blipped. Job id lives in
-  // localStorage so a page refresh resumes it. Returns the result so
-  // StudioPanel can PREVIEW it before the operator applies (copy-mode
-  // contract); the refresh-resume path applies directly.
-  const pollDraftResult = useCallback(async (draftId: string): Promise<CopyDraftResult> => {
-    const started = Date.now();
-    while (Date.now() - started < 6 * 60_000) {
-      await new Promise(r => setTimeout(r, 3000));
-      try {
-        const res = await fetch(`/api/pmax/draft-copy/${draftId}`);
-        const job = await res.json();
-        if (job.status === 'done') {
-          localStorage.removeItem('pmax-draft-id');
-          return (job.result || {}) as CopyDraftResult;
-        }
-        if (job.status === 'error') {
-          localStorage.removeItem('pmax-draft-id');
-          throw new Error(job.message || 'draft failed');
-        }
-        if (job.status === 'interrupted') {
-          // A backend restart killed the in-flight job (story 15.3). No
-          // transparent resume — surface it so the operator re-runs one-click
-          // (the Draft button below is the re-run).
-          localStorage.removeItem('pmax-draft-id');
-          throw new Error(job.message || 'Draft was interrupted by a restart — click Draft again to re-run.');
-        }
-        // still running — keep polling (transient fetch errors just retry)
-      } catch (e) {
-        if (e instanceof Error && e.message !== 'Failed to fetch') throw e;
-      }
-    }
-    throw new Error('Draft timed out after 6 minutes — try again.');
-  }, []);
+  const draftJob = useDraftJob(accountId, 'pmax-copy-draft-id',
+    (r: CopyJobResult) => applyRows(r.rows, r.business_name));
+  const hlRewriteJob = useDraftJob(accountId, 'pmax-hl-rewrite-id',
+    (r: CopyJobResult) => applyFieldRows('headline', r.rows));
+  const lhRewriteJob = useDraftJob(accountId, 'pmax-lh-rewrite-id',
+    (r: CopyJobResult) => applyFieldRows('long_headline', r.rows));
+  const descRewriteJob = useDraftJob(accountId, 'pmax-desc-rewrite-id',
+    (r: CopyJobResult) => applyFieldRows('description', r.rows));
+  const diversifyJob = useDraftJob(accountId, 'pmax-diversify-id',
+    (r: CopyJobResult) => applyFieldRows('headline', r.rows));
 
-  // Host-injected drafter for StudioPanel copy mode — the panel itself
-  // never calls PMax endpoints (decoupling rule). The operator's extra
-  // intent from the panel's input rides along inside the brief.
+  const applyDraft = useCallback((result: CopyDraftResult) => {
+    if (result.rows?.length) applyRows(result.rows as CopyRow[], result.business_name);
+    else {
+      if (result.business_name) setField('businessName', result.business_name.slice(0, rules.businessNameMaxChars));
+      if (result.headlines?.length) setField('headlines', result.headlines);
+      if (result.long_headlines?.length) setField('longHeadlines', result.long_headlines);
+      if (result.descriptions?.length) setField('descriptions', result.descriptions);
+    }
+  }, [applyRows, setField, rules.businessNameMaxChars]);
+
   const draftForPanel = useCallback(async (intent: string): Promise<CopyDraftResult> => {
     const brief = intent.trim()
       ? `${bundle.brief}\n\nOperator emphasis for this draft: ${intent.trim()}`.trim()
       : bundle.brief;
-    const res = await fetch(`/api/accounts/${accountId}/pmax/draft-copy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brief,
-        final_url: bundle.finalUrl,
-        business_name: bundle.businessName,
-        campaign_name: bundle.name,
-      }),
+    const r = await draftJob.start({
+      campaign_type: 'pmax', mode: 'draft', brief,
+      final_url: bundle.finalUrl, business_name: bundle.businessName, campaign_name: bundle.name,
     });
-    const data = await res.json();
-    if (!res.ok || !data.draft_id) throw new Error(data.detail?.message || data.error || `HTTP ${res.status}`);
-    localStorage.setItem('pmax-draft-id', data.draft_id);
-    return pollDraftResult(data.draft_id);
-  }, [accountId, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name, pollDraftResult]);
+    const d = distributeRows(r.rows || []);
+    return {
+      business_name: r.business_name, headlines: d.headlines,
+      long_headlines: d.longHeadlines, descriptions: d.descriptions, rows: r.rows,
+    };
+  }, [draftJob, bundle.brief, bundle.finalUrl, bundle.businessName, bundle.name]);
 
-  // Resume polling a draft that was in flight when the page was
-  // refreshed — applies directly (the panel may not be open).
-  useEffect(() => {
-    const pending = localStorage.getItem('pmax-draft-id');
-    if (!pending) return;
-    setResuming(true);
-    pollDraftResult(pending)
-      .then(applyDraft)
-      .catch(e => setDraftError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setResuming(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const rewriteRow = useCallback(async (
+    tier: keyof typeof FIELD_KEYS, index: number, targetAngle: string,
+  ) => {
+    const k = FIELD_KEYS[tier];
+    const rows = toRows(bundle[k.text] as string[], bundle[k.angles] as (string | null)[], tier, bundle[k.locks] as boolean[]);
+    setRewriting(s => ({ ...s, [tier]: index }));
+    setLocalError(null);
+    try {
+      const job = tier === 'headline' ? hlRewriteJob : tier === 'long_headline' ? lhRewriteJob : descRewriteJob;
+      const r = await job.start({
+        campaign_type: 'pmax', mode: 'rewrite_row', rows, row_index: index,
+        target_angle: targetAngle, brief: bundle.brief, final_url: bundle.finalUrl,
+        business_name: bundle.businessName,
+      });
+      applyFieldRows(tier, r.rows);
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRewriting(s => ({ ...s, [tier]: null }));
+    }
+  }, [bundle, hlRewriteJob, lhRewriteJob, descRewriteJob, applyFieldRows]);
+
+  const dupCount = threshold == null ? 0
+    : new Set(findNearDupPairs(bundle.headlines.filter(s => s.trim()), { threshold }).flat()).size;
+
+  const diversify = useCallback(async () => {
+    if (threshold == null) return;
+    const rows = toRows(bundle.headlines, bundle.headlineAngles, 'headline', bundle.headlineLocks);
+    const flagged = new Set(findNearDupPairs(bundle.headlines, { threshold }).flat());
+    const body = buildDiversifyBody(rows, flagged, bundle.dismissedDupPairs);
+    setDiversifying(true);
+    setLocalError(null);
+    try {
+      const r = await diversifyJob.start({
+        campaign_type: 'pmax', mode: 'diversify', ...body,
+        brief: bundle.brief, final_url: bundle.finalUrl, business_name: bundle.businessName,
+      });
+      applyFieldRows('headline', r.rows);
+      if (r.dismissed_dup_pairs) setField('dismissedDupPairs', r.dismissed_dup_pairs);
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDiversifying(false);
+    }
+  }, [threshold, bundle, diversifyJob, applyFieldRows, setField]);
+
+  const resuming = draftJob.resuming;
+  const draftError = draftJob.error || localError;
 
   return (
     <div className="space-y-5">
@@ -587,9 +681,9 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
           <div className="flex items-start gap-2">
             <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <p className="text-muted-foreground leading-relaxed">
-              Let the <b>Creative Director</b> draft headlines and descriptions from your
+              Let the <b>Creative Director</b> draft the business name, headlines and descriptions from your
               brief and landing page ({bundle.finalUrl || 'set the Final URL in step 1'}).
-              You preview the draft before it replaces what's typed below.
+              Every drafted row wears its <b>angle</b>; you preview before it replaces what's below.
             </p>
           </div>
           <Button size="sm" onClick={() => setPanelOpen(true)} disabled={resuming || !bundle.finalUrl} className="gap-1.5 shrink-0">
@@ -618,6 +712,29 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         onDraftCopy={draftForPanel}
         onUseCopy={applyDraft}
       />
+
+      <PolicyHintCard />
+
+      <CoveragePanel
+        headlines={bundle.headlines}
+        headlineAngles={bundle.headlineAngles}
+        headlinesMax={rules.headlines.max}
+        descriptions={bundle.descriptions}
+        descriptionsMax={rules.descriptions.max}
+      />
+
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium">Headlines</label>
+        <Button
+          size="sm" variant="outline" onClick={diversify}
+          disabled={diversifying || threshold == null || dupCount === 0}
+          className="gap-1.5 h-7"
+          title="Regenerate near-duplicate headlines toward missing angles (locked rows are kept)"
+        >
+          {diversifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {diversifying ? 'Diversifying…' : dupCount ? `Diversify (${dupCount} near-dup)` : 'Diversify'}
+        </Button>
+      </div>
       <TextWorkbench
         label="Headlines"
         hint={`≥${rules.headlines.min}, each ≤${rules.headlines.maxChars} chars · up to ${rules.headlines.max}`}
@@ -626,6 +743,12 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         maxChars={rules.headlines.maxChars}
         minItems={rules.headlines.min}
         maxItems={rules.headlines.max}
+        angles={bundle.headlineAngles}
+        locked={bundle.headlineLocks}
+        onMetaChange={(a, l) => { setField('headlineAngles', a); setField('headlineLocks', l); }}
+        onRewriteRow={(i, a) => rewriteRow('headline', i, a)}
+        rewritingRow={rewriting.headline ?? null}
+        angleOptions={angleOptions}
       />
       <TextWorkbench
         label="Long headlines"
@@ -635,6 +758,12 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         maxChars={rules.longHeadlines.maxChars}
         minItems={rules.longHeadlines.min}
         maxItems={rules.longHeadlines.max}
+        angles={bundle.longHeadlineAngles}
+        locked={bundle.longHeadlineLocks}
+        onMetaChange={(a, l) => { setField('longHeadlineAngles', a); setField('longHeadlineLocks', l); }}
+        onRewriteRow={(i, a) => rewriteRow('long_headline', i, a)}
+        rewritingRow={rewriting.long_headline ?? null}
+        angleOptions={angleOptions}
       />
       <TextWorkbench
         label="Descriptions"
@@ -644,6 +773,12 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
         maxChars={rules.descriptions.maxChars}
         minItems={rules.descriptions.min}
         maxItems={rules.descriptions.max}
+        angles={bundle.descriptionAngles}
+        locked={bundle.descriptionLocks}
+        onMetaChange={(a, l) => { setField('descriptionAngles', a); setField('descriptionLocks', l); }}
+        onRewriteRow={(i, a) => rewriteRow('description', i, a)}
+        rewritingRow={rewriting.description ?? null}
+        angleOptions={angleOptions}
       />
     </div>
   );
@@ -656,16 +791,27 @@ interface SlotAssetMeta { url: string; filename: string }
 
 function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
   const rules = usePMaxRules();
-  // Shared campaign context for the StudioPanel each slot opens. Slot
+  // id → preview url for every slot item, sourced from the library
+  // list and merged with fresh generations/uploads as they land.
+  const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
+  // A short note naming the attached reference photos so every generated variant
+  // anchors to those real subjects (asset-anchored backport, story 16.5).
+  const referenceNote = useMemo(() => {
+    if (!bundle.referenceAssetIds.length) return undefined;
+    const names = bundle.referenceAssetIds.map(id => assetMeta[id]?.filename).filter(Boolean);
+    return names.length ? names.join(', ') : `${bundle.referenceAssetIds.length} attached image(s)`;
+  }, [bundle.referenceAssetIds, assetMeta]);
+  // Shared campaign context for the StudioPanel each slot opens. The corporate-
+  // brand preset + the operator's reference photos ride here (16.5); slot
   // label/aspect get appended per slot in ImageGroup.
   const baseContext: StudioPanelContext = {
     brief: bundle.brief,
     businessName: bundle.businessName,
     finalUrl: bundle.finalUrl,
+    preset: bundle.corporateBrand ? 'demand_gen' : undefined,
+    referenceAssetIds: bundle.referenceAssetIds.length ? bundle.referenceAssetIds : undefined,
+    referenceNote,
   };
-  // id → preview url for every slot item, sourced from the library
-  // list and merged with fresh generations/uploads as they land.
-  const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
   useEffect(() => {
     let cancelled = false;
     const qs = new URLSearchParams({ asset_type: 'image', limit: '500' });
@@ -1578,14 +1724,21 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
       </div>
 
       {/* ── Manual entry stays available ── */}
+      {/* FR5.4 — a NUDGE, never a gate: an image-only PMax bundle submits fine
+          (Google auto-generates a slideshow). We encourage a real video and warn
+          about the product-mismatch the auto-slideshow can create — no Ad-Strength
+          label chasing, no blocking validation on video count. */}
       {bundle.videoIds.filter(Boolean).length === 0 && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>
-            No video: Google will auto-generate one from your images and text.
-            Supply your own for control (recommended for &lsquo;Excellent&rsquo; Ad Strength).
-          </span>
-        </p>
+        <div className="text-[11px] text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 space-y-1">
+          <p className="flex items-start gap-1.5">
+            <Video className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>Add your own video to beat the auto-generated slideshow — a real clip almost always outperforms Google's stitched-image fallback.</span>
+          </p>
+          <p className="flex items-start gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>Product-mismatch warning: the auto-slideshow reuses your images out of context and can pair the wrong shot with the wrong message.</span>
+          </p>
+        </div>
       )}
       <p className="text-xs text-muted-foreground">
         Video is optional. To add your own, paste the video ID (the bit after
