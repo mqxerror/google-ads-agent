@@ -33,10 +33,6 @@ import {
 import type { AdAsset } from './AssetLibrary';
 import { ASSETS_QUERY_KEY } from './AssetLibrary';
 
-// The launched Demand Gen ad this flow was built to iterate on (editable).
-const DEFAULT_AD_GROUP_ID = '205525130784';
-const DEFAULT_AD_ID = '818651372857';
-
 // Demand Gen image slots → the fields the push endpoint accepts. Logo/square
 // are 1:1, landscape is 1.91:1.
 type Slot = 'landscape' | 'square' | 'logo';
@@ -46,12 +42,30 @@ const SLOTS: { key: Slot; label: string; hint: string }[] = [
   { key: 'logo', label: 'Logo', hint: '1:1' },
 ];
 
+// One Demand Gen ad the operator can push images to (account-resolved — never
+// a hardcoded live id).
+interface DemandGenAd {
+  ad_id: string;
+  ad_name: string;
+  ad_group_id: string;
+  ad_group_name: string;
+  campaign_id: string;
+  campaign_name: string;
+  status: string;
+}
+
 async function fetchImageAssets(accountId: string): Promise<AdAsset[]> {
   const qs = new URLSearchParams({
     account_id: accountId, asset_type: 'image', limit: '60', offset: '0',
   });
   const r = await fetch(`/api/assets?${qs}`);
   if (!r.ok) throw new Error(`assets list failed (${r.status})`);
+  return r.json();
+}
+
+async function fetchDemandGenAds(accountId: string): Promise<DemandGenAd[]> {
+  const r = await fetch(`/api/accounts/${accountId}/demand-gen/ads`);
+  if (!r.ok) throw new Error(`Demand Gen ads list failed (${r.status})`);
   return r.json();
 }
 
@@ -125,12 +139,15 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
     setGenerating(true);
     setGenMsg(null);
     try {
-      // Two DG aspects in one shot (1.91:1 landscape + 1:1 square), anchored to
-      // the attached references. Nano Banana takes reference images.
+      // Two DG aspects in one shot: 16:9 for the landscape slot + 1:1 for the
+      // square slot, anchored to the attached references. Nano Banana takes
+      // reference images. The landscape slot is 1.91:1, which NO image model
+      // declares — so we generate 16:9 and let the exact-aspect center-crop at
+      // Google submit (creative_images.fit_image_for_slot) trim it to 1.91:1.
       const res = await studioGenerateImage({
         prompt: prompt.trim(),
         model: 'nano_banana_2',
-        aspect_ratios: ['1.91:1', '1:1'],
+        aspect_ratios: ['16:9', '1:1'],
         variants_per_aspect: 1,
         account_id: accountId || undefined,
         reference_asset_ids: referenceIds.length ? referenceIds : undefined,
@@ -159,8 +176,20 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
   const totalAssigned = slotAssign.landscape.length + slotAssign.square.length + slotAssign.logo.length;
 
   // ── Card 3: push to ad ──────────────────────────────────────────
-  const [adGroupId, setAdGroupId] = useState(DEFAULT_AD_GROUP_ID);
-  const [adId, setAdId] = useState(DEFAULT_AD_ID);
+  // Push target is account-resolved and operator-SELECTED (never a hardcoded
+  // live ad id). Defaults to none until the operator picks one.
+  const adsQuery = useQuery({
+    queryKey: ['dg-ads', accountId],
+    queryFn: () => fetchDemandGenAds(accountId),
+    enabled: !!accountId,
+    staleTime: 30_000,
+  });
+  const dgAds = adsQuery.data ?? [];
+  const [selectedAdId, setSelectedAdId] = useState('');
+  const selectedAd = useMemo(
+    () => dgAds.find((a) => a.ad_id === selectedAdId),
+    [dgAds, selectedAdId],
+  );
   const [mode, setMode] = useState<'replace' | 'append'>('replace');
   const [confirming, setConfirming] = useState(false);
   const [pushing, setPushing] = useState(false);
@@ -168,13 +197,14 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
   const [pushError, setPushError] = useState<string | null>(null);
 
   const handlePush = useCallback(async () => {
+    if (!selectedAd) return;
     setPushing(true);
     setPushResult(null);
     setPushError(null);
     try {
       const res = await demandGenUpdateAdImages(accountId, {
-        ad_group_id: adGroupId.trim() || undefined,
-        ad_id: adId.trim() || undefined,
+        ad_group_id: selectedAd.ad_group_id,
+        ad_id: selectedAd.ad_id,
         mode,
         landscape_images: slotAssign.landscape,
         square_images: slotAssign.square,
@@ -189,9 +219,9 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
       setPushing(false);
       setConfirming(false);
     }
-  }, [accountId, adGroupId, adId, mode, slotAssign]);
+  }, [accountId, selectedAd, mode, slotAssign]);
 
-  const canPush = totalAssigned > 0 && !!(adGroupId.trim() && adId.trim());
+  const canPush = totalAssigned > 0 && !!selectedAd;
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -266,10 +296,13 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
           </Button>
           <Button size="sm" onClick={handleGenerate} disabled={generating} className="gap-1.5">
             {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-            Generate (1.91:1 + 1:1)
+            Generate (16:9 + 1:1)
           </Button>
           {genMsg && <span className="text-[11px] text-muted-foreground">{genMsg}</span>}
         </div>
+        <p className="text-[11px] text-muted-foreground">
+          Landscape is generated at 16:9, then auto-cropped to 1.91:1 when pushed to the ad.
+        </p>
       </section>
 
       {/* ── Card 2: gallery + slot assignment ── */}
@@ -388,22 +421,26 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
             Only the slots you assigned are changed.
           </p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-          <label className="text-[11px] text-muted-foreground">
-            Ad group ID
-            <input
-              value={adGroupId}
-              onChange={(e) => setAdGroupId(e.target.value)}
-              className="mt-0.5 w-full h-8 rounded border border-border bg-surface-2 px-2 text-xs font-mono focus:outline-none focus:border-accent"
-            />
-          </label>
-          <label className="text-[11px] text-muted-foreground">
-            Ad ID
-            <input
-              value={adId}
-              onChange={(e) => setAdId(e.target.value)}
-              className="mt-0.5 w-full h-8 rounded border border-border bg-surface-2 px-2 text-xs font-mono focus:outline-none focus:border-accent"
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+          <label className="text-[11px] text-muted-foreground sm:col-span-1">
+            Target ad
+            <select
+              value={selectedAdId}
+              onChange={(e) => setSelectedAdId(e.target.value)}
+              disabled={adsQuery.isLoading}
+              className="mt-0.5 w-full h-8 rounded border border-border bg-surface-2 px-2 text-xs focus:outline-none focus:border-accent disabled:opacity-60"
+            >
+              <option value="">
+                {adsQuery.isLoading
+                  ? 'Loading Demand Gen ads…'
+                  : dgAds.length ? 'Select a Demand Gen ad…' : 'No Demand Gen ads found'}
+              </option>
+              {dgAds.map((a) => (
+                <option key={a.ad_id} value={a.ad_id}>
+                  {a.campaign_name} · {a.ad_name || `ad ${a.ad_id}`} ({a.status})
+                </option>
+              ))}
+            </select>
           </label>
           <label className="text-[11px] text-muted-foreground">
             Mode
@@ -421,9 +458,19 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
             Push to ad
           </Button>
         </div>
+        {selectedAd && (
+          <p className="text-[11px] text-muted-foreground font-mono">
+            ad group {selectedAd.ad_group_id} · ad {selectedAd.ad_id}
+          </p>
+        )}
+        {adsQuery.isError && (
+          <p className="text-[11px] text-danger">
+            Couldn't load Demand Gen ads: {adsQuery.error instanceof Error ? adsQuery.error.message : 'unknown error'}
+          </p>
+        )}
         {!canPush && (
           <p className="text-[11px] text-muted-foreground">
-            Assign at least one image to a slot and set the ad group + ad IDs to enable the push.
+            Assign at least one image to a slot and select the Demand Gen ad to enable the push.
           </p>
         )}
         {pushResult && (
@@ -441,7 +488,7 @@ export default function DemandGenCreative({ accountId, onUpload }: Props) {
             <h3 className="text-sm font-semibold">Confirm push to live ad</h3>
             <p className="text-xs text-muted-foreground">
               This will <span className="font-medium text-foreground">{mode}</span> images on the live Demand Gen ad
-              <span className="font-mono"> {adId}</span> (ad group <span className="font-mono">{adGroupId}</span>):
+              <span className="font-mono"> {selectedAd?.ad_id}</span> (ad group <span className="font-mono">{selectedAd?.ad_group_id}</span>):
             </p>
             <ul className="text-[11px] space-y-0.5">
               {SLOTS.filter((s) => slotAssign[s.key].length).map((s) => (

@@ -579,6 +579,45 @@ class GoogleAdsService:
             )
         return results
 
+    # ── demand gen ads (Studio push-to-ad target resolution) ─────
+
+    async def get_demand_gen_ads(self, customer_id: str) -> list[dict]:
+        """List the account's Demand Gen ads (ad id + ad group + campaign)
+        so the Studio push-to-ad flow can offer an operator SELECTION instead
+        of a hardcoded live ad id. ONE GAQL over ad_group_ad filtered to
+        DEMAND_GEN campaigns; READ-ONLY. Returns [] when the account has none.
+        """
+        query = """
+            SELECT
+              ad_group_ad.ad.id,
+              ad_group_ad.ad.name,
+              ad_group_ad.status,
+              ad_group.id,
+              ad_group.name,
+              campaign.id,
+              campaign.name
+            FROM ad_group_ad
+            WHERE campaign.advertising_channel_type = 'DEMAND_GEN'
+              AND ad_group_ad.status != 'REMOVED'
+            ORDER BY campaign.name
+        """
+        rows = await asyncio.to_thread(
+            _run_query, _clean_id(customer_id), query
+        )
+        out: list[dict] = []
+        for r in rows:
+            ad = r.ad_group_ad.ad
+            out.append({
+                "ad_id": str(ad.id),
+                "ad_name": ad.name or "",
+                "ad_group_id": str(r.ad_group.id),
+                "ad_group_name": r.ad_group.name or "",
+                "campaign_id": str(r.campaign.id),
+                "campaign_name": r.campaign.name or "",
+                "status": r.ad_group_ad.status.name,
+            })
+        return out
+
     # ── campaign targeting ───────────────────────────────────────
 
     async def get_campaign_targeting(

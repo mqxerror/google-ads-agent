@@ -191,8 +191,12 @@ def _validate_bundle(bundle: Dict[str, Any]) -> None:
     for kind in ("landscape", "square"):
         if not (imgs.get(kind) or []):
             errs.append(f"need ≥1 {kind} marketing image")
-    if not (bundle.get("video_youtube_ids") or []):
-        errs.append("need ≥1 YouTube video ID")
+    # Video is OPTIONAL for a PMax asset group: when none is supplied Google
+    # auto-generates one from the image + text assets. Do NOT hard-gate on it —
+    # requiring ≥1 YouTube id was stricter than Google and blocked every
+    # image-only asset group. (Google Ads API "Asset Requirements"; Help
+    # 14528532 — verified 2026-08-03.) The wizard still nudges the operator to
+    # supply their own video for control / 'Excellent' Ad Strength.
 
     if errs:
         raise PMaxValidationError(errs)

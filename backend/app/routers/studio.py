@@ -274,6 +274,31 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
             ),
         )
 
+    # Validate every requested aspect against the chosen model's DECLARED
+    # aspect_ratios so an unsupported aspect (e.g. '1.91:1', which no image
+    # model declares) fails fast with a clear 422 instead of being passed
+    # silently to the Higgsfield CLI. Callers that need a 1.91:1 asset should
+    # generate 16:9 and rely on the exact-aspect center-crop at Google submit
+    # (creative_images.fit_image_for_slot). Unknown model ids (not in the
+    # curated catalog) skip this check — the CLI is the authority for ids we
+    # don't track.
+    from app.services.model_catalog import get_model
+
+    model_entry = get_model(body.model)
+    if model_entry is not None:
+        allowed = (model_entry.get("constraints") or {}).get("aspect_ratios") or []
+        unsupported = [a for a in body.aspect_ratios if a not in allowed]
+        if unsupported:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"model '{body.model}' does not support aspect ratio(s) "
+                    f"{unsupported}. Allowed for this model: {allowed}. "
+                    f"(For a 1.91:1 asset, generate 16:9 — it is auto-cropped "
+                    f"to 1.91:1 when pushed to the ad.)"
+                ),
+            )
+
     # Pre-create one row per (aspect × variant) so the FE can subscribe
     # immediately and the worker has a row to update.
     asset_ids: list[str] = []

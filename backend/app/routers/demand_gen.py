@@ -345,6 +345,41 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
     return DGDraftResponse(business_name=bn, **out)
 
 
+class DemandGenAdOption(BaseModel):
+    """One Demand Gen ad the Studio push-to-ad flow can target. Populates the
+    operator's ad picker so the push target is a SELECTION, never a hardcoded
+    live ad id."""
+
+    ad_id: str
+    ad_name: str
+    ad_group_id: str
+    ad_group_name: str
+    campaign_id: str
+    campaign_name: str
+    status: str
+
+
+@router.get(
+    "/accounts/{account_id}/demand-gen/ads",
+    response_model=list[DemandGenAdOption],
+)
+async def list_demand_gen_ads(account_id: str) -> list[DemandGenAdOption]:
+    """List the account's Demand Gen ads so the Studio push-to-ad flow targets
+    an operator-selected ad instead of a hardcoded live id. READ-ONLY; 502 on a
+    Google API failure. Returns [] when the account has no Demand Gen ads yet."""
+    from app.services.google_ads import GoogleAdsService
+
+    try:
+        ads = await GoogleAdsService().get_demand_gen_ads(account_id)
+    except Exception as e:
+        logger.exception("Demand Gen ad listing failed for account=%s", account_id)
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "GOOGLE_ADS_ERROR", "message": str(e)[:500]},
+        )
+    return [DemandGenAdOption(**a) for a in ads]
+
+
 class DemandGenUpdateImagesRequest(BaseModel):
     """Studio push-to-ad payload. All refs may be Google asset resource names,
     bare numeric asset ids, OR local library UUIDs (uploaded / generated) — the
