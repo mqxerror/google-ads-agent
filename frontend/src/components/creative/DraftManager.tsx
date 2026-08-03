@@ -3,15 +3,18 @@
 // a second draft never destroys the first. Export / import (story 15.5) is
 // layered on later in this same component.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Save, FolderOpen, Trash2, Pencil, Check, X, Loader2, AlertTriangle,
+  Download, Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNamedDrafts, type DraftRecord } from './useNamedDrafts';
 import { writeServerRef } from './crashCache';
+import { serializeDraft, parseDraft, bundleIssues, specFor } from './draftIO';
+import { useCreativeSpecs } from '@/lib/creativeSpecs';
 
 interface DraftManagerProps<B> {
   accountId: string | null;
@@ -30,12 +33,15 @@ export default function DraftManager<B extends object>({
   accountId, campaignType, bundle, onLoad, storageKey,
 }: DraftManagerProps<B>) {
   const dm = useNamedDrafts<B>(accountId, campaignType);
+  const { specs } = useCreativeSpecs();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [importIssues, setImportIssues] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Keep the name field in step with the currently loaded draft.
   useEffect(() => {
@@ -96,13 +102,73 @@ export default function DraftManager<B extends object>({
     } finally { setBusy(null); }
   };
 
+  // Export (story 15.5): the current bundle as an interchange JSON file — a draft
+  // doubles as a template.
+  const doExport = () => {
+    const json = serializeDraft(campaignType, bundle);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(name.trim() || campaignType)}.draft.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setFlash({ kind: 'ok', msg: 'Exported draft JSON.' });
+  };
+
+  // Import: read the file, load into the wizard, and surface any over-limit
+  // fields client-side (re-validated server-side on save). Never crashes.
+  const doImport = async (file: File) => {
+    setImportIssues([]);
+    try {
+      const text = await file.text();
+      const { bundle: imported } = parseDraft<B>(text);
+      onLoad(imported);
+      const issues = bundleIssues(imported as Record<string, unknown>, specFor(specs, campaignType));
+      setImportIssues(issues);
+      setFlash(issues.length
+        ? { kind: 'err', msg: `Imported with ${issues.length} over-limit field(s) — fix before create.` }
+        : { kind: 'ok', msg: 'Imported draft — review below.' });
+    } catch (e) {
+      setFlash({ kind: 'err', msg: e instanceof Error ? e.message : 'Import failed.' });
+    }
+  };
+
   return (
     <div className="border border-border rounded-lg bg-secondary/20 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <FolderOpen className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">Named drafts</h3>
         <span className="text-[10px] text-muted-foreground">saved on the server · survive a restart</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={doExport} className="gap-1.5 h-7">
+            <Download className="h-3.5 w-3.5" /> Export
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5 h-7">
+            <Upload className="h-3.5 w-3.5" /> Import
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = ''; }}
+          />
+        </div>
       </div>
+
+      {importIssues.length > 0 && (
+        <div className="border border-amber-500/40 bg-amber-500/10 rounded-md p-2 text-[11px] space-y-0.5">
+          <p className="font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" /> Imported bundle is over the limits:
+          </p>
+          <ul className="list-disc pl-5 text-muted-foreground">
+            {importIssues.map((iss, i) => <li key={i}>{iss}</li>)}
+          </ul>
+        </div>
+      )}
 
       {/* Save row */}
       <div className="flex items-center gap-2">
