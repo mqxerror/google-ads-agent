@@ -129,6 +129,75 @@ def _normalize_num(tok: str) -> str:
     return tok.replace("$", "").replace(",", "").rstrip("%").strip()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Seed-filtering primitives (Epic 18, story 18.3 · FR3.4). Honesty ledger #5:
+# `run_claim_gate` below was built to audit the Director's CHAT output against a
+# per-turn provenance manifest — it would silently no-op on scraped copy
+# FRAGMENTS (no IDs, no manifest). So FR3.4 reuses these NORMALIZATION + MATCHING
+# primitives behind brand_kit.filter_claim_seeds(), NOT the top-level function.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CLAIM_PUNCT_RE = re.compile(r"[^\w\s]")
+_WS_RE = re.compile(r"\s+")
+
+
+def normalize_claim(text: str) -> str:
+    """Lowercase, drop punctuation/symbols, collapse whitespace — the shared
+    normalization both a scraped claim and a pinned banned-phrase pass through so
+    matching is punctuation/case/spacing insensitive (e.g. "No-minimum stay!" ==
+    "no minimum stay")."""
+    s = (text or "").lower()
+    s = _CLAIM_PUNCT_RE.sub(" ", s)
+    return _WS_RE.sub(" ", s).strip()
+
+
+# Deterministic markers by which a pinned fact declares a BANNED claim (FR3.4).
+# A fact can either name the phrase explicitly (BANNED/NEVER/FALSE/DO NOT CLAIM:)
+# or quote a phrase and assert it is FALSE (the Panama "no minimum stay" case:
+# `"no minimum stay" is FALSE for Panama`).
+_BANNED_MARKER_RE = re.compile(
+    r"(?:banned|never|false|do\s*not|don't|no)\s*claim\s*[:\-]\s*(.+?)(?:\s*[—\-–(.]|$)",
+    re.IGNORECASE,
+)
+_QUOTED_FALSE_RE = re.compile(
+    r"""['"“”‘’]([^'"“”‘’]{3,})['"“”‘’]\s*(?:is|are|=|:)\s*(?:false|untrue|wrong|incorrect)""",
+    re.IGNORECASE,
+)
+
+
+def extract_banned_phrases(pinned_facts: list[str]) -> list[str]:
+    """Pull BANNED claim phrases from pinned-fact lines via the deterministic
+    markers above. Returns normalized phrases (dedup, order-stable). A fact that
+    carries no marker contributes nothing — pinned facts are TRUE statements, not
+    a blanket banlist."""
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: str) -> None:
+        norm = normalize_claim(raw)
+        if len(norm) >= 3 and norm not in seen:
+            seen.add(norm)
+            out.append(norm)
+
+    for fact in pinned_facts or []:
+        for m in _QUOTED_FALSE_RE.finditer(fact):
+            _add(m.group(1))
+        for m in _BANNED_MARKER_RE.finditer(fact):
+            _add(m.group(1))
+    return out
+
+
+def claim_matches_banned(claim: str, banned_phrases: list[str]) -> Optional[str]:
+    """Return the banned phrase a claim asserts, or None. Token-boundary substring
+    match on the normalized forms — so "no minimum stay" fires inside "enjoy
+    Panama with no minimum stay requirement" but not inside an unrelated word."""
+    nc = f" {normalize_claim(claim)} "
+    for phrase in banned_phrases:
+        if phrase and f" {phrase} " in nc:
+            return phrase
+    return None
+
+
 def run_claim_gate(
     final_text: str,
     manifest: ProvenanceManifest,

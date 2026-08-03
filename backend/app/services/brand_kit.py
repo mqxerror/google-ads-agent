@@ -801,12 +801,44 @@ async def assert_scrapable(url: str, *, confirm_ownership: bool) -> None:
         )
 
 
-# ── Claim seed gate (passthrough in 18.2; real gate lands in 18.3) ────────────
+# ── Claim seed gate (FR3.4 · Honesty ledger #5) ───────────────────────────────
 
 
 def filter_claim_seeds(claims: list[str], account_id: Optional[str],
                        campaign_id: Optional[str]) -> tuple[list[str], list[dict]]:
-    """Filter scraped claim seeds against pinned facts (FR3.4). Story 18.2 ships
-    the passthrough; story 18.3 replaces the body with the real pinned-fact gate
-    (reusing claim_gate primitives). Returns ``(kept_claims, dropped)``."""
-    return list(claims), []
+    """Filter scraped claim seeds against the campaign's pinned facts BEFORE any
+    of them can seed a draft (FR3.4) — so a scraped page can never resurrect the
+    Panama stay-requirement class of error.
+
+    Reuses ``prompt_drafter._load_pinned_claims`` (the pinned-fact store) +
+    ``claim_gate``'s normalization/matching PRIMITIVES — never ``run_claim_gate``,
+    which was built for chat-output auditing and would no-op on fragments
+    (Honesty ledger #5). A dropped claim is LOGGED with its text.
+
+    Returns ``(kept_claims, dropped)`` where ``dropped`` is
+    ``[{claim, banned_phrase}]``. When no campaign context / no banned facts
+    exist, every claim passes through unchanged."""
+    from app.services import claim_gate
+    from app.services.prompt_drafter import _load_pinned_claims
+
+    if not account_id or not campaign_id:
+        return list(claims), []
+
+    pinned = _load_pinned_claims(account_id=account_id, campaign_id=campaign_id)
+    banned = claim_gate.extract_banned_phrases(pinned)
+    if not banned:
+        return list(claims), []
+
+    kept: list[str] = []
+    dropped: list[dict] = []
+    for c in claims:
+        hit = claim_gate.claim_matches_banned(c, banned)
+        if hit:
+            dropped.append({"claim": c, "banned_phrase": hit})
+            logger.warning(
+                "brand_kit.filter_claim_seeds: DROPPED scraped claim seed as it "
+                "asserts a pinned-banned phrase %r — claim text: %r "
+                "(account=%s campaign=%s)", hit, c, account_id, campaign_id)
+        else:
+            kept.append(c)
+    return kept, dropped
