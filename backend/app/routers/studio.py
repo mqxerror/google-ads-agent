@@ -82,6 +82,38 @@ class GenerateImageResponse(BaseModel):
     asset_ids: list[str]
 
 
+# ── Smart ASPECT Set (batch render) — Epic 17 ──────────────────────────
+class BatchSlotSpec(BaseModel):
+    slot: str
+    variants: int = Field(ge=1, le=20)  # spec-ok: pydantic ceiling; server caps at ENGINE.batch_tile_cap
+
+
+class BatchRenderRequest(BaseModel):
+    account_id: str
+    art_direction: str = Field(min_length=1)
+    model: str = "nano_banana_2"
+    # with_logo | without_logo | asset_anchored — explicit request field, not a
+    # prompt convention (FR2.1). Policy for the logo overlay resolves from the
+    # registry, never a code branch (FR2.2).
+    mode: str = "without_logo"
+    campaign_id: Optional[str] = None
+    logo_asset_id: Optional[str] = None
+    reference_asset_ids: Optional[list[str]] = None
+    slots: list[BatchSlotSpec] = Field(default_factory=list)
+
+
+class BatchTile(BaseModel):
+    asset_id: str
+    slot: str
+    variant_index: int
+
+
+class BatchRenderResponse(BaseModel):
+    batch_id: str
+    tiles: list[BatchTile]
+    est_credits: int
+
+
 # Video generation accepts a single aspect (most video models support
 # one aspect per submission; multi-aspect for video isn't worth the
 # parallelism cost) and a duration in seconds — model-dependent
@@ -340,6 +372,90 @@ async def generate_image(body: GenerateImageRequest) -> GenerateImageResponse:
         task.add_done_callback(_BACKGROUND_TASKS.discard)
 
     return GenerateImageResponse(asset_ids=asset_ids)
+
+
+@router.post("/batch-render", response_model=BatchRenderResponse)
+async def batch_render(body: BatchRenderRequest) -> BatchRenderResponse:
+    """Smart ASPECT Set: one approved art direction → N slot×variant tiles,
+    rendered in waves under the SAME 6-job semaphore as ad-hoc Studio
+    generations. Creates one `creative_batches` parent + N child `ad_assets`
+    rows, then starts the per-batch supervisor. Rejected client+server above
+    `ENGINE.batch_tile_cap`."""
+    from app.services import batch_render as br
+
+    try:
+        result = await br.create_batch(
+            account_id=body.account_id,
+            art_direction=body.art_direction,
+            model=body.model,
+            slots=[s.model_dump() for s in body.slots],
+            mode=body.mode,
+            campaign_id=body.campaign_id,
+            logo_asset_id=body.logo_asset_id,
+            reference_asset_ids=body.reference_asset_ids,
+        )
+    except br.BatchRenderError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    br.start_supervisor(result["batch_id"])
+    return BatchRenderResponse(
+        batch_id=result["batch_id"],
+        tiles=[BatchTile(**t) for t in result["tiles"]],
+        est_credits=result["est_credits"],
+    )
+
+
+@router.get("/batch-render/{batch_id}")
+async def get_batch_render(batch_id: str) -> dict[str, Any]:
+    """Single-shot batch status read (polling fallback for the SSE stream)."""
+    from app.services import batch_render as br
+
+    view = await br.get_batch(batch_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="batch not found")
+    return view
+
+
+@router.get("/batch-render/{batch_id}/stream")
+async def stream_batch_render(batch_id: str) -> StreamingResponse:
+    """SSE of the batch view — emits on any status/progress/tile change, closes
+    when the batch reaches a terminal status. Progress is monotonic."""
+    from app.services import batch_render as br
+
+    async def event_source():
+        last = None
+        max_iters = int(30 * 60 / 1.5)  # 30 min ceiling for a large batch
+        for _ in range(max_iters):
+            view = await br.get_batch(batch_id)
+            if view is None:
+                yield f"data: {json.dumps({'error': 'batch not found'})}\n\n"
+                return
+            snapshot = json.dumps(view, sort_keys=True)
+            if snapshot != last:
+                yield f"data: {json.dumps(view)}\n\n"
+                last = snapshot
+            if view.get("status") in ("done", "done_with_failures", "cancelled"):
+                return
+            await asyncio.sleep(1.5)
+        yield f"data: {json.dumps({'error': 'stream timeout (30m)'})}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/batch-render/{batch_id}/tiles/{asset_id}/retry")
+async def retry_batch_tile(batch_id: str, asset_id: str) -> dict[str, Any]:
+    """Re-enqueue one failed tile (≤ `ENGINE.batch_retry_max`). Never re-renders
+    a completed tile."""
+    from app.services import batch_render as br
+
+    try:
+        return await br.retry_tile(batch_id, asset_id)
+    except br.BatchRenderError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.post("/cost-estimate", response_model=CostEstimateNullable)

@@ -125,6 +125,11 @@ register_scan_file(_BACKEND / "app" / "services" / "creative_copy.py", "py", 0)
 # set, so it stays literal-free under the scan. ──
 register_scan_file(_BACKEND / "app" / "services" / "near_dup.py", "py", 0)
 
+# ── Story 17.3 — batch_render.py enforces the tile cap + retry cap from
+# ENGINE.batch_tile_cap / ENGINE.batch_retry_max (no baked constant). It joins
+# the sentinel scan the moment it owns that enforcement (14.2's accretion). ──
+register_scan_file(_BACKEND / "app" / "services" / "batch_render.py", "py", 0)
+
 # ── Story 16.8 — the legacy per-type draft-copy shims are DELETED (strangler step
 # 5 complete); both wizards draft through the unified copy-jobs contract. Tombstone
 # the shim identifiers so they cannot be resurrected in their router files. ──
