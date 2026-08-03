@@ -29,6 +29,7 @@ import {
   FolderOpen, Search, Check, Clapperboard, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePMaxRules } from '@/lib/creativeSpecs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
@@ -58,20 +59,15 @@ const STEPS = [
   { id: 'review',   label: 'Review & submit'   },
 ] as const;
 
-// Google's PMax hard minimums — server validates these too; this is the
-// client-side mirror so Next/Submit can stay disabled until satisfied.
-const RULES = {
-  headlines:      { min: 3, max: 15, maxChars: 30 },
-  longHeadlines:  { min: 1, max: 5,  maxChars: 90 },
-  descriptions:   { min: 2, max: 5,  maxChars: 90 },
-  logos:          { min: 1 },
-  landscape:      { min: 1 },
-  square:         { min: 1 },
-  // Video is OPTIONAL: Google auto-generates one from the images + text when
-  // none is supplied. Not a gate — the step only nudges the operator to add
-  // their own for control. (Google Ads API Asset Requirements; Help 14528532.)
-  videos:         { min: 0 },
-};
+// PMax creative limits are FETCHED from the Creative Spec Registry via
+// `usePMaxRules()` (Epic 14, story 14.5) — no baked client constant (NFR-D1).
+// Each component that validates reads `const rules = usePMaxRules()`.
+// (Video stays OPTIONAL — Google auto-generates one; the step only nudges.)
+
+// Studio AI-clip duration bounds (SECONDS) — a Higgsfield/Veo generation knob,
+// NOT a Google creative-count/char limit, so it lives here and is waived below.
+const CLIP_MIN_SEC = 2;
+const CLIP_MAX_SEC = 15; // spec-ok: video clip duration seconds, not a creative-count limit
 
 interface PMaxBundle {
   name: string;
@@ -104,6 +100,7 @@ interface PMaxWizardProps {
 
 export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardProps) {
   const accountId = useClientAccountId();
+  const rules = usePMaxRules();
   const [stepIdx, setStepIdx] = useState(0);
   const [bundle, setBundle] = useState<PMaxBundle>(() => {
     try {
@@ -154,21 +151,21 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       const h = bundle.headlines.filter(Boolean);
       const lh = bundle.longHeadlines.filter(Boolean);
       const d = bundle.descriptions.filter(Boolean);
-      if (h.length < RULES.headlines.min) missing.push(`${RULES.headlines.min - h.length} more headline${RULES.headlines.min - h.length > 1 ? 's' : ''}`);
-      if (lh.length < RULES.longHeadlines.min) missing.push(`${RULES.longHeadlines.min - lh.length} long headline`);
-      if (d.length < RULES.descriptions.min) missing.push(`${RULES.descriptions.min - d.length} more description${RULES.descriptions.min - d.length > 1 ? 's' : ''}`);
-      if (h.some(s => s.length > RULES.headlines.maxChars)) missing.push('a headline is over 30 chars');
-      if (lh.some(s => s.length > RULES.longHeadlines.maxChars)) missing.push('a long headline is over 90 chars');
-      if (d.some(s => s.length > RULES.descriptions.maxChars)) missing.push('a description is over 90 chars');
+      if (h.length < rules.headlines.min) missing.push(`${rules.headlines.min - h.length} more headline${rules.headlines.min - h.length > 1 ? 's' : ''}`);
+      if (lh.length < rules.longHeadlines.min) missing.push(`${rules.longHeadlines.min - lh.length} long headline`);
+      if (d.length < rules.descriptions.min) missing.push(`${rules.descriptions.min - d.length} more description${rules.descriptions.min - d.length > 1 ? 's' : ''}`);
+      if (h.some(s => s.length > rules.headlines.maxChars)) missing.push(`a headline is over ${rules.headlines.maxChars} chars`);
+      if (lh.some(s => s.length > rules.longHeadlines.maxChars)) missing.push(`a long headline is over ${rules.longHeadlines.maxChars} chars`);
+      if (d.some(s => s.length > rules.descriptions.maxChars)) missing.push(`a description is over ${rules.descriptions.maxChars} chars`);
     } else if (stepId === 'images') {
-      if (bundle.logos.length < RULES.logos.min) missing.push('a logo');
-      if (bundle.landscape.length < RULES.landscape.min) missing.push('a landscape image');
-      if (bundle.square.length < RULES.square.min) missing.push('a square image');
+      if (bundle.logos.length < rules.logos.min) missing.push('a logo');
+      if (bundle.landscape.length < rules.landscape.min) missing.push('a landscape image');
+      if (bundle.square.length < rules.square.min) missing.push('a square image');
     }
     // Note: the 'videos' step has no blocking requirement — video is optional
     // (Google auto-generates one when none is supplied).
     return missing.length ? `To continue: ${missing.join(' · ')}` : null;
-  }, [stepId, bundle]);
+  }, [stepId, bundle, rules]);
 
   // ── Per-step validation: gates Next/Submit so a user never reaches the
   // server with an invalid bundle. Same rules as the orchestrator's
@@ -186,17 +183,17 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         const h = bundle.headlines.filter(Boolean);
         const lh = bundle.longHeadlines.filter(Boolean);
         const d = bundle.descriptions.filter(Boolean);
-        return h.length >= RULES.headlines.min
-          && lh.length >= RULES.longHeadlines.min
-          && d.length >= RULES.descriptions.min
-          && h.every(s => s.length <= RULES.headlines.maxChars)
-          && lh.every(s => s.length <= RULES.longHeadlines.maxChars)
-          && d.every(s => s.length <= RULES.descriptions.maxChars);
+        return h.length >= rules.headlines.min
+          && lh.length >= rules.longHeadlines.min
+          && d.length >= rules.descriptions.min
+          && h.every(s => s.length <= rules.headlines.maxChars)
+          && lh.every(s => s.length <= rules.longHeadlines.maxChars)
+          && d.every(s => s.length <= rules.descriptions.maxChars);
       }
       case 'images':
-        return bundle.logos.length >= RULES.logos.min
-          && bundle.landscape.length >= RULES.landscape.min
-          && bundle.square.length >= RULES.square.min;
+        return bundle.logos.length >= rules.logos.min
+          && bundle.landscape.length >= rules.landscape.min
+          && bundle.square.length >= rules.square.min;
       case 'videos':
         return true; // optional — video is auto-generated by Google when absent
       case 'signals':
@@ -204,7 +201,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       case 'review':
         return true; // submit handler does its own gate
     }
-  }, [stepId, bundle]);
+  }, [stepId, bundle, rules]);
 
   const handleSubmit = useCallback(async () => {
     if (!accountId) return;
@@ -334,7 +331,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         ) : (
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !rules.ready}
             className="gap-1.5"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -384,6 +381,7 @@ function StepBrief({ bundle, setField }: { bundle: PMaxBundle; setField: <K exte
 }
 
 function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  const rules = usePMaxRules();
   const [resuming, setResuming] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -500,30 +498,30 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
       />
       <TextList
         label="Headlines"
-        hint={`≥${RULES.headlines.min}, each ≤${RULES.headlines.maxChars} chars · up to ${RULES.headlines.max}`}
+        hint={`≥${rules.headlines.min}, each ≤${rules.headlines.maxChars} chars · up to ${rules.headlines.max}`}
         items={bundle.headlines}
         onChange={v => setField('headlines', v)}
-        maxChars={RULES.headlines.maxChars}
-        minItems={RULES.headlines.min}
-        maxItems={RULES.headlines.max}
+        maxChars={rules.headlines.maxChars}
+        minItems={rules.headlines.min}
+        maxItems={rules.headlines.max}
       />
       <TextList
         label="Long headlines"
-        hint={`≥${RULES.longHeadlines.min}, each ≤${RULES.longHeadlines.maxChars} chars · up to ${RULES.longHeadlines.max}`}
+        hint={`≥${rules.longHeadlines.min}, each ≤${rules.longHeadlines.maxChars} chars · up to ${rules.longHeadlines.max}`}
         items={bundle.longHeadlines}
         onChange={v => setField('longHeadlines', v)}
-        maxChars={RULES.longHeadlines.maxChars}
-        minItems={RULES.longHeadlines.min}
-        maxItems={RULES.longHeadlines.max}
+        maxChars={rules.longHeadlines.maxChars}
+        minItems={rules.longHeadlines.min}
+        maxItems={rules.longHeadlines.max}
       />
       <TextList
         label="Descriptions"
-        hint={`≥${RULES.descriptions.min}, each ≤${RULES.descriptions.maxChars} chars · up to ${RULES.descriptions.max}`}
+        hint={`≥${rules.descriptions.min}, each ≤${rules.descriptions.maxChars} chars · up to ${rules.descriptions.max}`}
         items={bundle.descriptions}
         onChange={v => setField('descriptions', v)}
-        maxChars={RULES.descriptions.maxChars}
-        minItems={RULES.descriptions.min}
-        maxItems={RULES.descriptions.max}
+        maxChars={rules.descriptions.maxChars}
+        minItems={rules.descriptions.min}
+        maxItems={rules.descriptions.max}
       />
     </div>
   );
@@ -535,6 +533,7 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
 interface SlotAssetMeta { url: string; filename: string }
 
 function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setField: <K extends keyof PMaxBundle>(k: K, v: PMaxBundle[K]) => void; accountId: string }) {
+  const rules = usePMaxRules();
   // Shared campaign context for the StudioPanel each slot opens. Slot
   // label/aspect get appended per slot in ImageGroup.
   const baseContext: StudioPanelContext = {
@@ -580,7 +579,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         items={bundle.logos}
         onChange={v => setField('logos', v)}
         accountId={accountId}
-        minItems={RULES.logos.min}
+        minItems={rules.logos.min}
         maxItems={5}
         promptContext={baseContext}
         assetMeta={assetMeta}
@@ -595,8 +594,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         items={bundle.landscape}
         onChange={v => setField('landscape', v)}
         accountId={accountId}
-        minItems={RULES.landscape.min}
-        maxItems={20}
+        minItems={rules.landscape.min}
+        maxItems={rules.imageMax}
         promptContext={baseContext}
         assetMeta={assetMeta}
         onAssetKnown={registerAsset}
@@ -610,8 +609,8 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         items={bundle.square}
         onChange={v => setField('square', v)}
         accountId={accountId}
-        minItems={RULES.square.min}
-        maxItems={20}
+        minItems={rules.square.min}
+        maxItems={rules.imageMax}
         promptContext={baseContext}
         assetMeta={assetMeta}
         onAssetKnown={registerAsset}
@@ -626,7 +625,7 @@ function StepImages({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
         onChange={v => setField('portrait', v)}
         accountId={accountId}
         minItems={0}
-        maxItems={20}
+        maxItems={rules.imageMax}
         promptContext={baseContext}
         assetMeta={assetMeta}
         onAssetKnown={registerAsset}
@@ -861,7 +860,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
   // ── Render job ──
   const pollRender = useCallback(async (jobId: string) => {
     const started = Date.now();
-    while (Date.now() - started < 15 * 60_000) {
+    while (Date.now() - started < 15 * 60_000) { // spec-ok: 15-min render poll timeout, not a creative limit
       await new Promise(r => setTimeout(r, 3000));
       try {
         const res = await fetch(`/api/pmax/video/render/${jobId}`);
@@ -1094,7 +1093,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
 
   const nImages = panel.imageIds.length;
   const canDraft = nImages >= 3 && nImages <= 8 && !drafting && !rendering;
-  const renderEta = panel.scenes ? Math.round((panel.scenes.length / 2) * 75 + 30) : 0;
+  const renderEta = panel.scenes ? Math.round((panel.scenes.length / 2) * 75 + 30) : 0; // spec-ok: render-ETA heuristic (seconds), not a creative limit
 
   return (
     <div className="space-y-5">
@@ -1206,7 +1205,7 @@ function StepVideos({ bundle, setField, accountId }: { bundle: PMaxBundle; setFi
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-medium">3 · Render</span>
-                {!panel.renderedAsset && <span className="text-[10px] text-muted-foreground">~{Math.ceil(renderEta / 60)} min, with voiceover</span>}
+                {!panel.renderedAsset && <span className="text-[10px] text-muted-foreground">~{Math.ceil(renderEta / 60)}{/* spec-ok: seconds→minutes, not a creative limit */} min, with voiceover</span>}
               </div>
               <Button size="sm" onClick={startRender} disabled={rendering || drafting} className="gap-1.5">
                 {rendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
@@ -1572,9 +1571,9 @@ function SceneRow({ index, scene, imageLookup, onChange }: {
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] text-muted-foreground shrink-0">Clip</span>
               <Input
-                type="number" min={2} max={15}
+                type="number" min={CLIP_MIN_SEC} max={CLIP_MAX_SEC}
                 value={scene.duration ?? 6}
-                onChange={e => onChange({ duration: Math.max(2, Math.min(15, Number(e.target.value) || 6)) })}
+                onChange={e => onChange({ duration: Math.max(CLIP_MIN_SEC, Math.min(CLIP_MAX_SEC, Number(e.target.value) || 6)) })}
                 className="h-7 w-14 text-xs font-mono"
                 title="Seconds. Veo snaps to 4/6/8 server-side."
               />
@@ -1734,7 +1733,7 @@ function TextList({
 
 function ImageGroup({
   label, spec, slotAspect, googleAspect, googleAspectLabel,
-  items, onChange, accountId, minItems, maxItems = 20, promptContext,
+  items, onChange, accountId, minItems, maxItems, promptContext,
   assetMeta, onAssetKnown,
 }: {
   label: string; spec: string; slotAspect: SlotAspect;

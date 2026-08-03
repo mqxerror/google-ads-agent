@@ -99,6 +99,16 @@ register_tombstone("_DG_BUSINESS_NAME_MAX", _ROUTERS / "demand_gen.py", "py")
 register_scan_file(_ROUTERS / "pmax.py", "py", 0)
 register_scan_file(_ROUTERS / "demand_gen.py", "py", 0)
 
+# ── Story 14.5 — wizards read the registry via useCreativeSpecs; RULES deleted ─
+_WIZ = _FRONTEND / "src" / "components" / "campaign"
+register_tombstone("RULES", _WIZ / "PMaxWizard.tsx", "tsx")
+register_tombstone("RULES", _WIZ / "DemandGenWizard.tsx", "tsx")
+register_scan_file(_WIZ / "DemandGenWizard.tsx", "tsx", 0)
+# PMax's 4 pragma'd sentinels are all non-creative-limit numerics (render-poll
+# timeout, render-ETA math ×2, video clip-duration seconds const) — see the
+# `spec-ok` reasons in PMaxWizard.tsx. Snapshot so any new one is visible in review.
+register_scan_file(_WIZ / "PMaxWizard.tsx", "tsx", 4)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2
@@ -119,56 +129,69 @@ def _py_sentinel_hits(src: str) -> List[Tuple[int, int]]:
     return hits
 
 
-def _strip_strings_and_comments(src: str) -> str:
-    """Blank out string/template-literal contents and comments, preserving line
-    numbers (newlines kept, everything else → space). So Tailwind classNames
-    (`w-20`, `text-[40px]`) and comment prose never trip the .tsx scan; only
-    bare CODE numerals remain."""
+def _strip_block_comments(src: str) -> str:
+    """Blank `/* ... */` block comments whole-file, preserving newlines."""
     out: List[str] = []
     i, n = 0, len(src)
     while i < n:
-        c = src[i]
-        # line comment
-        if c == "/" and i + 1 < n and src[i + 1] == "/":
-            while i < n and src[i] != "\n":
-                out.append(" ")
-                i += 1
-            continue
-        # block comment
-        if c == "/" and i + 1 < n and src[i + 1] == "*":
+        if src[i] == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
             while i < n and not (src[i] == "*" and i + 1 < n and src[i + 1] == "/"):
                 out.append("\n" if src[i] == "\n" else " ")
                 i += 1
-            out.append("  ")  # the closing */
+            out.append("  ")  # closing */
             i += 2
             continue
-        # string / template literal
+        out.append(src[i])
+        i += 1
+    return "".join(out)
+
+
+def _strip_line(line: str) -> str:
+    """Blank BALANCED string/template literals and `//` line comments on ONE line.
+
+    Per-line (state resets each newline) so a JSX-text apostrophe (`you're`) or a
+    stray quote can NEVER desync the scanner for the rest of the file — the flaw
+    that made a whole-file stripper mis-flag Tailwind classNames. Unbalanced
+    quotes on a line are left as-is (rare; err toward flagging, never toward
+    silently swallowing a real limit literal)."""
+    out: List[str] = []
+    i, n = 0, len(line)
+    while i < n:
+        c = line[i]
+        if c == "/" and i + 1 < n and line[i + 1] == "/":
+            break  # rest of the line is a comment
         if c in ("'", '"', "`"):
-            quote = c
-            out.append(" ")
-            i += 1
-            while i < n:
-                if src[i] == "\\" and i + 1 < n:
-                    out.append("  ")
-                    i += 2
+            j = i + 1
+            while j < n:
+                if line[j] == "\\":
+                    j += 2
                     continue
-                if src[i] == quote:
-                    out.append(" ")
-                    i += 1
+                if line[j] == c:
                     break
-                out.append("\n" if src[i] == "\n" else " ")
-                i += 1
+                j += 1
+            if j < n:                       # closed pair on this line → blank it
+                out.append(" " * (j - i + 1))
+                i = j + 1
+                continue
+            out.append(c)                   # unbalanced → keep as-is
+            i += 1
             continue
         out.append(c)
         i += 1
     return "".join(out)
 
 
+def _strip_tsx(src: str) -> str:
+    """Block-comment strip (whole-file) then per-line string/line-comment strip."""
+    return "\n".join(_strip_line(ln) for ln in _strip_block_comments(src).splitlines())
+
+
 def _tsx_sentinel_hits(src: str) -> List[Tuple[int, int]]:
     """Return [(lineno, value)] for bare CODE sentinel numerals in .tsx source
     (strings + comments stripped first)."""
     import re
-    stripped = _strip_strings_and_comments(src)
+    stripped = _strip_tsx(src)
     pat = re.compile(r"(?<![\w.])(\d+)(?![\w.])")
     hits: List[Tuple[int, int]] = []
     for lineno, line in enumerate(stripped.splitlines(), start=1):
@@ -210,7 +233,7 @@ def _py_defines_name(src: str, name: str) -> bool:
 
 def _tsx_defines_name(src: str, name: str) -> bool:
     import re
-    stripped = _strip_strings_and_comments(src)
+    stripped = _strip_tsx(src)
     return re.search(rf"\b{re.escape(name)}\b", stripped) is not None
 
 

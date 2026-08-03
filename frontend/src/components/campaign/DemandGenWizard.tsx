@@ -33,6 +33,7 @@ import {
   Monitor, Mail, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDemandGenRules } from '@/lib/creativeSpecs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
@@ -51,14 +52,9 @@ const STEPS = [
   { id: 'review',    label: 'Review & submit'  },
 ] as const;
 
-// Google's Demand Gen hard minimums — the orchestrator validates these too;
-// this is the client-side mirror so Next/Submit stays disabled until satisfied.
-const RULES = {
-  headlines:    { min: 1, max: 5, maxChars: 40 },
-  descriptions: { min: 1, max: 5, maxChars: 90 },
-  businessNameMaxChars: 25,
-  logos:        { min: 1, max: 5 },
-};
+// Demand Gen creative limits are FETCHED from the Creative Spec Registry via
+// `useDemandGenRules()` (Epic 14, story 14.5) — no baked client constant (NFR-D1).
+// Each component that validates reads `const rules = useDemandGenRules()`.
 
 type ChannelKey =
   | 'youtube_in_stream' | 'youtube_in_feed' | 'youtube_shorts'
@@ -144,6 +140,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; message: string; campaignId?: string } | null>(null);
+  const rules = useDemandGenRules();
 
   const setField = useCallback(<K extends keyof DGBundle>(key: K, value: DGBundle[K]) => {
     setBundle(prev => {
@@ -162,23 +159,23 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       if (!(parseFloat(bundle.dailyBudget) > 0)) missing.push('daily budget');
       if (!bundle.finalUrl.trim()) missing.push('final URL');
       if (!bundle.businessName.trim()) missing.push('business name');
-      else if (bundle.businessName.length > RULES.businessNameMaxChars) missing.push(`business name over ${RULES.businessNameMaxChars} chars`);
+      else if (bundle.businessName.length > rules.businessNameMaxChars) missing.push(`business name over ${rules.businessNameMaxChars} chars`);
       if (bundle.targetCpa.trim() && !(parseFloat(bundle.targetCpa) > 0)) missing.push('a valid target CPA (or leave it blank)');
     } else if (stepId === 'text') {
       const h = bundle.headlines.filter(s => s.trim());
       const d = bundle.descriptions.filter(s => s.trim());
-      if (h.length < RULES.headlines.min) missing.push(`${RULES.headlines.min - h.length} more headline`);
-      if (d.length < RULES.descriptions.min) missing.push(`${RULES.descriptions.min - d.length} more description`);
-      if (h.some(s => s.length > RULES.headlines.maxChars)) missing.push('a headline is over 40 chars');
-      if (d.some(s => s.length > RULES.descriptions.maxChars)) missing.push('a description is over 90 chars');
+      if (h.length < rules.headlines.min) missing.push(`${rules.headlines.min - h.length} more headline`);
+      if (d.length < rules.descriptions.min) missing.push(`${rules.descriptions.min - d.length} more description`);
+      if (h.some(s => s.length > rules.headlines.maxChars)) missing.push(`a headline is over ${rules.headlines.maxChars} chars`);
+      if (d.some(s => s.length > rules.descriptions.maxChars)) missing.push(`a description is over ${rules.descriptions.maxChars} chars`);
     } else if (stepId === 'images') {
-      if (bundle.logos.length < RULES.logos.min) missing.push('a logo');
+      if (bundle.logos.length < rules.logos.min) missing.push('a logo');
       if (bundle.landscape.length + bundle.square.length < 1) missing.push('a landscape or square marketing image');
     } else if (stepId === 'channels') {
       if (!Object.values(bundle.channels).some(Boolean)) missing.push('at least one channel ON');
     }
     return missing.length ? `To continue: ${missing.join(' · ')}` : null;
-  }, [stepId, bundle]);
+  }, [stepId, bundle, rules]);
 
   const stepValid = useMemo(() => {
     switch (stepId) {
@@ -188,7 +185,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
         return !!bundle.name.trim()
           && !!bundle.finalUrl.trim()
           && !!bundle.businessName.trim()
-          && bundle.businessName.length <= RULES.businessNameMaxChars
+          && bundle.businessName.length <= rules.businessNameMaxChars
           && Number.isFinite(b) && b > 0
           && cpaOk;
       }
@@ -197,20 +194,20 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       case 'text': {
         const h = bundle.headlines.filter(s => s.trim());
         const d = bundle.descriptions.filter(s => s.trim());
-        return h.length >= RULES.headlines.min && h.length <= RULES.headlines.max
-          && d.length >= RULES.descriptions.min && d.length <= RULES.descriptions.max
-          && h.every(s => s.length <= RULES.headlines.maxChars)
-          && d.every(s => s.length <= RULES.descriptions.maxChars);
+        return h.length >= rules.headlines.min && h.length <= rules.headlines.max
+          && d.length >= rules.descriptions.min && d.length <= rules.descriptions.max
+          && h.every(s => s.length <= rules.headlines.maxChars)
+          && d.every(s => s.length <= rules.descriptions.maxChars);
       }
       case 'images':
-        return bundle.logos.length >= RULES.logos.min
+        return bundle.logos.length >= rules.logos.min
           && (bundle.landscape.length + bundle.square.length) >= 1;
       case 'channels':
         return Object.values(bundle.channels).some(Boolean);
       case 'review':
         return true;
     }
-  }, [stepId, bundle]);
+  }, [stepId, bundle, rules]);
 
   const parseIds = (raw: string): string[] =>
     raw.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s));
@@ -337,7 +334,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
             <CheckCircle2 className="h-4 w-4" /> Done
           </Button>
         ) : (
-          <Button onClick={() => setConfirmOpen(true)} disabled={submitting} className="gap-1.5">
+          <Button onClick={() => setConfirmOpen(true)} disabled={submitting || !rules.ready} className="gap-1.5">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {submitting ? 'Creating...' : 'Create campaign'}
           </Button>
@@ -374,7 +371,8 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
 type SetField = <K extends keyof DGBundle>(k: K, v: DGBundle[K]) => void;
 
 function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
-  const nameOver = bundle.businessName.length > RULES.businessNameMaxChars;
+  const rules = useDemandGenRules();
+  const nameOver = bundle.businessName.length > rules.businessNameMaxChars;
   const [showRefLib, setShowRefLib] = useState(false);
   // Preview meta for the attached reference chips (id → url/filename), sourced
   // from the same ad_assets library the picker reads.
@@ -422,16 +420,16 @@ function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="text-xs font-medium">Business name *</label>
           <span className={cn('text-[10px] tabular-nums', nameOver ? 'text-red-500' : 'text-muted-foreground')}>
-            {bundle.businessName.length}/{RULES.businessNameMaxChars}
+            {bundle.businessName.length}/{rules.businessNameMaxChars}
           </span>
         </div>
         <Input
           value={bundle.businessName}
-          onChange={e => setField('businessName', e.target.value.slice(0, RULES.businessNameMaxChars))}
+          onChange={e => setField('businessName', e.target.value.slice(0, rules.businessNameMaxChars))}
           placeholder="Mercan"
           className={cn(nameOver && 'border-red-500')}
         />
-        <p className="text-[10px] text-muted-foreground mt-1">Shown on the ad; keep it short and brand-faithful (≤{RULES.businessNameMaxChars} chars).</p>
+        <p className="text-[10px] text-muted-foreground mt-1">Shown on the ad; keep it short and brand-faithful (≤{rules.businessNameMaxChars} chars).</p>
       </div>
 
       {/* Campaign brief — fuels the assisted copy + image drafts */}
@@ -566,13 +564,14 @@ function StepTargeting({ bundle, setField }: { bundle: DGBundle; setField: SetFi
 }
 
 function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
+  const rules = useDemandGenRules();
   const [resuming, setResuming] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
   // A DG draft fills business_name (Brief step), headlines + descriptions.
   const applyDraft = useCallback((result: CopyDraftResult) => {
-    if (result.business_name) setField('businessName', result.business_name.slice(0, RULES.businessNameMaxChars));
+    if (result.business_name) setField('businessName', result.business_name.slice(0, rules.businessNameMaxChars));
     if (result.headlines?.length) setField('headlines', result.headlines);
     if (result.descriptions?.length) setField('descriptions', result.descriptions);
   }, [setField]);
@@ -682,21 +681,21 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
       <PolicyHint />
       <TextList
         label="Headlines"
-        hint={`≥${RULES.headlines.min}, each ≤${RULES.headlines.maxChars} chars · up to ${RULES.headlines.max}`}
+        hint={`≥${rules.headlines.min}, each ≤${rules.headlines.maxChars} chars · up to ${rules.headlines.max}`}
         items={bundle.headlines}
         onChange={v => setField('headlines', v)}
-        maxChars={RULES.headlines.maxChars}
-        minItems={RULES.headlines.min}
-        maxItems={RULES.headlines.max}
+        maxChars={rules.headlines.maxChars}
+        minItems={rules.headlines.min}
+        maxItems={rules.headlines.max}
       />
       <TextList
         label="Descriptions"
-        hint={`≥${RULES.descriptions.min}, each ≤${RULES.descriptions.maxChars} chars · up to ${RULES.descriptions.max}`}
+        hint={`≥${rules.descriptions.min}, each ≤${rules.descriptions.maxChars} chars · up to ${rules.descriptions.max}`}
         items={bundle.descriptions}
         onChange={v => setField('descriptions', v)}
-        maxChars={RULES.descriptions.maxChars}
-        minItems={RULES.descriptions.min}
-        maxItems={RULES.descriptions.max}
+        maxChars={rules.descriptions.maxChars}
+        minItems={rules.descriptions.min}
+        maxItems={rules.descriptions.max}
       />
       <div>
         <label className="text-xs font-medium mb-1.5 block">Call to action (optional)</label>
@@ -729,6 +728,7 @@ function PolicyHint() {
 interface SlotAssetMeta { url: string; filename: string }
 
 function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setField: SetField; accountId: string }) {
+  const rules = useDemandGenRules();
   // id → preview meta, sourced from the ad_assets library and merged with
   // fresh uploads as they land.
   const [assetMeta, setAssetMeta] = useState<Record<string, SlotAssetMeta>>({});
@@ -784,21 +784,21 @@ function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setFiel
         label="Logos" spec="Auto-cropped to 1:1 · min 128×128 · transparent bg preferred"
         targetRatio={1} targetLabel="1:1" slotAspect="1:1"
         items={bundle.logos} onChange={v => setField('logos', v)}
-        accountId={accountId} minItems={RULES.logos.min} maxItems={RULES.logos.max}
+        accountId={accountId} minItems={rules.logos.min} maxItems={rules.logos.max}
         assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Landscape marketing image (1.91:1)" spec="Any aspect works — cropped to 1.91:1 · min 600×314 · 1200×628 recommended"
         targetRatio={1.91} targetLabel="1.91:1" slotAspect="16:9"
         items={bundle.landscape} onChange={v => setField('landscape', v)}
-        accountId={accountId} minItems={0} maxItems={20}
+        accountId={accountId} minItems={0} maxItems={rules.imageMax}
         assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Square marketing image (1:1)" spec="Any aspect works — cropped to 1:1 · min 300×300 · 1200×1200 recommended"
         targetRatio={1} targetLabel="1:1" slotAspect="1:1"
         items={bundle.square} onChange={v => setField('square', v)}
-        accountId={accountId} minItems={0} maxItems={20}
+        accountId={accountId} minItems={0} maxItems={rules.imageMax}
         assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <p className="text-[10px] text-muted-foreground -mt-2">Provide at least one landscape or square marketing image. Portrait &amp; tall are optional extras.</p>
@@ -806,14 +806,14 @@ function StepImages({ bundle, setField, accountId }: { bundle: DGBundle; setFiel
         label="Portrait marketing image (4:5)" spec="Optional · cropped to 4:5 · min 480×600 · 960×1200 recommended"
         targetRatio={0.8} targetLabel="4:5" slotAspect="4:5"
         items={bundle.portrait} onChange={v => setField('portrait', v)}
-        accountId={accountId} minItems={0} maxItems={20}
+        accountId={accountId} minItems={0} maxItems={rules.imageMax}
         assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
       <ImageGroup
         label="Tall portrait image (9:16)" spec="Optional · cropped to 9:16 · for YouTube Shorts placements"
         targetRatio={0.5625} targetLabel="9:16" slotAspect="9:16"
         items={bundle.tallPortrait} onChange={v => setField('tallPortrait', v)}
-        accountId={accountId} minItems={0} maxItems={20}
+        accountId={accountId} minItems={0} maxItems={rules.imageMax}
         assetMeta={assetMeta} onAssetKnown={registerAsset} promptContext={baseContext}
       />
     </div>
@@ -994,7 +994,7 @@ function TextList({
 
 function ImageGroup({
   label, spec, targetRatio, targetLabel, slotAspect,
-  items, onChange, accountId, minItems, maxItems = 20,
+  items, onChange, accountId, minItems, maxItems,
   assetMeta, onAssetKnown, promptContext,
 }: {
   label: string; spec: string; targetRatio: number; targetLabel: string;
