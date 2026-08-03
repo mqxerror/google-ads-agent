@@ -44,6 +44,7 @@ import { useAngles } from '@/lib/angles';
 import { distributeRows, toRows, buildDiversifyBody, type CopyRow } from '@/lib/copyRows';
 import { findNearDupPairs } from '@/lib/nearDup';
 import CoveragePanel from '@/components/creative/CoveragePanel';
+import BrandKitPanel from '@/components/creative/BrandKitPanel';
 import PolicyHintCard from '@/components/creative/PolicyHintCard';
 import BusinessNameField from '@/components/creative/BusinessNameField';
 import BrandPresetToggle from '@/components/creative/BrandPresetToggle';
@@ -748,6 +749,10 @@ function StepText({ bundle, setField, accountId }: { bundle: DGBundle; setField:
           { slot: 'logos', label: 'Logo', count: bundle.logos.length },
         ]}
       />
+
+      {/* Rationale surface (FR5.2). Demand Gen has no search-theme array, so no
+          one-click theme target — the research grounds the copy + brand assets. */}
+      <BrandKitPanel accountId={accountId} finalUrl={bundle.finalUrl} />
 
       <div className="flex items-center justify-between">
         <label className="text-xs font-medium">Headlines</label>

@@ -41,6 +41,7 @@ import { useAngles } from '@/lib/angles';
 import { distributeRows, toRows, buildDiversifyBody, type CopyRow } from '@/lib/copyRows';
 import { findNearDupPairs } from '@/lib/nearDup';
 import CoveragePanel from '@/components/creative/CoveragePanel';
+import BrandKitPanel from '@/components/creative/BrandKitPanel';
 import PolicyHintCard from '@/components/creative/PolicyHintCard';
 import BusinessNameField from '@/components/creative/BusinessNameField';
 import BrandPresetToggle from '@/components/creative/BrandPresetToggle';
@@ -741,6 +742,17 @@ function StepText({ bundle, setField, accountId }: { bundle: PMaxBundle; setFiel
           { slot: 'portrait', label: 'Portrait', count: bundle.portrait.length },
           { slot: 'logos', label: 'Logo', count: bundle.logos.length },
         ]}
+      />
+
+      <BrandKitPanel
+        accountId={accountId}
+        finalUrl={bundle.finalUrl}
+        themeTarget={rules.searchThemes ? {
+          themes: bundle.audienceSignals,
+          maxItems: rules.searchThemes.maxCount,
+          maxChars: rules.searchThemes.maxChars,
+          onChange: v => setField('audienceSignals', v),
+        } : undefined}
       />
 
       <div className="flex items-center justify-between">

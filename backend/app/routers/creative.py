@@ -59,6 +59,27 @@ class BrandKitBody(BaseModel):
     # campaign's pinned facts (FR3.4). Absent → account-level pass-through.
     campaign_id: Optional[str] = None
     confirm_ownership: bool = False
+    # Opt-in rationale (FR5.2/FR5.3): run the Stage-1 decompose on the SAME
+    # fetched page → value_prop / audience / tone / claim_hints + one-click
+    # audience suggestions. Off by default so a pure asset-scrape never spends an
+    # LLM call; the BrandKitPanel sets it true.
+    include_research: bool = False
+
+
+def _suggested_audiences(brief: Dict[str, Any], claims: list) -> List[str]:
+    """Derive one-click audience suggestions from the decomposed brief + gated
+    claims (FR5.3). Cleaned, deduped, ≤80 chars each — the frontend clamps to the
+    registry cap, but keep the wire values sane."""
+    out: List[str] = []
+    seen: set = set()
+    candidates = [brief.get("audience", "")] + list(brief.get("claim_hints") or []) + list(claims or [])
+    for c in candidates:
+        t = " ".join(str(c or "").split())[:80].strip()
+        key = t.lower()
+        if t and key not in seen:
+            seen.add(key)
+            out.append(t)
+    return out[:8]
 
 
 @router.post("/brand-kit")
@@ -105,6 +126,24 @@ async def create_brand_kit(body: BrandKitBody) -> Dict[str, Any]:
         gated_claims=gated_claims, research_hash_val=rh,
     )
 
+    # Opt-in rationale surface (FR5.2/FR5.3): decompose the SAME page (no second
+    # fetch). Best-effort — a decompose failure leaves research null and the panel
+    # renders its honest empty state, never placeholders.
+    research: Optional[Dict[str, Any]] = None
+    if body.include_research:
+        try:
+            from app.services.prompt_drafter import _stage1_decompose
+            brief = await _stage1_decompose(page=ro, target="image")
+            research = {
+                "value_prop": brief.get("value_prop"),
+                "audience": brief.get("audience"),
+                "tone": brief.get("tone"),
+                "claim_hints": list(brief.get("claim_hints") or []),
+                "suggested_audiences": _suggested_audiences(brief, gated_claims),
+            }
+        except Exception:  # noqa: BLE001 — rationale is advisory, never blocks the scrape
+            research = None
+
     kd = kit.to_dict()
     return {
         "brand_name": kd["brand_name"],
@@ -121,6 +160,7 @@ async def create_brand_kit(body: BrandKitBody) -> Dict[str, Any]:
         "missing_fields": kd["missing_fields"],
         "kit_asset_id": persisted["kit_asset_id"],
         "research_hash": rh,
+        "research": research,                          # rationale (FR5.2/5.3) or null
     }
 
 

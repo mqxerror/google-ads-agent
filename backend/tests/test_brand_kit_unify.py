@@ -167,6 +167,39 @@ class BrandKitEndpoint(unittest.TestCase):
         # separate asset fetches (mocked away here), never a page re-fetch.
         self.assertEqual(len(counter), 1)
 
+    def test_include_research_returns_rationale_payload(self):
+        """Story 18.5 — include_research runs the Stage-1 decompose on the SAME
+        page and returns value_prop/audience/tone/claim_hints + one-click audience
+        suggestions (FR5.2/FR5.3). Decompose is mocked (network-free)."""
+        self._patch()
+
+        async def fake_decompose(*, page, target, **kw):
+            assert "body_excerpt" in page  # the shared research object is the input
+            return {"subject": "an investor", "setting": "Panama",
+                    "value_prop": "residency by investment", "audience": "HNW investors",
+                    "tone": "aspirational", "program": "panama",
+                    "hard_constraints": [], "claim_hints": ["trusted program"]}
+
+        import app.services.prompt_drafter as pd
+        orig = pd._stage1_decompose
+        pd._stage1_decompose = fake_decompose
+        try:
+            r = self.client.post("/api/creative/brand-kit", json={
+                "url": "https://www.mercan.com/lp/panama", "account_id": "acc-research",
+                "confirm_ownership": True, "include_research": True,
+            })
+        finally:
+            pd._stage1_decompose = orig
+            self._unpatch()
+        self.assertEqual(r.status_code, 200, r.text)
+        research = r.json()["research"]
+        self.assertIsNotNone(research)
+        self.assertEqual(research["value_prop"], "residency by investment")
+        self.assertEqual(research["audience"], "HNW investors")
+        self.assertEqual(research["tone"], "aspirational")
+        self.assertIn("trusted program", research["claim_hints"])
+        self.assertIn("HNW investors", research["suggested_audiences"])
+
     def test_refuses_without_ownership_confirmation(self):
         r = self.client.post("/api/creative/brand-kit", json={
             "url": "https://www.notmine.example.com/", "account_id": "acc-x",
