@@ -213,6 +213,24 @@ class RewriteRow(unittest.TestCase):
         self.assertEqual(out["rows"][1]["angle"], "urgency")
 
 
+class OnImageTextPolicyFlip(unittest.TestCase):
+    """FR1.6 / NFR-C1 — the prompt builder reads spec.policy; a fixture flip
+    changes the emitted instruction with ZERO code change. (Migrated here from
+    test_demand_gen_draft.py when the legacy DG draft route was deleted, 16.8.)"""
+
+    def test_flip_rda_forbid_to_allow_changes_instruction(self):
+        import dataclasses
+        rda = cs.get("rda")
+        self.assertEqual(rda.policy.on_image_text, "forbid")
+        forbid_line = cs.on_image_text_instruction(rda)
+        allow_rda = dataclasses.replace(
+            rda, policy=dataclasses.replace(rda.policy, on_image_text="allow_warned"))
+        allow_line = cs.on_image_text_instruction(allow_rda)
+        self.assertNotEqual(forbid_line, allow_line)
+        self.assertIn("OUT of generated images", forbid_line)
+        self.assertIn("WARNED", allow_line)
+
+
 class CopyJobLifecycle(unittest.TestCase):
     def test_run_job_draft_persists_rows(self):
         import app.services.agent as agent_mod

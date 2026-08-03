@@ -125,6 +125,14 @@ register_scan_file(_BACKEND / "app" / "services" / "creative_copy.py", "py", 0)
 # set, so it stays literal-free under the scan. ──
 register_scan_file(_BACKEND / "app" / "services" / "near_dup.py", "py", 0)
 
+# ── Story 16.8 — the legacy per-type draft-copy shims are DELETED (strangler step
+# 5 complete); both wizards draft through the unified copy-jobs contract. Tombstone
+# the shim identifiers so they cannot be resurrected in their router files. ──
+register_tombstone("DGDraftRequest", _ROUTERS / "demand_gen.py", "py")
+register_tombstone("_dg_draft_prompt", _ROUTERS / "demand_gen.py", "py")
+register_tombstone("PMaxDraftRequest", _ROUTERS / "pmax.py", "py")
+register_tombstone("_pmax_draft_prompt", _ROUTERS / "pmax.py", "py")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2

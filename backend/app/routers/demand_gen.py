@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.services import creative_specs
 from google_ads.services.campaign.demand_gen_orchestrator import (
     ApiCtx,
     DemandGenAdUpdateError,
@@ -188,131 +187,13 @@ async def create_demand_gen(
         )
 
 
-# ── Assisted copy drafting (mirrors app/routers/pmax.py::draft-copy) ──────
-#
-# The DG wizard's assisted flow drafts business_name + headlines + descriptions
-# from the campaign brief + landing page through the SAME pipeline PMax uses
-# (`stream_agent_response` with the creative_director role, no Google Ads
-# tools). It differs from PMax only in the OUTPUT shape: Demand Gen has NO long
-# headlines and DOES carry a business_name, and its hard limits are DG's
-# (headlines ≤5/≤40c, descriptions ≤5/≤90c, business_name ≤25c) — so a draft
-# can never exceed what `_validate_bundle` will later accept.
-#
-# Same job+poll shape as PMax: a single 1-3 min HTTP request kept dying when the
-# Vite dev proxy or either server blipped mid-draft, so the wizard POLLS. The
-# in-memory store is fine — drafts are ephemeral and single-process.
-
-
-class DGDraftRequest(BaseModel):
-    brief: str = ""
-    final_url: str = ""
-    business_name: str = ""
-    campaign_name: str = ""
-
-
-class DGDraftResponse(BaseModel):
-    business_name: str
-    headlines: List[str]
-    descriptions: List[str]
-
-
-# Draft clamps + prompt limits are derived from the Creative Spec Registry
-# (creative_specs.get("demand_gen")) — no local limit table (Epic 14, fence F1),
-# so the prompt can never promise a number the validator would reject. Draft jobs
-# are `creative_jobs` DB rows (story 15.3, fence F6) — no in-memory store — so a
-# restart yields a recoverable `interrupted` status, never a lost job.
-
-
-def _dg_draft_prompt(body: "DGDraftRequest", spec) -> str:
-    """Thin shim over ``creative_copy.build_draft_prompt`` (Epic 16, story 16.1).
-
-    The unified drafting prompt now lives in ``creative_copy`` (routers are thin);
-    this delegates so the DG draft route + its prompt tests keep passing until the
-    route is deleted at the P2 exit (16.8). HARD-LIMITS / deliberate-length still
-    derive from ``spec``."""
-    from app.services import creative_copy
-
-    return creative_copy.build_draft_prompt(
-        "demand_gen", brief=body.brief, final_url=body.final_url,
-        business_name=body.business_name, campaign_name=body.campaign_name, spec=spec,
-    )
-
-
-async def _run_dg_draft_job(job_id: str, account_id: str, body: DGDraftRequest) -> None:
-    from app.services import creative_copy
-    try:
-        result = await _draft_dg_copy_inner(account_id, body)
-        await creative_copy.complete_job(job_id, result.model_dump())
-    except HTTPException as e:
-        detail = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
-        await creative_copy.fail_job(job_id, detail.get("message", "draft failed"))
-    except Exception as e:
-        logger.exception("Demand Gen draft job %s failed", job_id)
-        await creative_copy.fail_job(job_id, str(e)[:300])
-
-
-@router.post("/accounts/{account_id}/demand-gen/draft-copy")
-async def start_draft_demand_gen_copy(account_id: str, body: DGDraftRequest) -> Dict[str, str]:
-    """Start a Creative Director draft job; poll GET .../demand-gen/draft-copy/{id}."""
-    import asyncio
-
-    from app.services import creative_copy
-
-    job_id = await creative_copy.create_job("draft", account_id, "demand_gen", body.model_dump())
-    asyncio.create_task(_run_dg_draft_job(job_id, account_id, body))
-    return {"draft_id": job_id, "status": "running"}
-
-
-@router.get("/demand-gen/draft-copy/{draft_id}")
-async def get_draft_demand_gen_copy(draft_id: str) -> Dict[str, Any]:
-    from app.services import creative_copy
-
-    job = await creative_copy.get_job(draft_id)
-    if not job:
-        return {"status": "error", "message": "unknown draft id — start a new draft"}
-    return job
-
-
-async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraftResponse:
-    """Draft Demand Gen text assets — thin shim over the unified copy contract
-    (Epic 16, story 16.1). ``creative_copy.draft_copy`` produces angle-tagged
-    ``[{text, angle, tier}]`` rows; this shim maps them back to DG's legacy
-    ``{business_name, headlines, descriptions}`` shape and re-enforces DG's count
-    minimums (too few valid lines → 502 so the operator regenerates). Deleted at
-    the P2 exit (16.8) once the wizard is on copy-jobs."""
-    from app.services import creative_copy
-
-    spec = creative_specs.get("demand_gen")
-    try:
-        result = await creative_copy.draft_copy(
-            account_id, "demand_gen",
-            brief=body.brief, final_url=body.final_url,
-            business_name=body.business_name, campaign_name=body.campaign_name,
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=502,
-            detail={"error": "DRAFT_FAILED", "message": str(e)},
-        )
-
-    legacy = creative_copy.rows_to_legacy(result["rows"])
-    clamps = creative_specs.draft_clamps(spec)
-    out: Dict[str, List[str]] = {}
-    for field in ("headlines", "descriptions"):
-        min_n, max_n, _ = clamps[field]
-        out[field] = legacy[field][:max_n]
-        if len(out[field]) < min_n:
-            raise HTTPException(
-                status_code=502,
-                detail={
-                    "error": "DRAFT_FAILED",
-                    "message": f"Draft produced too few valid {field} "
-                               f"({len(out[field])}/{min_n}) — try again.",
-                },
-            )
-
-    bn = (result.get("business_name") or (body.business_name or "").strip())[:spec.business_name_max]
-    return DGDraftResponse(business_name=bn, **out)
+# ── Legacy assisted-copy draft route: DELETED at the P2 exit (story 16.8). ──
+# The DG wizard now drafts through the unified copy-jobs contract
+# (POST /api/accounts/{id}/creative/copy-jobs → creative_copy, story 16.1), which
+# returns angle-tagged [{text, angle, tier}] rows. The old
+# /demand-gen/draft-copy shim (DGDraftRequest/Response, _dg_draft_prompt,
+# start/get routes, _draft_dg_copy_inner) is gone — strangler step 5 complete.
+# Prompt/parse/draft coverage lives in test_creative_copy.py.
 
 
 class DemandGenAdOption(BaseModel):
