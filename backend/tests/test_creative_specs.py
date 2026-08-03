@@ -133,11 +133,13 @@ def test_geometry_is_identity_not_copy():
     assert sq.geometry is IMAGE_SLOT_SPECS["square"]
 
 
-def test_geometry_none_for_slot_absent_until_p3():
-    # landscape_logo (4:1) is not in the crop pipeline until P3 / story 17.5.
+def test_geometry_resolves_for_landscape_logo_from_p3():
+    # landscape_logo (4:1) joined the crop pipeline in P3 / story 17.5 — its
+    # geometry now resolves BY IMPORT from creative_images.IMAGE_SLOT_SPECS
+    # (fence F2), so the registry cannot disagree with the crop math.
     ll = cs.get("pmax").logos["landscape_logo"]
-    assert ll.geometry is None
-    assert ll.aspect is None
+    assert ll.geometry == {"aspect": 4.0, "min_w": 512, "min_h": 128, "label": "4:1"}
+    assert ll.aspect == 4.0
 
 
 # ── fence F4 — frozen (mutation raises) ───────────────────────────────────────

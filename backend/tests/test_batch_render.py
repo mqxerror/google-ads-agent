@@ -277,6 +277,27 @@ class RetryPath(SchedulerBase):
             _run(br.retry_tile(batch_id, tile_id))
 
 
+class SafeZoneFlagStored(SchedulerBase):
+    def test_completed_tile_gets_safe_zone_verdict(self):
+        tracker = _Concurrency()
+
+        async def _flow():
+            res = await br.create_batch(
+                account_id="acc-sz", art_direction="subject at frame edge",
+                model="nano_banana_2",
+                slots=[{"slot": "tall_portrait", "variants": 1}])
+            with mock.patch.object(studio, "HiggsfieldClient", _fake_client(tracker)), \
+                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                await br._supervise(res["batch_id"])
+            return await br.get_batch(res["batch_id"])
+
+        view = _run(_flow())
+        tile = view["tiles"][0]
+        self.assertIsNotNone(tile["safe_zone"], "safe-zone verdict not stored at completion")
+        self.assertEqual(tile["safe_zone"]["slot"], "tall_portrait")
+        self.assertIn("tall_portrait", tile["safe_zone"]["slots"])
+
+
 class AutoAssignExactAspect(SchedulerBase):
     def test_completed_landscape_tile_crops_to_1_91_within_tolerance(self):
         from google_ads.services.campaign.creative_images import (

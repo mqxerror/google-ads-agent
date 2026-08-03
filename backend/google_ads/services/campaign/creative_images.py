@@ -56,14 +56,178 @@ MAX_GOOGLE_IMAGE_BYTES = 5 * 1024 * 1024
 # plus the optional 9:16 `tall_portrait` slot — the minimums below match both
 # PMax's PMax-image minimums AND Demand Gen's DemandGenMultiAssetAdInfo
 # minimums (they are identical for the shared four).
+#
+# `landscape_logo` (4:1) is the RDA landscape-logo geometry, pre-added in P3
+# (Epic 17.5) — when the Image Engine already touches slot plumbing — so P5's
+# RDA builder genuinely cannot need a `creative_images.py` edit (FR6.1/FR6.2:
+# after this story the module is FROZEN, and the P5 exit gate diffs it for zero
+# changes). The `creative_specs.py` registry composes its geometry BY IMPORT
+# from this dict (fence F2), so adding the key here flows to `GET /specs`
+# automatically.
 IMAGE_SLOT_SPECS = {
-    "logos":         {"aspect": 1.0,    "min_w": 128, "min_h": 128,  "label": "1:1"},
-    "landscape":     {"aspect": 1.91,   "min_w": 600, "min_h": 314,  "label": "1.91:1"},
-    "square":        {"aspect": 1.0,    "min_w": 300, "min_h": 300,  "label": "1:1"},
-    "portrait":      {"aspect": 0.8,    "min_w": 480, "min_h": 600,  "label": "4:5"},
-    "tall_portrait": {"aspect": 0.5625, "min_w": 600, "min_h": 1067, "label": "9:16"},
+    "logos":          {"aspect": 1.0,    "min_w": 128, "min_h": 128,  "label": "1:1"},
+    "landscape":      {"aspect": 1.91,   "min_w": 600, "min_h": 314,  "label": "1.91:1"},
+    "square":         {"aspect": 1.0,    "min_w": 300, "min_h": 300,  "label": "1:1"},
+    "portrait":       {"aspect": 0.8,    "min_w": 480, "min_h": 600,  "label": "4:5"},
+    "tall_portrait":  {"aspect": 0.5625, "min_w": 600, "min_h": 1067, "label": "9:16"},
+    "landscape_logo": {"aspect": 4.0,    "min_w": 512, "min_h": 128,  "label": "4:1"},
 }
 ASPECT_TOLERANCE = 0.01  # Google allows ±1% off the exact ratio
+
+
+# ── Safe-zone heuristic v1 (FR2.5, D1) ─────────────────────────────────────
+#
+# "Subject will be cut" flags, computed FREE and LOCALLY — pure Pillow + stdlib,
+# ZERO network and ZERO vision-model calls (the spy AC). The detector is one
+# function behind a stable signature so the deferred vision model can drop in
+# without touching a single caller (Risk R5). The flag is ADVISORY: the
+# SlotThumb crop preview stays the human-verifiable truth beside it, and submit
+# is NEVER blocked.
+
+# Google overlays UI (CTA, headline) on the outer band of a served image; the
+# central 80% is the reliable "safe zone" (research #9). A subject that spills
+# outside it risks being covered or cropped — highest signal on the 9:16 slot.
+SAFE_ZONE_FRACTION = 0.80
+
+
+def subject_bbox(img) -> tuple[float, float, float, float]:
+    """Estimate the subject's bounding box as normalized ``(x0, y0, x1, y1)`` in
+    ``[0, 1]`` — a cheap, deterministic edge-energy heuristic (D1's accepted
+    ceiling), NOT a saliency/vision model.
+
+    Pipeline (architecture AD-3): grayscale → ``ImageFilter.FIND_EDGES`` → mean
+    energy per 8×8-pixel block → threshold at ``mean + 1σ`` → bounding box of the
+    LARGEST 4-connected region of above-threshold blocks → pad 4%. When no block
+    clears the threshold (a near-featureless frame) the whole frame is returned
+    (advisory over-flag, never a silent miss)."""
+    from PIL import Image, ImageFilter  # local import — keeps module import light
+
+    g = img.convert("L")
+    w, h = g.size
+    if not w or not h:
+        return (0.0, 0.0, 1.0, 1.0)
+
+    edges = g.filter(ImageFilter.FIND_EDGES)
+    block = 8
+    cols = max(1, w // block)
+    rows = max(1, h // block)
+    # BOX-resample the edge map to one cell per 8×8 block = mean block energy.
+    small = edges.resize((cols, rows), Image.BOX)
+    energy = list(small.tobytes())  # mode 'L' → one byte per cell, row-major
+    n = len(energy)
+    mean = sum(energy) / n
+    var = sum((e - mean) ** 2 for e in energy) / n
+    sd = var ** 0.5
+    threshold = mean + sd
+
+    hot = [e > threshold for e in energy]
+    if not any(hot):
+        return (0.0, 0.0, 1.0, 1.0)
+
+    # Largest 4-connected region of hot cells (iterative flood fill).
+    seen = [False] * n
+    best: list[int] = []
+    for start in range(n):
+        if not hot[start] or seen[start]:
+            continue
+        stack = [start]
+        seen[start] = True
+        region: list[int] = []
+        while stack:
+            idx = stack.pop()
+            region.append(idx)
+            r, c = divmod(idx, cols)
+            for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
+                if 0 <= nr < rows and 0 <= nc < cols:
+                    nidx = nr * cols + nc
+                    if hot[nidx] and not seen[nidx]:
+                        seen[nidx] = True
+                        stack.append(nidx)
+        if len(region) > len(best):
+            best = region
+
+    r_vals = [idx // cols for idx in best]
+    c_vals = [idx % cols for idx in best]
+    # Block indices → normalized coords (block c spans [c/cols, (c+1)/cols]).
+    x0 = min(c_vals) / cols
+    x1 = (max(c_vals) + 1) / cols
+    y0 = min(r_vals) / rows
+    y1 = (max(r_vals) + 1) / rows
+    pad = 0.04
+    return (
+        max(0.0, x0 - pad), max(0.0, y0 - pad),
+        min(1.0, x1 + pad), min(1.0, y1 + pad),
+    )
+
+
+def crop_survival(img, target_aspect: float, *, bbox=None) -> dict:
+    """Does the subject survive the center-crop to ``target_aspect`` (w/h)?
+
+    Computes the exact-aspect center-crop window, shrinks it to its central 80%
+    (the Google safe zone), and measures the fraction of the subject bbox AREA
+    that lands inside. Returns ``{"flagged", "survival", "bbox", "aspect"}`` —
+    ``flagged`` is True (advisory "subject will be cut") when <80% survives. Pure
+    arithmetic; no image is re-encoded."""
+    if bbox is None:
+        bbox = subject_bbox(img)
+    x0, y0, x1, y1 = bbox
+    w, h = img.size
+    src_aspect = (w / h) if h else target_aspect
+
+    # Center-crop window in normalized source coords at target_aspect.
+    if src_aspect > target_aspect:                 # too wide → trim left/right
+        keep = target_aspect / src_aspect
+        cx0, cx1 = (1 - keep) / 2, (1 + keep) / 2
+        cy0, cy1 = 0.0, 1.0
+    else:                                          # too tall → trim top/bottom
+        keep = src_aspect / target_aspect
+        cy0, cy1 = (1 - keep) / 2, (1 + keep) / 2
+        cx0, cx1 = 0.0, 1.0
+
+    def _central(a0: float, a1: float) -> tuple[float, float]:
+        c = (a0 + a1) / 2
+        half = (a1 - a0) * SAFE_ZONE_FRACTION / 2
+        return c - half, c + half
+
+    sx0, sx1 = _central(cx0, cx1)
+    sy0, sy1 = _central(cy0, cy1)
+
+    inter = max(0.0, min(x1, sx1) - max(x0, sx0)) * max(0.0, min(y1, sy1) - max(y0, sy0))
+    bbox_area = max(1e-9, (x1 - x0) * (y1 - y0))
+    survival = inter / bbox_area
+    return {
+        "flagged": survival < SAFE_ZONE_FRACTION,
+        "survival": round(survival, 4),
+        "bbox": [round(v, 4) for v in bbox],
+        "aspect": target_aspect,
+    }
+
+
+def safe_zone_for_slot(path: "Path", slot: str) -> dict:
+    """Open a rendered tile once and compute its safe-zone verdict for ``slot``.
+
+    The batch renderer calls this at tile completion (FR2.5). Returns a
+    JSON-able dict ``{"slot", "bbox", "slots": {slot: {flagged, survival}}}`` so
+    the UI can render a per-slot amber chip. Never raises — a decode failure
+    yields an empty (unflagged) verdict so a batch tile is never lost to an
+    advisory check."""
+    from PIL import Image
+
+    spec = IMAGE_SLOT_SPECS.get(slot)
+    if spec is None:
+        return {"slot": slot, "bbox": None, "slots": {}}
+    try:
+        with Image.open(path) as opened:
+            opened.load()
+            bbox = subject_bbox(opened)
+            verdict = crop_survival(opened, spec["aspect"], bbox=bbox)
+    except Exception:
+        return {"slot": slot, "bbox": None, "slots": {}}
+    return {
+        "slot": slot,
+        "bbox": verdict["bbox"],
+        "slots": {slot: {"flagged": verdict["flagged"], "survival": verdict["survival"]}},
+    }
 
 
 def is_google_asset_ref(ref: str) -> bool:

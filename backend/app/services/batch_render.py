@@ -244,10 +244,38 @@ async def _render_tile(
 
 async def _post_complete(batch: dict[str, Any], row: dict[str, Any]) -> None:
     """Per-tile completion hook — one seam so every mode/flag plugs in without
-    touching the scheduler. 17.2: the with_logo compositor (policy-gated). 17.5
-    adds the safe-zone flag write beside it."""
+    touching the scheduler. 17.5: the free + local safe-zone flag. 17.2: the
+    with_logo compositor (policy-gated)."""
+    await _store_safe_zone(row)
     if (batch.get("mode") == "with_logo") and batch.get("logo_asset_id"):
         await _apply_logo(batch, row)
+
+
+async def _store_safe_zone(row: dict[str, Any]) -> None:
+    """Compute the advisory "subject will be cut" verdict for this tile's slot
+    (free, local, zero network) and store it on the row (FR2.5). Never raises —
+    an advisory check must never lose a completed tile."""
+    slot = row.get("slot")
+    if not slot:
+        return
+    from google_ads.services.campaign.creative_images import (
+        locate_local_image, safe_zone_for_slot,
+    )
+
+    try:
+        path, _mime = await locate_local_image(row["id"])
+    except LookupError:
+        return
+    verdict = safe_zone_for_slot(path, slot)
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE ad_assets SET safe_zone_json=? WHERE id=?",
+            (json.dumps(verdict), row["id"]),
+        )
+        await db.commit()
+    finally:
+        await db.close()
 
 
 def _logo_overlay_policy(campaign_type: str) -> str:
