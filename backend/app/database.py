@@ -1240,7 +1240,75 @@ async def init_db() -> None:
             await db.commit()
             logger.info("V26 migration complete (pause_confirmation_grants — pause protection).")
 
-        if version >= 26:
-            logger.info("Database schema is V26 (up to date).")
+        # V27: Draft persistence (Unified Creative Engine, Epic 15 / AD-5).
+        #
+        # Two tables give draft state a durable home so nothing lives in process
+        # memory (fence F6). `creative_drafts` = named, per-account draft bundles
+        # (a second draft can never destroy the first because names are ROWS, not
+        # a singleton key — FR4.1/FR4.2, D4). `creative_jobs` = the DB-row job
+        # store that replaces the in-memory `_dg_draft_jobs` / `_draft_jobs`
+        # dicts (FR4.3, NFR-R1) — a draft/rewrite/diversify job is a row from
+        # birth, so a backend restart yields a recoverable `interrupted` status,
+        # never a 404. The `running → interrupted` sweep runs at every app
+        # startup (app lifespan, NOT this migration — it must fire every boot).
+        if version < 27:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS creative_drafts (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    campaign_type TEXT NOT NULL,      -- pmax | demand_gen | rda
+                    name TEXT NOT NULL,
+                    bundle_json TEXT NOT NULL,         -- the wizard bundle (create-API shape)
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(account_id, campaign_type, name)
+                );
+                CREATE INDEX IF NOT EXISTS idx_creative_drafts_scope
+                    ON creative_drafts(account_id, campaign_type, updated_at DESC);
+
+                CREATE TABLE IF NOT EXISTS creative_jobs (
+                    id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL,                -- draft | rewrite_row | diversify
+                    account_id TEXT NOT NULL,
+                    campaign_type TEXT NOT NULL,       -- pmax | demand_gen | rda
+                    status TEXT NOT NULL DEFAULT 'running', -- running|done|error|interrupted
+                    request_json TEXT,                 -- the originating request (one-click re-run)
+                    result_json TEXT,                  -- the completed result payload
+                    error_message TEXT,
+                    research_hash TEXT,                -- shared research object identity (Epic 18)
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_creative_jobs_status
+                    ON creative_jobs(status, created_at);
+            """)
+            await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (27)")
+            await db.commit()
+            logger.info("V27 migration complete (creative_drafts + creative_jobs — draft persistence).")
+
+        if version >= 27:
+            logger.info("Database schema is V27 (up to date).")
+    finally:
+        await db.close()
+
+
+async def sweep_interrupted_creative_jobs() -> int:
+    """Boot-time sweep: any ``creative_jobs`` row left ``running`` when the
+    process died is marked ``interrupted`` (FR4.3 — a recoverable status, not a
+    404). Runs on EVERY app startup from the lifespan (NOT the migration), like
+    the workflow / chat zombie sweeps. Returns the number of rows swept.
+
+    The Claude CLI subprocess dies with the backend, so an in-flight job cannot
+    silently resume — ``interrupted`` + the persisted ``request_json`` is what
+    the wizard's one-click re-run reads (Honesty Ledger #4: restart survival is
+    NOT mid-LLM resume)."""
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "UPDATE creative_jobs SET status='interrupted', "
+            "updated_at=datetime('now') WHERE status='running'"
+        )
+        await db.commit()
+        return cur.rowcount if cur.rowcount is not None else 0
     finally:
         await db.close()

@@ -21,6 +21,11 @@ async def lifespan(app: FastAPI):
     """
     async with mcp_lifespan(app):
         await init_db()
+        # Draft persistence (Epic 15 / FR4.3): mark any creative_jobs left
+        # 'running' by a killed process as 'interrupted' so the wizard offers a
+        # one-click re-run instead of a 404. Runs every boot (not the migration).
+        from app.database import sweep_interrupted_creative_jobs
+        await sweep_interrupted_creative_jobs()
         # Apply DB overrides to runtime settings so MCP toggles persist across restarts
         from app.routers.settings import load_settings_overrides
         await load_settings_overrides()
