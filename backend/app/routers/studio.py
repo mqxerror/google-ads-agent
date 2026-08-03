@@ -702,6 +702,7 @@ async def _run_image_job(
     aspect_ratio: str,
     soul_id: Optional[str],
     reference_asset_ids: Optional[list[str]] = None,
+    reattach_job_id: Optional[str] = None,
 ) -> None:
     """Background task: submit higgsfield, download result, update row.
 
@@ -737,13 +738,19 @@ async def _run_image_job(
                 return
 
         try:
-            result = await client.submit_image(
-                model=model,
-                prompt=prompt,
-                aspect_ratio=aspect_ratio,
-                **({"soul_id": soul_id} if soul_id else {}),
-                **({"image": reference_upload_ids} if reference_upload_ids else {}),
-            )
+            if reattach_job_id:
+                # Restart-recovery (17.4): the job was already submitted before
+                # the process died — re-poll it instead of re-submitting, so a
+                # mid-flight tile costs ZERO extra credits.
+                result = await client.wait_for_job(job_id=reattach_job_id)
+            else:
+                result = await client.submit_image(
+                    model=model,
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio,
+                    **({"soul_id": soul_id} if soul_id else {}),
+                    **({"image": reference_upload_ids} if reference_upload_ids else {}),
+                )
         except HiggsfieldError as e:
             await _update_asset_status(
                 asset_id, status="failed" if e.code != "nsfw" else "nsfw",

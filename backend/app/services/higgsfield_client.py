@@ -181,6 +181,39 @@ class HiggsfieldClient:
         share code). Slice S4 wires the video model picker."""
         return await self.submit_image(model=model, prompt=prompt, **params)
 
+    async def wait_for_job(self, *, job_id: str) -> dict[str, Any]:
+        """Reattach to an ALREADY-SUBMITTED job and wait for its result via
+        ``higgsfield --json generate wait <job_id>``. Returns the same shape as
+        ``submit_image``.
+
+        Used by batch restart-recovery (story 17.4): a tile that was mid-flight
+        when the process died can be finished WITHOUT re-submitting — no extra
+        Higgsfield credits. Raises ``HiggsfieldError`` when the job id is unknown
+        / expired (the caller lands the tile in ``failed`` and the operator can
+        retry) — so a stale reattach costs nothing."""
+        argv = _build_wait_argv(job_id)
+        try:
+            stdout, stderr, code = await asyncio.wait_for(
+                _run_cli(argv), timeout=self._timeout_s,
+            )
+        except asyncio.TimeoutError as e:
+            raise HiggsfieldError(
+                message=f"reattach to job {job_id} timed out", code="run",
+            ) from e
+        if code != 0:
+            err = (stderr or stdout or "").strip()
+            raise HiggsfieldError(
+                message=_summarize_cli_error(err) or f"reattach to job {job_id} failed",
+                code=_classify_cli_error(err),
+            )
+        jobs = _parse_envelope(stdout)
+        url = _first_raw_url(jobs)
+        if not url:
+            raise HiggsfieldError(
+                message=f"no result_url when reattaching to job {job_id}", code="shape",
+            )
+        return {"image_url": url, "raw": jobs}
+
     async def estimate_cost(
         self, *, model: str, prompt: str, **params: Any,
     ) -> dict[str, Any]:

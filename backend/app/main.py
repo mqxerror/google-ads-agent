@@ -26,6 +26,12 @@ async def lifespan(app: FastAPI):
         # one-click re-run instead of a 404. Runs every boot (not the migration).
         from app.database import sweep_interrupted_creative_jobs
         await sweep_interrupted_creative_jobs()
+        # Image Engine (Epic 17 / FR2.4, NFR-Q1): respawn a supervisor for every
+        # creative_batches row left 'running' by a killed process — from DB state
+        # alone. Completed tiles are never re-rendered; running-with-a-job-id
+        # tiles reattach; the rest re-enqueue. Runs every boot (not the migration).
+        from app.services.batch_render import recover_running_batches
+        await recover_running_batches()
         # Apply DB overrides to runtime settings so MCP toggles persist across restarts
         from app.routers.settings import load_settings_overrides
         await load_settings_overrides()

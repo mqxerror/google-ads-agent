@@ -400,6 +400,87 @@ async def retry_tile(batch_id: str, asset_id: str) -> dict[str, Any]:
     return {"asset_id": asset_id, "status": "pending", "retry_count": retry_count + 1}
 
 
+# ── restart recovery (17.4) ──────────────────────────────────────────────────
+
+async def recover_running_batches() -> dict[str, int]:
+    """Respawn supervisors for every batch left ``running`` when the process
+    died — from DB state ALONE (app lifespan; NOT a migration). For each such
+    batch:
+
+    * COMPLETED / failed / nsfw children are TERMINAL — never re-rendered (R2;
+      the sweep issues zero generation calls for them);
+    * a ``running`` child WITH a ``higgsfield_job_id`` re-polls via the CLI's
+      job-status reattach (no re-submit, no extra credits);
+    * a ``pending`` child, or a ``running`` child WITHOUT a job id (the common
+      case — the blocking runner writes the id only at completion), re-enqueues;
+    * a batch whose every child is already terminal is finalized
+      (``done`` / ``done_with_failures``), never left ``running``.
+
+    Returns ``{recovered, finalized}`` for the startup log. Idempotent: a second
+    call after resume is a no-op on already-finalized batches."""
+    batches = await _read_running_batches()
+    recovered = 0
+    finalized = 0
+    for batch in batches:
+        children = await _read_children(batch["id"])
+        if children and all(_is_terminal(c) for c in children):
+            await _finalize_if_done(batch["id"])
+            finalized += 1
+            continue
+        task = asyncio.create_task(_resume(batch["id"]))
+        _track(task)
+        recovered += 1
+    if recovered or finalized:
+        logger.info("batch restart-recovery: respawned %d, finalized %d",
+                    recovered, finalized)
+    return {"recovered": recovered, "finalized": finalized}
+
+
+async def _resume(batch_id: str) -> None:
+    """Recovery supervisor: route each non-terminal child (reattach vs
+    re-enqueue), leave terminal children untouched, then finalize."""
+    batch = await _read_batch(batch_id)
+    if batch is None:
+        return
+    children = await _read_children(batch_id)
+    coros = []
+    for c in children:
+        if _is_terminal(c):
+            continue  # completed/failed/nsfw — NEVER re-render (R2)
+        job_id = c.get("higgsfield_job_id")
+        if (c.get("status") == "running") and job_id:
+            coros.append(_render_tile(batch, c, reattach_job_id=job_id))
+        else:
+            # pending, or running-without-a-job-id → re-enqueue from scratch.
+            await _reset_to_pending(c["id"])
+            coros.append(_render_tile(batch, {**c, "status": "pending"}))
+    if coros:
+        await asyncio.gather(
+            *[asyncio.create_task(x) for x in coros], return_exceptions=True
+        )
+    await _finalize_if_done(batch_id)
+
+
+async def _reset_to_pending(asset_id: str) -> None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE ad_assets SET status='pending' WHERE id=?", (asset_id,)
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def _read_running_batches() -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT * FROM creative_batches WHERE status='running'")
+        return [dict(r) for r in await cur.fetchall()]
+    finally:
+        await db.close()
+
+
 # ── read / progress ────────────────────────────────────────────────────────
 
 def _is_terminal(child: dict[str, Any]) -> bool:
