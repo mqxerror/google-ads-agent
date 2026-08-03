@@ -37,6 +37,7 @@ import { useDemandGenRules } from '@/lib/creativeSpecs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+import DraftManager from '@/components/creative/DraftManager';
 import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
@@ -148,6 +149,16 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
+  }, []);
+
+  // Replace the whole bundle when a named draft is loaded (story 15.2) / a JSON
+  // template is imported (story 15.5). Writes through to the crash cache so a
+  // refresh right after a load keeps the loaded content.
+  const loadBundle = useCallback((next: DGBundle) => {
+    const merged: DGBundle = { ...EMPTY_BUNDLE, ...next };
+    merged.channels = { ...EMPTY_BUNDLE.channels, ...(next.channels || {}) };
+    setBundle(merged);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
   }, []);
 
   const stepId = STEPS[stepIdx].id;
@@ -307,7 +318,12 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
         {stepId === 'text'      && <StepText      bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'images'    && <StepImages    bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'channels'  && <StepChannels  bundle={bundle} setField={setField} />}
-        {stepId === 'review'    && <StepReview    bundle={bundle} submitResult={submitResult} submitting={submitting} />}
+        {stepId === 'review'    && (
+          <div className="space-y-4">
+            <DraftManager<DGBundle> accountId={accountId} campaignType="demand_gen" bundle={bundle} onLoad={loadBundle} />
+            <StepReview bundle={bundle} submitResult={submitResult} submitting={submitting} />
+          </div>
+        )}
       </div>
 
       {/* Footer nav */}

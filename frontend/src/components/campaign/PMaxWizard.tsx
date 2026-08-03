@@ -34,6 +34,7 @@ import { validatePMax, isMalformedUrl } from '@/lib/pmaxClientValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
+import DraftManager from '@/components/creative/DraftManager';
 import StudioPanel, {
   type CopyDraftResult,
   type StudioPanelContext,
@@ -134,6 +135,14 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       try { localStorage.setItem('pmax-wizard-bundle', JSON.stringify(next)); } catch {}
       return next;
     });
+  }, []);
+
+  // Replace the whole bundle when a named draft is loaded (story 15.2) / a JSON
+  // template is imported (story 15.5). Writes through to the crash cache.
+  const loadBundle = useCallback((next: PMaxBundle) => {
+    const merged: PMaxBundle = { ...EMPTY_BUNDLE, ...next };
+    setBundle(merged);
+    try { localStorage.setItem('pmax-wizard-bundle', JSON.stringify(merged)); } catch {}
   }, []);
 
   const stepId = STEPS[stepIdx].id;
@@ -321,7 +330,12 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
         {stepId === 'images'   && <StepImages   bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'videos'   && <StepVideos   bundle={bundle} setField={setField} accountId={accountId} />}
         {stepId === 'signals'  && <StepSignals  bundle={bundle} setField={setField} />}
-        {stepId === 'review'   && <StepReview   bundle={bundle} submitResult={submitResult} submitting={submitting} />}
+        {stepId === 'review'   && (
+          <div className="space-y-4">
+            <DraftManager<PMaxBundle> accountId={accountId} campaignType="pmax" bundle={bundle} onLoad={loadBundle} />
+            <StepReview bundle={bundle} submitResult={submitResult} submitting={submitting} />
+          </div>
+        )}
       </div>
 
       {/* FR1.4/FR1.3 — mirror every server rejection here so no limit is first

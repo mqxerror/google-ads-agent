@@ -175,5 +175,100 @@ class MigrationV27(unittest.TestCase):
         self.assertEqual(rows["j-done"]["status"], "done")
 
 
+class NamedDraftsCRUD(unittest.TestCase):
+    """Story 15.2 — the CRUD contract over the real HTTP surface (TestClient).
+    DATA_DIR is the module temp DB (set at import), so these hit the V27 table."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from app.main import app
+        cls.client = TestClient(app)
+
+    def _base(self, account="acc-CRUD"):
+        return f"/api/accounts/{account}/creative-drafts"
+
+    def test_create_list_get_rename_delete(self):
+        c = self.client
+        # create
+        r = c.post(self._base(), json={
+            "name": "panama-v1", "campaign_type": "pmax",
+            "bundle": {"headlines": ["Move to Panama"], "businessName": "Mercan"},
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        d = r.json()
+        did = d["id"]
+        self.assertEqual(d["name"], "panama-v1")
+        self.assertEqual(d["bundle"]["businessName"], "Mercan")
+
+        # list (filtered by type) shows it
+        r = c.get(self._base(), params={"campaign_type": "pmax"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(did, [x["id"] for x in r.json()])
+
+        # get by id round-trips the bundle
+        r = c.get(f"{self._base()}/{did}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["bundle"]["headlines"], ["Move to Panama"])
+
+        # rename
+        r = c.put(f"{self._base()}/{did}", json={"name": "panama-final"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["name"], "panama-final")
+
+        # delete
+        r = c.delete(f"{self._base()}/{did}")
+        self.assertEqual(r.status_code, 200)
+        r = c.get(f"{self._base()}/{did}")
+        self.assertEqual(r.status_code, 404)
+
+    def test_name_collision_409(self):
+        c = self.client
+        c.post(self._base(), json={"name": "dup", "campaign_type": "pmax", "bundle": {}})
+        r = c.post(self._base(), json={"name": "dup", "campaign_type": "pmax", "bundle": {}})
+        self.assertEqual(r.status_code, 409, r.text)
+
+    def test_second_draft_never_destroys_first(self):
+        """FR4.2 core: two drafts of the same type both retrievable; deleting one
+        leaves the other intact."""
+        c = self.client
+        a = c.post(self._base(), json={"name": "a", "campaign_type": "demand_gen",
+                                       "bundle": {"headlines": ["A"]}}).json()
+        b = c.post(self._base(), json={"name": "b", "campaign_type": "demand_gen",
+                                       "bundle": {"headlines": ["B"]}}).json()
+        c.delete(f"{self._base()}/{a['id']}")
+        r = c.get(f"{self._base()}/{b['id']}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["bundle"]["headlines"], ["B"])
+
+    def test_account_scoping(self):
+        """A draft saved under account A is invisible to account B (D4)."""
+        c = self.client
+        made = c.post(self._base("acc-A"), json={"name": "scoped", "campaign_type": "pmax",
+                                                  "bundle": {}}).json()
+        r = c.get(self._base("acc-B"))
+        self.assertNotIn(made["id"], [x["id"] for x in r.json()])
+        # and B cannot fetch A's draft by id
+        r = c.get(f"{self._base('acc-B')}/{made['id']}")
+        self.assertEqual(r.status_code, 404)
+
+    def test_put_revalidates_soft_limits_to_warnings(self):
+        """PUT re-validates against the registry; over-limit is advisory (never
+        blocks the save)."""
+        c = self.client
+        d = c.post(self._base(), json={"name": "warn", "campaign_type": "pmax",
+                                       "bundle": {}}).json()
+        r = c.put(f"{self._base()}/{d['id']}", json={
+            "bundle": {"businessName": "z" * 40},  # over the 25-char cap
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(any("business_name" in w for w in r.json()["warnings"]))
+
+    def test_bad_campaign_type_422(self):
+        r = self.client.post(self._base(), json={"name": "x", "campaign_type": "search",
+                                                 "bundle": {}})
+        self.assertEqual(r.status_code, 422)
+
+
 if __name__ == "__main__":
     unittest.main()

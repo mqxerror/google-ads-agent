@@ -558,6 +558,72 @@ def deliberate_length_note(spec: CampaignSpec, field: str = "headlines") -> str:
             f"fuller, specific message — do NOT pad or repeat words just to fill it.")
 
 
+def _clean_text_list(lst: Any) -> List[str]:
+    return [s for s in (lst or []) if isinstance(s, str) and s.strip()]
+
+
+def _normalize_draft_bundle(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Map a WIZARD bundle onto the registry validators' expected keys (story
+    15.2 PUT re-validation).
+
+    The wizards persist camelCase, flat image slots, and a singular ``finalUrl``;
+    the validators read snake_case, a nested ``marketing_images`` dict, and a
+    ``final_urls`` list. This is best-effort — a draft may be incomplete, so a
+    missing field just yields an empty value rather than raising. Empty text rows
+    are dropped so a placeholder blank row never reads as "empty" noise."""
+    marketing = raw.get("marketing_images")
+    if not isinstance(marketing, dict):
+        marketing = {
+            "landscape": raw.get("landscape") or [],
+            "square": raw.get("square") or [],
+            "portrait": raw.get("portrait") or [],
+            "tall_portrait": raw.get("tallPortrait") or raw.get("tall_portrait") or [],
+        }
+    final_urls = raw.get("final_urls")
+    if not final_urls:
+        fu = raw.get("finalUrl") or raw.get("final_url")
+        final_urls = [fu] if fu else []
+    audience = (
+        raw.get("audience_signals")
+        or raw.get("audienceSignals")
+        or raw.get("searchThemes")
+    )
+    return {
+        "headlines": _clean_text_list(raw.get("headlines")),
+        "long_headlines": _clean_text_list(raw.get("long_headlines") or raw.get("longHeadlines")),
+        "descriptions": _clean_text_list(raw.get("descriptions")),
+        "business_name": raw.get("business_name") or raw.get("businessName"),
+        "final_urls": final_urls,
+        "logos": raw.get("logos") or [],
+        "marketing_images": marketing,
+        "audience_signals": audience,
+    }
+
+
+def validate_draft_bundle(raw_bundle: Dict[str, Any], campaign_type: str) -> List[str]:
+    """Re-validate a saved draft against the registry (story 15.2 PUT AC).
+
+    A draft is work-in-progress, so NOTHING blocks the save — every registry
+    finding is returned as an advisory warning (soft limits per FR1.3, plus
+    over-limit / still-incomplete notes) so the operator sees them before the
+    real create ever runs. All numbers come from the passed spec (no literals)."""
+    try:
+        spec = get(campaign_type)
+    except KeyError:
+        return [f"unknown campaign_type {campaign_type!r}"]
+    bundle = _normalize_draft_bundle(raw_bundle)
+    report = ValidationReport()
+    check_text_fields(bundle, spec, report)
+    check_short_description(bundle, spec, report)
+    check_business_name(bundle, spec, report, required=False)
+    check_image_caps(bundle, spec, report)
+    check_search_themes(bundle, spec, report)
+    if bundle.get("final_urls"):
+        check_final_urls(bundle, spec, report)
+    # Draft save is never blocked: fold both channels into one advisory list.
+    return report.errors + report.warnings
+
+
 def on_image_text_instruction(spec: CampaignSpec) -> str:
     """Policy-driven on-image-text guidance (FR1.6/D3, NFR-C1). The campaign type
     never appears as a branch — only the registry knob does, so flipping the
