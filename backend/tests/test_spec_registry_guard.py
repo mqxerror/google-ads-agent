@@ -130,6 +130,12 @@ register_scan_file(_BACKEND / "app" / "services" / "near_dup.py", "py", 0)
 # the sentinel scan the moment it owns that enforcement (14.2's accretion). ──
 register_scan_file(_BACKEND / "app" / "services" / "batch_render.py", "py", 0)
 
+# ── Story 18.1 — brand_kit.py extraction module. Its scraper knobs (stylesheet
+# sub-fetch cap, color/claim/hero caps) are NOT creative limits (none is in the
+# sentinel set); image min-size floors are IMPORTED from creative_images, never
+# baked. It joins the sentinel scan as an enforcement file the moment it exists. ──
+register_scan_file(_BACKEND / "app" / "services" / "brand_kit.py", "py", 0)
+
 # ── Story 17.6 — SmartAspectSet.tsx reads the tile cap from
 # specs.engine.batch_tile_cap (no baked literal); the preflight rejects over-cap
 # client-side with the cap NAMED. It joins the sentinel scan as the batch UI. ──

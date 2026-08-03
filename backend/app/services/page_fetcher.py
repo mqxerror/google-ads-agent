@@ -45,6 +45,13 @@ class FetchedPage:
     h1: str | None
     body_excerpt: str
     status: int
+    # The decoded HTML of the SAME response body the signals were parsed from.
+    # Carried so a second consumer (the brand-kit extractor, Epic 18) can
+    # re-parse the identical bytes with BeautifulSoup WITHOUT a second HTML
+    # document fetch — this field is the "one fetch, two consumers" contract
+    # (architecture AD-4 / FR3.3). Defaults to "" so pre-Epic-18 call sites and
+    # synthesized page dicts (extract-brief's context mode) stay valid.
+    raw_html: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -200,4 +207,5 @@ async def fetch(url: str) -> FetchedPage:
         h1=h1,
         body_excerpt=excerpt,
         status=r.status_code,
+        raw_html=html_text,
     )
