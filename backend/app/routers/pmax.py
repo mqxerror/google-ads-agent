@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.services import creative_specs
 from google_ads.services.campaign.pmax_orchestrator import (
     ApiCtx,
     PMaxOrchestrator,
@@ -94,12 +95,30 @@ class PMaxDraftResponse(BaseModel):
     descriptions: List[str]
 
 
-# Google's hard limits, enforced server-side on whatever the model returns.
-_DRAFT_LIMITS = {
-    "headlines": (3, 15, 30),
-    "long_headlines": (1, 5, 90),
-    "descriptions": (2, 5, 90),
-}
+# Draft clamps + prompt limits are derived from the Creative Spec Registry
+# (creative_specs.get("pmax")) — no local limit table (Epic 14, fence F1).
+
+
+def _pmax_draft_prompt(body: "PMaxDraftRequest", spec) -> str:
+    """Build the Creative Director draft prompt from the registry spec (FR1.5).
+
+    Pure + module-level for snapshot testing; the HARD-LIMITS block derives from
+    ``spec`` so the prompt can never promise a cap the validator would reject."""
+    return (
+        "Draft Performance Max ad copy for this campaign. First fetch the "
+        "landing page to ground every claim — never invent offers or numbers.\n\n"
+        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
+        f"Business name: {body.business_name or '-'}\n"
+        f"Campaign name: {body.campaign_name or '-'}\n"
+        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
+        f"{creative_specs.hard_limits_prompt(spec)} No em dashes. No third-party "
+        "brand names. Vary the angles: benefit, urgency, social proof, "
+        "question, specificity.\n\n"
+        "Respond with ONLY this JSON, no prose:\n"
+        '{"headlines": [several distinct strings], '
+        '"long_headlines": [several distinct strings], '
+        '"descriptions": [several distinct strings]}'
+    )
 
 
 # Draft jobs run in the background and the wizard POLLS for the result —
@@ -151,22 +170,8 @@ async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMa
 
     from app.services.agent import stream_agent_response
 
-    prompt = (
-        "Draft Performance Max ad copy for this campaign. First fetch the "
-        "landing page to ground every claim — never invent offers or numbers.\n\n"
-        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
-        f"Business name: {body.business_name or '-'}\n"
-        f"Campaign name: {body.campaign_name or '-'}\n"
-        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
-        "HARD LIMITS (Google rejects violations): headlines ≤30 chars each, "
-        "long_headlines ≤90, descriptions ≤90. No em dashes. No third-party "
-        "brand names. Vary the angles: benefit, urgency, social proof, "
-        "question, specificity.\n\n"
-        "Respond with ONLY this JSON, no prose:\n"
-        '{"headlines": [8-12 strings ≤30 chars], '
-        '"long_headlines": [3-5 strings ≤90 chars], '
-        '"descriptions": [4-5 strings ≤90 chars]}'
-    )
+    spec = creative_specs.get("pmax")
+    prompt = _pmax_draft_prompt(body, spec)
 
     parts: list[str] = []
     async for ev in stream_agent_response(
@@ -194,7 +199,9 @@ async def _draft_pmax_copy_inner(account_id: str, body: PMaxDraftRequest) -> PMa
         )
 
     out: Dict[str, List[str]] = {}
-    for field, (min_n, max_n, max_chars) in _DRAFT_LIMITS.items():
+    clamps = creative_specs.draft_clamps(spec)
+    for field in ("headlines", "long_headlines", "descriptions"):
+        min_n, max_n, max_chars = clamps[field]
         items = [
             s.strip() for s in (parsed.get(field) or [])
             if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars

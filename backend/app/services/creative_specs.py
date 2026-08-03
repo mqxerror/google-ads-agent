@@ -526,3 +526,44 @@ def check_final_urls(bundle: Dict[str, Any], spec: CampaignSpec,
             report.errors.append(
                 f"final URL is {len(str(u))} chars (max {spec.final_url_max})"
             )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Drafting — clamp tuples + prompt blocks derived from the SAME spec, so a
+# drafter prompt can never promise a number the validator would reject (AD-1,
+# FR1.5/FR1.6). Used by the draft routes now; by creative_copy.py in Epic 16.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def draft_clamps(spec: CampaignSpec) -> Dict[str, Tuple[int, int, int]]:
+    """``{field: (min_count, max_count, max_chars)}`` for server-side draft
+    clamping — the exact numbers the validator enforces (one source)."""
+    return {name: (fs.min_count, fs.max_count, fs.max_chars)
+            for name, fs in spec.text.items()}
+
+
+def hard_limits_prompt(spec: CampaignSpec) -> str:
+    """The 'HARD LIMITS' prompt line, built from ``spec.text`` so the prompt can
+    never promise a different char cap than the validator enforces (FR1.5)."""
+    parts = [f"{name} ≤{fs.max_chars} chars each" for name, fs in spec.text.items()]
+    return ("HARD LIMITS (Google rejects violations): " + ", ".join(parts)
+            + f". business_name ≤{spec.business_name_max} chars.")
+
+
+def deliberate_length_note(spec: CampaignSpec, field: str = "headlines") -> str:
+    """FR1.5: tell the drafter to USE the (raised) char budget deliberately, not
+    pad. Reads the cap from the registry — no literal — so the note tracks the
+    real limit (e.g. DG headlines at 40)."""
+    cap = spec.text[field].max_chars
+    return (f"Use the full {cap}-char {field.rstrip('s')} budget DELIBERATELY for a "
+            f"fuller, specific message — do NOT pad or repeat words just to fill it.")
+
+
+def on_image_text_instruction(spec: CampaignSpec) -> str:
+    """Policy-driven on-image-text guidance (FR1.6/D3, NFR-C1). The campaign type
+    never appears as a branch — only the registry knob does, so flipping the
+    knob in a fixture changes the emitted prompt with zero code diff."""
+    if spec.policy.on_image_text == "forbid":
+        return ("Keep ALL text OUT of generated images — no overlaid words, "
+                "captions, or logos baked into the photo.")
+    return ("Text on images is permitted but will be WARNED and may be discounted "
+            "— use it sparingly and only when it adds real value.")

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.services import creative_specs
 from google_ads.services.campaign.demand_gen_orchestrator import (
     ApiCtx,
     DemandGenAdUpdateError,
@@ -215,15 +216,39 @@ class DGDraftResponse(BaseModel):
     descriptions: List[str]
 
 
-# (min_count, max_count, max_chars) — enforced server-side on whatever the
-# model returns. Mirrors demand_gen_orchestrator._TEXT_RULES + BUSINESS_NAME_MAX.
-_DG_DRAFT_LIMITS = {
-    "headlines": (1, 5, 40),
-    "descriptions": (1, 5, 90),
-}
-_DG_BUSINESS_NAME_MAX = 25
+# Draft clamps + prompt limits are derived from the Creative Spec Registry
+# (creative_specs.get("demand_gen")) — no local limit table (Epic 14, fence F1),
+# so the prompt can never promise a number the validator would reject.
 
 _dg_draft_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+def _dg_draft_prompt(body: "DGDraftRequest", spec) -> str:
+    """Build the Creative Director draft prompt from the registry spec (FR1.5).
+
+    Pure + module-level so it can be snapshot-tested. The HARD-LIMITS block and
+    the deliberate-40-char instruction both derive from ``spec`` — flipping a
+    registry value changes the prompt with zero code change here."""
+    return (
+        "Draft Google Demand Gen ad copy for this campaign. First fetch the "
+        "landing page to ground every claim — never invent offers or numbers.\n\n"
+        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
+        f"Business name (brand): {body.business_name or '-'}\n"
+        f"Campaign name: {body.campaign_name or '-'}\n"
+        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
+        f"{creative_specs.hard_limits_prompt(spec)}\n"
+        f"{creative_specs.deliberate_length_note(spec, 'headlines')}\n"
+        "DEMAND GEN POLICY: NO prices or discounts in the copy · NO citizenship "
+        "or guaranteed-approval promises · avoid the symbols ~ | + (flagged as "
+        "gimmicky). No em dashes. No third-party brand names. Vary the angles: "
+        "benefit, aspiration, social proof, specificity.\n"
+        "business_name is the advertiser's SHORT brand label shown on the ad — "
+        f"keep it the real brand (≤{spec.business_name_max} chars), not a slogan.\n\n"
+        "Respond with ONLY this JSON, no prose:\n"
+        '{"business_name": "<brand, short>", '
+        '"headlines": [several distinct strings], '
+        '"descriptions": [several distinct strings]}'
+    )
 
 
 async def _run_dg_draft_job(job_id: str, account_id: str, body: DGDraftRequest) -> None:
@@ -270,27 +295,8 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
 
     from app.services.agent import stream_agent_response
 
-    prompt = (
-        "Draft Google Demand Gen ad copy for this campaign. First fetch the "
-        "landing page to ground every claim — never invent offers or numbers.\n\n"
-        f"Landing page: {body.final_url or '(none given — use the brief only)'}\n"
-        f"Business name (brand): {body.business_name or '-'}\n"
-        f"Campaign name: {body.campaign_name or '-'}\n"
-        f"Brief from the operator: {body.brief or '(none — derive from the landing page)'}\n\n"
-        "HARD LIMITS (Google rejects violations): business_name ≤25 chars, "
-        "headlines ≤40 chars each, descriptions ≤90 chars each. Provide up to 5 "
-        "headlines and up to 5 descriptions.\n"
-        "DEMAND GEN POLICY: NO prices or discounts in the copy · NO citizenship "
-        "or guaranteed-approval promises · avoid the symbols ~ | + (flagged as "
-        "gimmicky). No em dashes. No third-party brand names. Vary the angles: "
-        "benefit, aspiration, social proof, specificity.\n"
-        "business_name is the advertiser's SHORT brand label shown on the ad — "
-        "keep it the real brand (≤25 chars), not a slogan.\n\n"
-        "Respond with ONLY this JSON, no prose:\n"
-        '{"business_name": "<brand, ≤25 chars>", '
-        '"headlines": [3-5 strings ≤40 chars], '
-        '"descriptions": [3-5 strings ≤90 chars]}'
-    )
+    spec = creative_specs.get("demand_gen")
+    prompt = _dg_draft_prompt(body, spec)
 
     parts: list[str] = []
     async for ev in stream_agent_response(
@@ -318,7 +324,9 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
         )
 
     out: Dict[str, List[str]] = {}
-    for field, (min_n, max_n, max_chars) in _DG_DRAFT_LIMITS.items():
+    clamps = creative_specs.draft_clamps(spec)
+    for field in ("headlines", "descriptions"):
+        min_n, max_n, max_chars = clamps[field]
         items = [
             s.strip() for s in (parsed.get(field) or [])
             if isinstance(s, str) and s.strip() and len(s.strip()) <= max_chars
@@ -334,13 +342,13 @@ async def _draft_dg_copy_inner(account_id: str, body: DGDraftRequest) -> DGDraft
                 },
             )
 
-    # business_name: the brand is a proper noun (unlikely to exceed 25), so
+    # business_name: the brand is a proper noun (unlikely to exceed the cap), so
     # clip defensively rather than fail; fall back to the operator's own entry
     # from the brief step if the model omitted it or returned an empty value.
     bn = str(parsed.get("business_name") or "").strip()
     if not bn:
         bn = (body.business_name or "").strip()
-    bn = bn[:_DG_BUSINESS_NAME_MAX]
+    bn = bn[:spec.business_name_max]
 
     return DGDraftResponse(business_name=bn, **out)
 

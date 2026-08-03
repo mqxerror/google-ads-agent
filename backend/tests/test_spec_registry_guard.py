@@ -91,6 +91,14 @@ register_tombstone("MAX_LOGOS", _ORCH / "demand_gen_orchestrator.py", "py")
 register_scan_file(_ORCH / "pmax_orchestrator.py", "py", 0)
 register_scan_file(_ORCH / "demand_gen_orchestrator.py", "py", 0)
 
+# ── Story 14.4 — router draft clamps + prompts read the registry ──
+_ROUTERS = _BACKEND / "app" / "routers"
+register_tombstone("_DRAFT_LIMITS", _ROUTERS / "pmax.py", "py")
+register_tombstone("_DG_DRAFT_LIMITS", _ROUTERS / "demand_gen.py", "py")
+register_tombstone("_DG_BUSINESS_NAME_MAX", _ROUTERS / "demand_gen.py", "py")
+register_scan_file(_ROUTERS / "pmax.py", "py", 0)
+register_scan_file(_ROUTERS / "demand_gen.py", "py", 0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Scanner primitives (reused by mechanism self-tests, so they are proven at 14.2

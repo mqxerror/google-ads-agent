@@ -125,5 +125,54 @@ class DGDraftJobStore(unittest.TestCase):
         self.assertEqual(job["status"], "error")
 
 
+class DGDraftPromptFromRegistry(unittest.TestCase):
+    """Story 14.4 — the draft prompt is BUILT from the registry (FR1.5/FR1.6)."""
+
+    def _spec(self):
+        from app.services import creative_specs
+        return creative_specs.get("demand_gen")
+
+    def test_prompt_hard_limits_track_the_registry(self):
+        spec = self._spec()
+        body = dgr.DGDraftRequest(brief="b", final_url="https://x",
+                                  business_name="Mercan", campaign_name="c")
+        prompt = dgr._dg_draft_prompt(body, spec)
+        # char caps come from the registry, not a literal in the prompt string
+        self.assertIn(f"≤{spec.text['headlines'].max_chars} chars", prompt)
+        self.assertIn(f"≤{spec.text['descriptions'].max_chars} chars", prompt)
+        self.assertIn(f"≤{spec.business_name_max} chars", prompt)
+
+    def test_prompt_has_deliberate_40char_instruction(self):
+        # FR1.5: the raised 40-char headline budget must be used deliberately.
+        spec = self._spec()
+        prompt = dgr._dg_draft_prompt(dgr.DGDraftRequest(), spec)
+        self.assertEqual(spec.text["headlines"].max_chars, 40)
+        self.assertIn("40", prompt)
+        self.assertIn("deliberately", prompt.lower())
+        self.assertIn("do not pad", prompt.lower())
+
+
+class OnImageTextPolicyFlip(unittest.TestCase):
+    """Story 14.4 / FR1.6 / NFR-C1 — the prompt builder reads spec.policy; a
+    fixture flip changes the emitted prompt with ZERO code change."""
+
+    def test_flip_rda_forbid_to_allow_changes_prompt(self):
+        import dataclasses
+        from app.services import creative_specs as cs
+
+        rda = cs.get("rda")
+        self.assertEqual(rda.policy.on_image_text, "forbid")
+        forbid_line = cs.on_image_text_instruction(rda)
+
+        allow_rda = dataclasses.replace(
+            rda, policy=dataclasses.replace(rda.policy, on_image_text="allow_warned")
+        )
+        allow_line = cs.on_image_text_instruction(allow_rda)
+
+        self.assertNotEqual(forbid_line, allow_line)
+        self.assertIn("OUT of generated images", forbid_line)
+        self.assertIn("WARNED", allow_line)
+
+
 if __name__ == "__main__":
     unittest.main()
