@@ -225,7 +225,9 @@ async def _render_tile(
     kwargs: dict[str, Any] = dict(
         asset_id=child["id"],
         model=batch["model"],
-        prompt=batch["art_direction"],
+        # Registry-driven on-image-text guidance appended per the campaign type's
+        # policy knob (FR1.6/FR6.4) — RDA (forbid) generates clean, text-free tiles.
+        prompt=_generation_prompt(batch.get("campaign_type") or "pmax", batch["art_direction"]),
         aspect_ratio=child.get("aspect_ratio") or SLOT_GEN_ASPECT.get(child.get("slot") or "", "1:1"),
         soul_id=None,
         reference_asset_ids=reference,
@@ -287,6 +289,23 @@ def _logo_overlay_policy(campaign_type: str) -> str:
         return cs.get(campaign_type).policy.logo_overlay
     except Exception:
         return "forbid"  # safest default: never overlay when the type is unknown
+
+
+def _generation_prompt(campaign_type: str, art_direction: str) -> str:
+    """Append the registry-driven on-image-text guidance to the art direction
+    (FR1.6/FR6.4, NFR-C1). The instruction emits from ``spec.policy.on_image_text``
+    — table-driven, never a campaign-type branch — so flipping the knob (e.g.
+    rda→allow_warned) changes the emitted generation prompt with ZERO code diff.
+    RDA defaults to ``forbid`` (>20%-text images are discounted [research §2c]),
+    so its generated tiles come out clean. Unknown types degrade to the raw art
+    direction rather than raising."""
+    from app.services import creative_specs as cs
+
+    try:
+        note = cs.on_image_text_instruction(cs.get(campaign_type))
+    except Exception:
+        note = ""
+    return f"{art_direction}\n\n{note}" if note else art_direction
 
 
 def composite_logo(base_path: "Path", logo_path: "Path", out_path: "Path") -> tuple[int, int, int]:
