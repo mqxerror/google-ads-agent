@@ -78,6 +78,7 @@ from google_ads.servers.campaign_draft_server import campaign_draft_server
 from google_ads.servers.campaign_label_server import campaign_label_server
 from google_ads.servers.campaign_server import campaign_server
 from google_ads.servers.demand_gen_server import demand_gen_server
+from google_ads.servers.rda_server import rda_server
 from google_ads.servers.pmax_server import pmax_server
 from google_ads.servers.campaign_shared_set_server import (
     campaign_shared_set_server,
@@ -288,6 +289,7 @@ SERVER_GROUPS = {
         ("campaign", campaign_server),
         ("pmax", pmax_server),
         ("demand_gen", demand_gen_server),
+        ("rda", rda_server),
         ("budget", budget_server),
         ("ad_group", ad_group_server),
         ("keyword", keyword_server),

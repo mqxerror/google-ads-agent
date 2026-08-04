@@ -157,6 +157,8 @@ _CATALOG_WRITE_CANDIDATES = [
     # in-place Demand Gen ad image refresh (Studio push-to-ad — replace/append
     # marketing/square/portrait/tall/logo images on a live multi-asset ad)
     "demand_gen_update_ad_images",
+    # responsive display campaign — the P5 Display consumer (story 19.2)
+    "rda_create_responsive_display_campaign",
 ]
 
 

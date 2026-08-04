@@ -91,6 +91,12 @@ register_tombstone("MAX_LOGOS", _ORCH / "demand_gen_orchestrator.py", "py")
 register_scan_file(_ORCH / "pmax_orchestrator.py", "py", 0)
 register_scan_file(_ORCH / "demand_gen_orchestrator.py", "py", 0)
 
+# ── Story 19.2 — the RDA orchestrator is the P5 Display consumer. Every creative
+# limit is read from creative_specs.get("rda") (F1) and geometry from
+# creative_images (F2), so it carries zero baked creative-limit literals. It joins
+# the sentinel scan as an enforcement file the moment it exists. ──
+register_scan_file(_ORCH / "rda_orchestrator.py", "py", 0)
+
 # ── Story 14.4 — router draft clamps + prompts read the registry ──
 _ROUTERS = _BACKEND / "app" / "routers"
 register_tombstone("_DRAFT_LIMITS", _ROUTERS / "pmax.py", "py")

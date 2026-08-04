@@ -1497,6 +1497,28 @@ HARVEST_TOOL_ARGS: Dict[str, Any] = {
         "mode": "replace",
         "landscape_images": [_req(ids["image_asset_id"], "no image_asset_id")],
     },
+    # ── rda (responsive display, story 19.2) ────────────────────────────────
+    # Fail-closed to an honest SKIP when no real IMAGE asset is harvested. Like
+    # PMax/DG, the orchestrator aspect-verifies pre-uploaded Google image assets
+    # pre-flight, so a generic (off-aspect) harvested asset is rejected as
+    # VALIDATION_FAILED before any mutate — no live entity is created, and every
+    # mutate that WOULD run does so under force_validate_only.
+    "rda_create_responsive_display_campaign": lambda ids: {
+        "customer_id": CUSTOMER_ID,
+        "name": "Harness Responsive Display",
+        "budget_micros": 1_000_000,
+        "final_urls": ["https://goldenvisas.mercan.com"],
+        "business_name": "Mercan",
+        "headlines": ["Immigration Help", "Free Consultation", "Apply Today"],
+        "long_headlines": ["Expert immigration guidance for your residency journey"],
+        "descriptions": ["Trusted immigration advisors ready to help you.",
+                         "Start your residency application with confidence."],
+        "logos": [_req(ids["image_asset_id"], "no image_asset_id")],
+        "landscape_images": [_req(ids["image_asset_id"], "no image_asset_id")],
+        "square_images": [_req(ids["image_asset_id"], "no image_asset_id")],
+        "location_ids": [ids["geo_target_id"]],
+        "language_ids": [ids["language_id"]],
+    },
     # ── recommendation ────────────────────────────────────────────────────
     "recommendation_apply_recommendation": lambda ids: {
         "customer_id": CUSTOMER_ID,
