@@ -68,6 +68,27 @@ RDA activation + verification (story 19.1, 2026-08-04):
   RDA VIDEO stays ``verified=False``: Google publishes no firm per-orientation
   video count for RDA (the ``youtube_videos`` field exists, but "≤5" is
   aggregator-sourced), so it soft-validates only — the honest remaining unknown.
+
+Story 20.1 — live-verification sweep close-out (2026-08-04):
+  After stories 14.1 and 19.1 verified the PMax/DG/RDA text + image + logo limits
+  against Google's current documentation, exactly FOUR entries remain
+  ``verified=False``, and each stays that way BY DESIGN — none is a number Google
+  firmly publishes, so flipping it without evidence would be the R3 failure the
+  registry exists to prevent:
+    * PMax ``short_description`` ≤60 — the "≥1 description ≤60" rule is NOT in
+      Google's current docs (14528373, re-checked 2026-08-03); soft advisory.
+    * PMax ``video.max_per_orientation`` (15) — 5-vs-15 aggregator conflict, no
+      firm Google figure (research §6-2).
+    * RDA ``video.max_per_orientation`` (5) — no firm Google RDA video count.
+    * PMax ``landscape_logo`` (4:1) slot — pre-added geometry for P5 (17.5); PMax
+      does not create with a 4:1 logo today, so its count is unverified data.
+  Because every one soft-validates (warns, never blocks — FR1.3) and any
+  correction auto-propagates to client + server + drafter from this one object,
+  the registry never confidently enforces a wrong limit. The remaining
+  confirmation step — a validate-only / PAUSED create against the real Mercan
+  account to flip these to ``verified=True`` — is a live-session action gated on
+  Wassim; it was NOT run in the close-out sweep because that phase is money-safe
+  (no real Google mutations). Left honest rather than faked green.
 """
 
 from __future__ import annotations
