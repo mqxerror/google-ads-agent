@@ -12,6 +12,8 @@ inputDocuments: [product-brief-unified-creative-engine.md, research/creative-bes
 
 # PRD — Unified Creative Engine
 
+> **✅ BUILD STATUS — 2026-08-04 (completion annotation; content below unchanged).** All 37 FRs / 8 NFRs are BUILT across Epics 14–20 (P1a → close-out), committed on `main` 2026-08-03 → 2026-08-04. Every per-phase exit gate passed; the Epic 20 close-out re-ran the full battery — **backend 671 pytest** (≥496 floor, NFR-T1) **· vitest 107** · `tsc -b` + `vite build` clean · CI spec-drift guard green — and recorded a one-line evidence entry for each of the 8 NFRs. The 4 remaining `verified:false` registry entries (PMax short-desc ≤60, PMax + RDA video counts, PMax 4:1-logo slot) stay soft-validated by design (no firm Google figure; FR1.3); the validate-only/PAUSED live-account confirmation is Wassim-gated. Per the repo's Tier-2 drift discipline this is an annotation only — the PRD CONTENT is unchanged; per-story deltas live in `_bmad-output/feature-log.md`.
+
 **Citation key:** `[research §X]` = `research/creative-best-practices-2026-08.md` · `[audit §X]` =
 `~/Documents/LangarAI/data/gads-creative-gap-analysis-2026-08-03.md` (repo @ `a0602d9`).
 Every character/count limit in this document carries one of the two. Limits marked **UNVERIFIED**

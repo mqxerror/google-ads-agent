@@ -27,13 +27,13 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  ArrowLeft, ArrowRight, Megaphone, CheckCircle2, Circle, Plus, X,
+  ArrowLeft, ArrowRight, Megaphone, CheckCircle2, Circle, X,
   Upload, Image as ImageIcon, Sparkles, Loader2, AlertCircle,
   FolderOpen, Search, Globe, Languages, DollarSign, Video, Compass,
-  Monitor, Mail, ShieldAlert,
+  Monitor, Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDemandGenRules } from '@/lib/creativeSpecs';
+import { useDemandGenRules, useCreativeSpecs } from '@/lib/creativeSpecs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
@@ -1064,7 +1064,7 @@ function ImageGroup({
    * negligible difference at submit). Locks the StudioPanel aspect selector. */
   slotAspect: string;
   items: string[]; onChange: (v: string[]) => void;
-  accountId: string; minItems: number; maxItems?: number;
+  accountId: string; minItems: number; maxItems: number;
   assetMeta: Record<string, SlotAssetMeta>;
   onAssetKnown: (id: string, meta: SlotAssetMeta) => void;
   /** Shared campaign context for the Generate panel (brief, business name,

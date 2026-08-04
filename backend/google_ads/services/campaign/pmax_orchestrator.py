@@ -28,7 +28,6 @@ users get clear, actionable errors instead of API exceptions.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from fastmcp import Context, FastMCP
@@ -65,9 +64,6 @@ from google_ads.services.campaign.creative_images import (  # noqa: F401 (re-exp
 )
 from google_ads.services.campaign.creative_images import (
     asset_resource_name as _asset_resource_name,
-    encode_for_google as _encode_for_google,
-    fit_image_for_slot as _fit_image_for_slot,
-    is_google_asset_ref as _is_google_asset_ref,
 )
 from google_ads.utils import format_customer_id, get_logger
 

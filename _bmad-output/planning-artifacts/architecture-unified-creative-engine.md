@@ -12,8 +12,10 @@ parent: architecture-v2.md
 **Author:** Wassim (drafted by Dam3oun-Google)
 **Date:** 2026-08-03
 **Version:** 1.0
-**Status:** draft — for epics & stories
+**Status:** ✅ BUILT — realized across Epics 14–20, shipped 2026-08-03 → 2026-08-04 (see BUILD STATUS callout below)
 **Parent:** architecture-v2.md (V2 system architecture; this document scopes one subsystem)
+
+> **✅ BUILD STATUS — 2026-08-04 (completion annotation; content below unchanged).** AD-1…AD-6 and the §7 strangler map (steps 1–10) are all realized on `main`. Structural fences hold under test: F2 geometry single-source + F4 frozen specs (`test_creative_specs.py`), F5 near-dup parity (`test_near_dup_parity.py`), F6 no module-level job dicts (`test_creative_jobs_restart.py`), the NFR-D1 CI drift guard (`test_spec_registry_guard.py`), and the P5 diff-scope check proving `creative_images.py` + `components/creative/*` were untouched by the RDA consumer. Migrations landed through **V28** (`creative_drafts`/`creative_jobs` V27, `creative_batches`/`ad_assets` columns V28). Close-out battery: **backend 671 pytest · vitest 107** · `tsc -b` + `vite build` clean · launchctl restart → health 200. Per the Tier-2 drift discipline this is an annotation only — the architecture CONTENT is unchanged.
 **Contract:** prd-unified-creative-engine.md (37 FRs / 8 NFRs) — every component below names the FRs it satisfies.
 
 ---

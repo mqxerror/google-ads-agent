@@ -24,12 +24,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, Plus, X,
+  ArrowLeft, ArrowRight, Layers, CheckCircle2, Circle, X,
   Upload, Image as ImageIcon, Video, Sparkles, Loader2, AlertCircle,
   FolderOpen, Search, Check, Clapperboard, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePMaxRules } from '@/lib/creativeSpecs';
+import { usePMaxRules, useCreativeSpecs } from '@/lib/creativeSpecs';
 import { validatePMax, isMalformedUrl } from '@/lib/pmaxClientValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -2030,7 +2030,7 @@ function ImageGroup({
    * post-crop preview frames every item at this ratio. */
   googleAspect: number; googleAspectLabel: string;
   items: string[]; onChange: (v: string[]) => void;
-  accountId: string; minItems: number; maxItems?: number;
+  accountId: string; minItems: number; maxItems: number;
   promptContext?: StudioPanelContext;
   assetMeta: Record<string, SlotAssetMeta>;
   onAssetKnown: (id: string, meta: SlotAssetMeta) => void;

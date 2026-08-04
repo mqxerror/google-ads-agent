@@ -20,7 +20,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from app.database import get_db
 from app.services import creative_specs

@@ -11,11 +11,13 @@ parent: epics-v2.md
 **Author:** Wassim (drafted by Dam3oun-Google)
 **Date:** 2026-08-03
 **Version:** 1.0
-**Status:** draft — ready for story execution
+**Status:** ✅ BUILT — Epics 14–20 shipped 2026-08-03 → 2026-08-04 (see BUILD STATUS callout below)
 **Contract:** prd-unified-creative-engine.md (37 FRs / 8 NFRs) · architecture-unified-creative-engine.md (AD-1…AD-6, §7 strangler map)
 **Numbering note:** epics-v2.md occupies Epics 1–13 (11/12 reserved by the Studio track, both shipped). **14 is the next free number**; this subsystem takes Epics 14–20. Stories are `<epic>.<n>`.
 
 ---
+
+> **✅ BUILD STATUS — 2026-08-04 (completion annotation; content below unchanged).** Epics 14–20 — the whole Unified Creative Engine — are BUILT and committed on `main` (`24d94ab` … Epic 20 close-out `4ed7759`+). Built 2026-08-03 → 2026-08-04 under the fleet's Fable-conducts / Opus-performs pattern. **Final suites: backend 671 pytest** (≥ the 496 baseline, NFR-T1) **· vitest 107** · `tsc -b` + `vite build` clean · CI spec-drift guard (`test_spec_registry_guard.py`) + RDA shell-gate (`RdaWizard.tsx` 643 < 647) + P5 diff-scope (`test_rda_policy.py::test_p5_diff_scope_zero_core_changes`) all green · **all 8 NFRs evidenced** in the Epic 20 close-out. Live `GET /api/creative/specs` serves `pmax` / `demand_gen` / `rda` with per-field sources. Per-story deltas live in `_bmad-output/feature-log.md` (reconciled under its Reconciled heading, 2026-08-04). Per the repo's Tier-2 drift discipline this is an annotation only — the artifact CONTENT is unchanged.
 
 ## Sizing key & conventions
 
