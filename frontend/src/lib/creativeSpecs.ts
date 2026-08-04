@@ -134,6 +134,20 @@ export interface PMaxRules {
   ready: boolean;
 }
 
+export interface RdaRules {
+  headlines: FieldRule;
+  longHeadlines: FieldRule;   // exactly 1 (min==max==1)
+  descriptions: FieldRule;
+  logos: SlotRule;
+  landscapeLogo: SlotRule;    // optional 4:1
+  landscape: SlotRule;
+  square: SlotRule;
+  imageMax: number;
+  businessNameMaxChars: number;
+  finalUrlMax: number;
+  ready: boolean;
+}
+
 const OPEN_FIELD: FieldRule = { min: 0, max: Infinity, maxChars: Infinity };
 
 function fieldRule(t: TextFieldSpec | undefined): FieldRule {
@@ -180,6 +194,25 @@ export function pmaxRulesFromSpecs(specs: SpecsResponse | null): PMaxRules {
   };
 }
 
+/** Pure RDA mapper (story 19.3) — the P5 thin shell reads its boundaries ONLY
+ *  from here, never a baked literal (the shell-gate audit + FR6.3). */
+export function rdaRulesFromSpecs(specs: SpecsResponse | null): RdaRules {
+  const s = specs?.campaign_types?.rda;
+  return {
+    headlines: fieldRule(s?.text?.headlines),
+    longHeadlines: fieldRule(s?.text?.long_headlines),
+    descriptions: fieldRule(s?.text?.descriptions),
+    logos: slotRule(s?.logos?.logos),
+    landscapeLogo: slotRule(s?.logos?.landscape_logo),
+    landscape: slotRule(s?.images?.landscape),
+    square: slotRule(s?.images?.square),
+    imageMax: s?.total_image_cap ?? Infinity,
+    businessNameMaxChars: s?.business_name_max ?? Infinity,
+    finalUrlMax: s?.final_url_max ?? Infinity,
+    ready: specs !== null,
+  };
+}
+
 // ── hooks ─────────────────────────────────────────────────────────────────────
 
 function useResolvedSpecs(): { specs: SpecsResponse | null; ready: boolean } {
@@ -204,4 +237,8 @@ export function useDemandGenRules(): DemandGenRules {
 
 export function usePMaxRules(): PMaxRules {
   return pmaxRulesFromSpecs(useResolvedSpecs().specs);
+}
+
+export function useRdaRules(): RdaRules {
+  return rdaRulesFromSpecs(useResolvedSpecs().specs);
 }

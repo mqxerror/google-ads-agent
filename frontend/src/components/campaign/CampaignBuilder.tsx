@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Play, CheckCircle2,
   Circle, Upload, X, LinkIcon, Globe, Languages, DollarSign,
   Sparkles, Rocket, Zap, Brain, RefreshCw,
-  Layers, Video, Megaphone,
+  Layers, Video, Megaphone, Images,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useClientAccountId } from '@/hooks/useClientAccountId';
 import PMaxWizard from './PMaxWizard';
 import DemandGenWizard from './DemandGenWizard';
+import RdaWizard from './RdaWizard';
 // chatApi used for atomic conversation creation in runStage and Research
 
 type ModelId = 'fable' | 'sonnet' | 'opus' | 'haiku';
@@ -42,7 +43,7 @@ const STAGE_COLORS = [
 ];
 
 type WizardStep = 'type' | 'input' | 'pipeline' | 'review';
-type CampaignType = 'search' | 'pmax' | 'demandgen' | 'video';
+type CampaignType = 'search' | 'pmax' | 'demandgen' | 'display' | 'video';
 
 export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
   const accountId = useClientAccountId();
@@ -362,12 +363,26 @@ export default function CampaignBuilder({ onClose }: CampaignBuilderProps) {
     );
   }
 
+  // Responsive Display (RDA) — the P5 thin shell, its own asset-bundle flow.
+  if (campaignType === 'display') {
+    return (
+      <RdaWizard
+        onClose={onClose}
+        onBackToTypePicker={() => {
+          persistCampaignType(null);
+          setStep('type');
+        }}
+      />
+    );
+  }
+
   // Campaign-type picker — first step on a fresh session.
   if (step === 'type') {
     const TYPE_CARDS: { id: CampaignType; label: string; tagline: string; icon: typeof Search; available: boolean; note?: string }[] = [
       { id: 'search',    label: 'Search', tagline: 'Keyword-driven text ads on Google.com', icon: Search, available: true },
       { id: 'pmax',      label: 'Performance Max', tagline: "Google's all-network campaign with auto-placed creative.", icon: Layers, available: true },
       { id: 'demandgen', label: 'Demand Gen', tagline: 'Visual ads across YouTube, Discover & Display (Gmail off by default).', icon: Megaphone, available: true },
+      { id: 'display',   label: 'Responsive Display', tagline: 'Auto-fitting image + text ads across the Google Display Network.', icon: Images, available: true },
       { id: 'video',     label: 'Video (YouTube)', tagline: 'YouTube + Discover video ads.', icon: Video, available: false, note: 'Coming soon — needs YouTube channel linked.' },
     ];
     return (

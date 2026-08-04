@@ -109,7 +109,13 @@ register_scan_file(_ROUTERS / "demand_gen.py", "py", 0)
 _WIZ = _FRONTEND / "src" / "components" / "campaign"
 register_tombstone("RULES", _WIZ / "PMaxWizard.tsx", "tsx")
 register_tombstone("RULES", _WIZ / "DemandGenWizard.tsx", "tsx")
+register_tombstone("RULES", _WIZ / "RdaWizard.tsx", "tsx")  # story 19.3 — thin shell, no RULES
 register_scan_file(_WIZ / "DemandGenWizard.tsx", "tsx", 0)
+# ── Story 19.3 — the RdaWizard thin shell reads every limit from useRdaRules()
+# (FR6.3); zero baked creative-limit literals. Joins the sentinel scan as a wizard
+# enforcement file (the frontend RdaWizard.shell.test.ts also asserts the <647
+# line cap + import-only, per 14.2's accretion plan). ──
+register_scan_file(_WIZ / "RdaWizard.tsx", "tsx", 0)
 # PMax's 4 pragma'd sentinels are all non-creative-limit numerics (render-poll
 # timeout, render-ETA math ×2, video clip-duration seconds const) — see the
 # `spec-ok` reasons in PMaxWizard.tsx. Snapshot so any new one is visible in review.

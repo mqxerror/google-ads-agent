@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   dgRulesFromSpecs,
   pmaxRulesFromSpecs,
+  rdaRulesFromSpecs,
   resolveSpecs,
   loadSpecsCache,
   saveSpecsCache,
@@ -53,6 +54,23 @@ function specsWith(dgHeadlineMaxChars: number): SpecsResponse {
         },
         logos: { logos: slot('logos', 5, true) },
       },
+      rda: {
+        ...base,
+        total_image_cap: 15,
+        text: {
+          headlines: tf(1, 5, 30),
+          long_headlines: tf(1, 1, 90),   // exactly one
+          descriptions: tf(1, 5, 90),
+        },
+        images: {
+          landscape: slot('landscape', 15, true),
+          square: slot('square', 15, true),
+        },
+        logos: {
+          logos: slot('logos', 5, true),
+          landscape_logo: slot('landscape_logo', 5, false),
+        },
+      },
     },
     engine: { near_dup_threshold: 0.65, batch_tile_cap: 20, batch_retry_max: 2 },
     version: 'test',
@@ -97,6 +115,26 @@ describe('mappers cover the wizard rule shapes', () => {
     expect(r.square.min).toBe(1);
     expect(r.imageMax).toBe(20);
     expect(r.ready).toBe(true);
+  });
+
+  it('RDA maps the exactly-1 long headline + required marketing slots + optional 4:1 logo', () => {
+    const r = rdaRulesFromSpecs(specsWith(40));
+    expect(r.headlines).toEqual({ min: 1, max: 5, maxChars: 30 });
+    expect(r.longHeadlines).toEqual({ min: 1, max: 1, maxChars: 90 }); // exactly one
+    expect(r.descriptions).toEqual({ min: 1, max: 5, maxChars: 90 });
+    expect(r.landscape.min).toBe(1);   // required
+    expect(r.square.min).toBe(1);      // required
+    expect(r.logos.min).toBe(1);       // required 1:1 logo
+    expect(r.landscapeLogo.min).toBe(0); // 4:1 optional
+    expect(r.imageMax).toBe(15);       // combined cap
+    expect(r.ready).toBe(true);
+  });
+
+  it('RDA null specs → not ready, permissive (no false over-limit)', () => {
+    const r = rdaRulesFromSpecs(null);
+    expect(r.ready).toBe(false);
+    expect(r.longHeadlines.max).toBe(Infinity);
+    expect(r.logos.min).toBe(0);
   });
 });
 
