@@ -99,16 +99,97 @@ def test_dg_headline_is_40_not_30():
     assert cs.get("demand_gen").text["headlines"].max_chars == 40
 
 
-def test_rda_ships_as_data_all_unverified():
+def test_rda_activated_and_verified_against_google_docs():
+    # Story 19.1 — RDA numbers verified against CURRENT Google docs (Help 9050310
+    # + API v23 ResponsiveDisplayAdInfo) and flipped verified=True (see module
+    # docstring). Text char/count caps confirmed; the singular long_headline; the
+    # landscape (1.91:1) + square (1:1) marketing images; the 1:1 + 4:1 logos.
     spec = cs.get("rda")
-    assert spec.text["long_headlines"].min_count == 1
-    assert spec.text["long_headlines"].max_count == 1   # exactly 1
-    assert spec.text["headlines"].max_chars == 30
+    assert (spec.text["headlines"].min_count, spec.text["headlines"].max_count,
+            spec.text["headlines"].max_chars) == (1, 5, 30)
+    assert (spec.text["long_headlines"].min_count,
+            spec.text["long_headlines"].max_count,
+            spec.text["long_headlines"].max_chars) == (1, 1, 90)   # exactly 1
+    assert (spec.text["descriptions"].min_count, spec.text["descriptions"].max_count,
+            spec.text["descriptions"].max_chars) == (1, 5, 90)
+    assert spec.business_name_max == 25
     for f in spec.text.values():
-        assert f.verified is False
+        assert f.verified is True
+        assert "verified 2026-08-04" in f.source
     for slot in {**spec.images, **spec.logos}.values():
-        assert slot.verified is False
-    assert "landscape_logo" in spec.logos       # 4:1 field type ships as data
+        assert slot.verified is True
+    assert "landscape_logo" in spec.logos       # 4:1 field type (verified)
+    assert set(spec.logos) == {"logos", "landscape_logo"}
+
+
+def test_rda_has_no_portrait_slot_docs_win():
+    # The API's ResponsiveDisplayAdInfo has landscape + square marketing images
+    # ONLY — no portrait field. The P1 aggregator seed's portrait slot is removed
+    # (docs win, D6): offering a slot an RDA can never carry would be a lie.
+    spec = cs.get("rda")
+    assert set(spec.images) == {"landscape", "square"}
+    assert "portrait" not in spec.images
+
+
+def test_rda_total_image_cap_is_combined_15():
+    # Combined marketing + square-marketing max 15 (API), not 15/ratio.
+    assert cs.get("rda").total_image_cap == 15
+
+
+def test_rda_video_stays_unverified():
+    # Google publishes no firm per-orientation RDA video count — the one figure
+    # that remains verified=False (soft-validate only).
+    v = cs.get("rda").video
+    assert v.verified is False
+    assert v.max_per_orientation == 5
+
+
+def test_rda_two_long_headlines_rejected_hard():
+    # FR6.1 — exactly-1 long headline is enforceable STRUCTURE (a singular proto
+    # field), so 2 is a HARD error (report.errors), not a soft warning — even
+    # though the singular rule fires independent of the verified flag.
+    spec = cs.get("rda")
+    report = cs.ValidationReport()
+    cs.check_text_fields(
+        {"headlines": ["A", "B"], "long_headlines": ["one", "two"],
+         "descriptions": ["d"]},
+        spec, report,
+    )
+    assert any("too many long_headlines" in e for e in report.errors)
+    assert not any("long_headlines" in w for w in report.warnings)
+
+
+def test_singular_over_count_is_hard_even_when_unverified():
+    # The structural singular-field rule (max_count==1 → hard) does NOT depend on
+    # verified: a verified=False singular field still rejects >1 as an error, while
+    # a verified=False multi-count field's over-count stays a soft warning.
+    spec = cs.CampaignSpec(
+        text={
+            "long_headlines": cs.TextFieldSpec(1, 1, 90, False, "fixture"),
+            "headlines": cs.TextFieldSpec(1, 5, 30, False, "fixture"),
+        },
+        images={}, logos={}, business_name_max=25, total_image_cap=None,
+        search_themes=None,
+        video=cs.VideoSpec(None, None, False, False, "fixture"),
+        final_url_max=2048,
+        policy=cs.PolicyKnobs("forbid", "forbid", "nudge"),
+    )
+    report = cs.ValidationReport()
+    cs.check_text_fields(
+        {"long_headlines": ["a", "b"], "headlines": ["1", "2", "3", "4", "5", "6"]},
+        spec, report,
+    )
+    assert any("too many long_headlines" in e for e in report.errors)   # singular → hard
+    assert any("too many headlines" in w for w in report.warnings)      # soft → warn
+
+
+def test_rda_landscape_logo_geometry_served(client):
+    # The specs endpoint serves the rda block with the 4:1 slot geometry imported
+    # from creative_images.IMAGE_SLOT_SPECS.landscape_logo (fence F2).
+    body = client.get("/api/creative/specs").json()
+    ll = body["campaign_types"]["rda"]["logos"]["landscape_logo"]
+    assert ll["geometry"] == {"aspect": 4.0, "min_w": 512, "min_h": 128, "label": "4:1"}
+    assert ll["verified"] is True
 
 
 def test_policy_knobs_defaults_forbid():

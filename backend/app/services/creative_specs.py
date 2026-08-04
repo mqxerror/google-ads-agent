@@ -40,6 +40,34 @@ IMPORTANT — count minimums are Google-verified (2026-08-03):
   char-cap / cross-field side (see FR1.4). The PMax "≥1 description ≤60" short
   rule is NOT present in Google's current docs (verified 2026-08-03) → it ships
   ``verified=False`` and soft-validates only.
+
+RDA activation + verification (story 19.1, 2026-08-04):
+  The ``rda`` entry shipped as data in P1 with every field ``verified=False``
+  (aggregator-sourced). Story 19.1 verified each number against CURRENT Google
+  documentation and flipped the confirmed ones to ``verified=True`` with the
+  Google source cited. Verified against:
+    * Google Ads Help 9050310 (Manage your responsive display ads, 2026-08-04):
+      up to 5 short headlines × 30 chars, 1 long headline × 90 chars, up to 5
+      descriptions × 90 chars, up to 15 marketing images, up to 5 logos in a
+      "1:1 or 4:1 aspect ratio".
+    * Google Ads API v23 ``ResponsiveDisplayAdInfo`` (proto): ``long_headline``
+      is a SINGULAR field ⇒ exactly 1 (enforced structurally, see
+      ``check_text_fields``); ``business_name`` max 25; ``marketing_images``
+      (1.91:1) + ``square_marketing_images`` (1:1) are the ONLY marketing-image
+      fields — there is NO portrait field for RDA; ``logo_images`` (4:1) +
+      ``square_logo_images`` (1:1).
+  Two places where the CURRENT DOCS beat the P1 seed (docs win, D6):
+    1. **No portrait slot.** The seed carried an optional ``portrait`` (4:5)
+       image slot from the aggregator table; the API's ``ResponsiveDisplayAdInfo``
+       has no portrait marketing-image field, so it is REMOVED (an RDA can never
+       carry a portrait asset — offering the slot would be a lie).
+    2. **Total image cap is 15 COMBINED, not 15/ratio.** ``marketing_images``
+       combined with ``square_marketing_images`` maxes at 15 (API), so
+       ``total_image_cap=15`` (the seed left it ``None`` per an aggregator
+       "≤15/ratio" reading).
+  RDA VIDEO stays ``verified=False``: Google publishes no firm per-orientation
+  video count for RDA (the ``youtube_videos`` field exists, but "≤5" is
+  aggregator-sourced), so it soft-validates only — the honest remaining unknown.
 """
 
 from __future__ import annotations
@@ -59,6 +87,10 @@ _REPO_PROVEN = "repo-proven post-create attach (pmax_orchestrator.py)"
 _RESEARCH_2A = "research §2a (aggregator — UNVERIFIED)"
 _RESEARCH_2C = "research §2c (RDA aggregator — UNVERIFIED)"
 _RESEARCH_62 = "research §6-2 (5-vs-15 conflict — UNVERIFIED)"
+# RDA verified against CURRENT Google docs in story 19.1 (see module docstring).
+_G_RDA_TEXT = "Google Ads Help 9050310 + API v23 ResponsiveDisplayAdInfo (verified 2026-08-04)"
+_G_RDA_ASSETS = "Google Ads Help 9050310 + API v23 ResponsiveDisplayAdInfo assets (verified 2026-08-04)"
+_RDA_VIDEO_U = "research §2c (RDA video ≤5 — aggregator, no firm Google figure — UNVERIFIED)"
 
 
 @dataclass(frozen=True)
@@ -219,29 +251,35 @@ REGISTRY: Dict[str, CampaignSpec] = {
                            video_gate="nudge"),
         short_description=None,
     ),
-    # RDA data ships in P1 (costs nothing); FR6.1 only *activates* it in P5. Every
-    # entry is aggregator-sourced ⇒ verified=False until confirmed against the
-    # live API at the P5 exit gate.
+    # RDA data shipped in P1 (costs nothing); FR6.1 *activates* it in P5. Story
+    # 19.1 verified every number below against CURRENT Google docs and flipped the
+    # confirmed ones to verified=True (see module docstring). Video stays
+    # verified=False — the one figure Google does not firmly publish for RDA.
     "rda": CampaignSpec(
         text={
-            "headlines": TextFieldSpec(1, 5, 30, False, _RESEARCH_2C),
-            "long_headlines": TextFieldSpec(1, 1, 90, False, _RESEARCH_2C),
-            "descriptions": TextFieldSpec(1, 5, 90, False, _RESEARCH_2C),
+            "headlines": TextFieldSpec(1, 5, 30, True, _G_RDA_TEXT),
+            # long_headline is a SINGULAR proto field ⇒ exactly 1 (min==max==1);
+            # check_text_fields enforces the singular over-count as a HARD error
+            # structurally, independent of the verified flag.
+            "long_headlines": TextFieldSpec(1, 1, 90, True, _G_RDA_TEXT),
+            "descriptions": TextFieldSpec(1, 5, 90, True, _G_RDA_TEXT),
         },
         images={
-            "landscape": ImageSlotSpec("landscape", 15, True, False, _RESEARCH_2C),
-            "square": ImageSlotSpec("square", 15, True, False, _RESEARCH_2C),
-            "portrait": ImageSlotSpec("portrait", 15, False, False, _RESEARCH_2C),
+            # RDA marketing images are landscape (1.91:1) + square (1:1) ONLY —
+            # the API has no portrait field for RDA (removed from the P1 seed).
+            "landscape": ImageSlotSpec("landscape", 15, True, True, _G_RDA_ASSETS),
+            "square": ImageSlotSpec("square", 15, True, True, _G_RDA_ASSETS),
         },
         logos={
-            "logos": ImageSlotSpec("logos", 5, True, False, _RESEARCH_2C),
-            "landscape_logo": ImageSlotSpec("landscape_logo", 5, False, False, _RESEARCH_2C),
+            "logos": ImageSlotSpec("logos", 5, True, True, _G_RDA_ASSETS),
+            "landscape_logo": ImageSlotSpec("landscape_logo", 5, False, True, _G_RDA_ASSETS),
         },
         business_name_max=25,
-        total_image_cap=None,       # RDA is ≤15/ratio — per-slot, no cross-slot total
+        # Combined marketing + square-marketing images max 15 (API), not 15/ratio.
+        total_image_cap=15,
         search_themes=None,
         video=VideoSpec(max_per_orientation=5, min_seconds=None, required=False,
-                        verified=False, source=_RESEARCH_2C),
+                        verified=False, source=_RDA_VIDEO_U),
         final_url_max=2048,
         policy=PolicyKnobs(on_image_text="forbid", logo_overlay="forbid",
                            video_gate="nudge"),
@@ -288,7 +326,7 @@ FIELD_TIER: Dict[str, str] = {
 }
 
 # Bump when the shape or any value changes (surfaced by the endpoint + guard).
-VERSION = "2026-08-03"
+VERSION = "2026-08-04"
 
 
 def get(campaign_type: str) -> CampaignSpec:
@@ -473,7 +511,13 @@ def check_text_fields(bundle: Dict[str, Any], spec: CampaignSpec,
         if n < fs.min_count:
             channel.append(f"need ≥{fs.min_count} {name} (got {n})")
         if n > fs.max_count:
-            channel.append(f"too many {name}: {n} (max {fs.max_count})")
+            # A SINGULAR field (max_count == 1, e.g. RDA long_headline, a singular
+            # proto field) can never hold >1 — that is enforceable STRUCTURE, not a
+            # soft aggregator limit, so it is a HARD error even when verified=False
+            # (FR6.1: "2 long headlines rejected"). Other over-counts follow the
+            # field's verified flag.
+            over_channel = report.errors if fs.max_count == 1 else channel
+            over_channel.append(f"too many {name}: {n} (max {fs.max_count})")
         for i, txt in enumerate(items):
             if not isinstance(txt, str) or not txt.strip():
                 report.errors.append(f"{name}[{i}] is empty")
