@@ -241,7 +241,12 @@ REGISTRY: Dict[str, CampaignSpec] = {
         video=VideoSpec(max_per_orientation=15, min_seconds=10, required=False,
                         verified=False, source=_RESEARCH_62),
         final_url_max=2048,
-        policy=PolicyKnobs(on_image_text="forbid", logo_overlay="allow_warned",
+        # logo_overlay=forbid across ALL types (2026-08-05): compositing the logo
+        # onto a scene tile produced the "giant gold medallion floating on a
+        # building facade" defect (c). The logo now ships ONLY in its dedicated
+        # logo slot, never overlaid on a photo. The composite path stays as a
+        # data-flippable capability (allow_warned), proven by fixture flip.
+        policy=PolicyKnobs(on_image_text="forbid", logo_overlay="forbid",
                            video_gate="nudge"),
         short_description=TextFieldSpec(
             1, 5, 60, False,

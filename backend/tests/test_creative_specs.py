@@ -196,8 +196,10 @@ def test_policy_knobs_defaults_forbid():
     assert cs.get("pmax").policy.on_image_text == "forbid"
     assert cs.get("demand_gen").policy.on_image_text == "forbid"
     assert cs.get("rda").policy.on_image_text == "forbid"
-    # PMax allows logo overlay (composite mode); DG/RDA forbid (dedicated slot).
-    assert cs.get("pmax").policy.logo_overlay == "allow_warned"
+    # ALL types forbid logo overlay (2026-08-05): compositing the logo onto a
+    # scene tile caused the giant-medallion defect (c); the logo now ships only in
+    # its dedicated logo slot. The composite path stays a data-flippable capability.
+    assert cs.get("pmax").policy.logo_overlay == "forbid"
     assert cs.get("demand_gen").policy.logo_overlay == "forbid"
     assert cs.get("rda").policy.logo_overlay == "forbid"
     for t in ("pmax", "demand_gen", "rda"):

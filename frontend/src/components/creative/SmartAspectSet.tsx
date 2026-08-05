@@ -152,8 +152,13 @@ export default function SmartAspectSet(props: SmartAspectSetProps) {
         mode,
         campaign_type: campaignType,
         campaign_id: campaignId,
-        logo_asset_id: mode === 'with_logo' ? logoAssetId : undefined,
-        reference_asset_ids: mode === 'asset_anchored' ? referenceAssetIds : undefined,
+        // Send BOTH whenever the wizard has them — they are additive, NOT
+        // mutually exclusive by mode (defect a fix): the logo routes to the logo
+        // slots and the reference photos anchor every scene tile. The old
+        // `mode === 'with_logo' ? … : undefined` gate DROPPED the operator's
+        // reference photos the moment they chose to include a logo.
+        logo_asset_id: logoAssetId || undefined,
+        reference_asset_ids: referenceAssetIds?.length ? referenceAssetIds : undefined,
         slots: slots
           .map(s => ({ slot: s.slot, variants: variants[s.slot] ?? 0 }))
           .filter(s => s.variants > 0),
@@ -238,7 +243,7 @@ export default function SmartAspectSet(props: SmartAspectSetProps) {
                 >
                   <option value="without_logo">No logo (default)</option>
                   <option value="with_logo" disabled={!logoAssetId}>
-                    Composite my logo{logoAssetId ? '' : ' (add a logo first)'}
+                    Use my logo (fills the logo slot){logoAssetId ? '' : ' — add a logo first'}
                   </option>
                   <option value="asset_anchored" disabled={!referenceAssetIds?.length}>
                     Anchor to my reference photos

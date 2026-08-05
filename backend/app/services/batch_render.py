@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shutil
 import uuid
 from typing import Any, Optional
 
@@ -39,6 +40,48 @@ from app.services.creative_specs import ENGINE
 logger = logging.getLogger(__name__)
 
 MODES = ("with_logo", "without_logo", "asset_anchored")
+
+# The two slots that carry the brand MARK, never a photographic scene. A logo
+# slot is filled from the operator's REAL logo file when one is provided (defect
+# d / fix 4) and never anchored to property photos.
+_LOGO_SLOTS = ("logos", "landscape_logo")
+
+# Deterministic per-variant compositional angle (defect e — no two variants of a
+# slot share a composition). Indexed by ``variant_index % len`` — a pure function
+# of the index, never random, so a re-run reproduces the exact same set.
+_VARIANT_ANGLES: tuple[str, ...] = (
+    "Hero establishing shot — the primary subject framed WIDE, full environment, "
+    "cinematic depth, one clear focal point.",
+    "Human-scale intimate detail — move IN CLOSE on a single evocative detail of "
+    "the same subject, shallow depth of field, tactile and personal.",
+    "Editorial three-quarter angle — the subject from an oblique perspective with "
+    "strong directional light and layered foreground/background.",
+    "Quiet negative-space composition — the subject offset to one side with "
+    "generous clean space where the feed overlays its own headline.",
+)
+
+# Anti-collage clause (defect b). Modeled on the prompt_drafter demand_gen
+# preset's "NOT collage" register, hardened into an explicit prohibition so a
+# multi-concept art direction cannot render as a grid.
+_SINGLE_SCENE_CLAUSE = (
+    "SINGLE SCENE ONLY — the art direction above may describe several concepts, "
+    "aspect ratios, or a whole asset set; IGNORE that and render EXACTLY ONE "
+    "photographic scene for THIS tile. Absolutely NO grids, mosaics, collages, "
+    "split-screens, multi-panel or side-by-side layouts, framed insets, "
+    "picture-in-picture, or contact sheets. One continuous edge-to-edge image, "
+    "one coherent subject, filling the entire frame."
+)
+
+# Clean brand-mark instruction for a LOGO slot when NO real logo asset exists
+# (defect d — a logo slot is never a photographic scene). When a logo asset IS
+# provided the tile bypasses generation entirely (see ``_place_logo_asset``).
+_LOGO_MARK_PROMPT = (
+    "A single clean, flat brand logo mark, centered on a plain solid neutral "
+    "background with generous margins. Minimal, crisp, high-contrast, vector-"
+    "style. This is a LOGO tile, NOT an advertising photo — no photographic "
+    "scene, no people, no buildings, no landscape, no collage, no paragraphs of "
+    "text."
+)
 
 # Each slot's Higgsfield generation aspect: the model-supported aspect closest to
 # the slot's Google geometry. `fit_image_for_slot` center-crops the remainder at
@@ -214,23 +257,35 @@ async def _render_tile(
     lands every failure in the row's status."""
     from app.routers import studio  # lazy — batch_render builds ON studio's runner
 
-    mode = batch.get("mode") or "without_logo"
-    reference: Optional[list[str]] = None
-    if mode == "asset_anchored":
-        try:
-            reference = json.loads(batch.get("reference_asset_ids_json") or "null")
-        except (TypeError, ValueError):
-            reference = None
+    slot = child.get("slot") or ""
+    logo_asset_id = batch.get("logo_asset_id")
+
+    # LOGO slots: fill from the operator's REAL logo file (fit to the slot) rather
+    # than generating an AI impression of a brand mark (defect d / fix 4). Only
+    # when a logo asset exists and this is NOT a restart-reattach of an in-flight
+    # generation. On success there is no generation, no credit, no _post_complete.
+    if slot in _LOGO_SLOTS and logo_asset_id and not reattach_job_id:
+        if await _place_logo_asset(batch, child, logo_asset_id):
+            return
 
     kwargs: dict[str, Any] = dict(
         asset_id=child["id"],
         model=batch["model"],
-        # Registry-driven on-image-text guidance appended per the campaign type's
-        # policy knob (FR1.6/FR6.4) — RDA (forbid) generates clean, text-free tiles.
-        prompt=_generation_prompt(batch.get("campaign_type") or "pmax", batch["art_direction"]),
-        aspect_ratio=child.get("aspect_ratio") or SLOT_GEN_ASPECT.get(child.get("slot") or "", "1:1"),
+        # Per-slot / per-variant prompt: the single-scene anti-collage clause
+        # (defect b), a deterministic per-variant angle (defect e), the clean
+        # brand-mark prompt for a logo slot with no asset (defect d), and the
+        # registry-driven on-image-text guidance (FR1.6/FR6.4, NFR-C1).
+        prompt=_generation_prompt(
+            batch.get("campaign_type") or "pmax",
+            batch["art_direction"],
+            slot,
+            int(child.get("variant_index") or 0),
+        ),
+        aspect_ratio=child.get("aspect_ratio") or SLOT_GEN_ASPECT.get(slot, "1:1"),
         soul_id=None,
-        reference_asset_ids=reference,
+        # Scene tiles anchor to the operator's real reference photos whenever the
+        # batch carries them, INDEPENDENT of the mode selector (defect a / fix 1).
+        reference_asset_ids=_references_for(batch, slot),
     )
     # reattach_job_id is a 17.4 addition to the runner; pass only when set so the
     # runner signature stays compatible across the increment.
@@ -291,21 +346,129 @@ def _logo_overlay_policy(campaign_type: str) -> str:
         return "forbid"  # safest default: never overlay when the type is unknown
 
 
-def _generation_prompt(campaign_type: str, art_direction: str) -> str:
-    """Append the registry-driven on-image-text guidance to the art direction
-    (FR1.6/FR6.4, NFR-C1). The instruction emits from ``spec.policy.on_image_text``
-    — table-driven, never a campaign-type branch — so flipping the knob (e.g.
-    rda→allow_warned) changes the emitted generation prompt with ZERO code diff.
-    RDA defaults to ``forbid`` (>20%-text images are discounted [research §2c]),
-    so its generated tiles come out clean. Unknown types degrade to the raw art
-    direction rather than raising."""
+def _references_for(batch: dict[str, Any], slot: str) -> Optional[list[str]]:
+    """Reference asset ids for a SCENE tile — passed to the runner as ``--image``
+    anchors so generation is bound to the operator's real photos (defect a).
+
+    Loaded whenever the batch carries references, INDEPENDENT of the mode selector
+    (fix 1: scene tiles are asset-anchored whenever references exist). Logo slots
+    never anchor to property photos — they carry the brand mark, not a scene."""
+    if slot in _LOGO_SLOTS:
+        return None
+    try:
+        refs = json.loads(batch.get("reference_asset_ids_json") or "null")
+    except (TypeError, ValueError):
+        return None
+    return refs or None
+
+
+def _generation_prompt(campaign_type: str, art_direction: str, slot: str = "",
+                       variant_index: int = 0) -> str:
+    """Build the per-tile generation prompt.
+
+    * A LOGO slot with no real logo asset gets a clean flat brand-mark prompt —
+      NEVER the scene brief (defect d). When a logo asset exists the tile bypasses
+      generation entirely (``_place_logo_asset``), so this branch runs only as the
+      no-asset fallback.
+    * A SCENE slot gets the art direction + the single-scene anti-collage clause
+      (defect b) + a deterministic per-variant compositional angle (defect e).
+
+    The registry-driven on-image-text guidance is appended in both cases from
+    ``spec.policy.on_image_text`` — table-driven, never a campaign-type branch —
+    so flipping the knob changes the emitted prompt with ZERO code diff (NFR-C1).
+    Unknown types degrade to no note rather than raising."""
     from app.services import creative_specs as cs
 
     try:
         note = cs.on_image_text_instruction(cs.get(campaign_type))
     except Exception:
         note = ""
-    return f"{art_direction}\n\n{note}" if note else art_direction
+
+    if slot in _LOGO_SLOTS:
+        return f"{_LOGO_MARK_PROMPT}\n\n{note}" if note else _LOGO_MARK_PROMPT
+
+    angle = _VARIANT_ANGLES[variant_index % len(_VARIANT_ANGLES)]
+    parts = [
+        art_direction,
+        _SINGLE_SCENE_CLAUSE,
+        f"COMPOSITION FOR THIS VARIANT — {angle}",
+    ]
+    if note:
+        parts.append(note)
+    return "\n\n".join(parts)
+
+
+async def _place_logo_asset(
+    batch: dict[str, Any], child: dict[str, Any], logo_asset_id: str,
+) -> bool:
+    """Fill a LOGO slot tile with the operator's REAL logo file, fitted to the
+    slot geometry via the shared crop/fit pipeline — never an AI impression of a
+    brand mark (defect d / fix 4). Returns True when the logo was placed; False to
+    fall through to generation (e.g. the logo file cannot be located)."""
+    from PIL import Image
+    from app.routers.assets import ASSETS_DIR
+    from google_ads.services.campaign.creative_images import (
+        fit_image_for_slot, locate_local_image,
+    )
+
+    slot = child.get("slot") or "logos"
+    try:
+        src_path, mime = await locate_local_image(logo_asset_id)
+    except LookupError:
+        logger.warning("logo asset %s not locatable; generating logo tile instead",
+                       logo_asset_id)
+        return False
+
+    warning: Optional[str] = None
+    try:
+        fitted = fit_image_for_slot(src_path, slot, mime)  # None | (bytes, mime) | raises
+    except ValueError as e:
+        # Below Google's minimum for the slot, or un-compressible: place the real
+        # logo best-effort anyway (an under-sized real mark beats an AI fake) and
+        # flag it so the operator can re-upload a larger file.
+        fitted = None
+        warning = f"logo {str(e)}"
+
+    try:
+        if fitted is not None:
+            data, out_mime = fitted
+            ext = ".png" if "png" in (out_mime or "").lower() else ".jpg"
+            out_name = f"{child['id']}{ext}"
+            out_path = ASSETS_DIR / out_name
+            out_path.write_bytes(data)
+        else:
+            # Already compliant on disk OR best-effort fallback: copy the real
+            # logo through untouched (preserves fidelity / transparency).
+            ext = src_path.suffix or ".png"
+            out_name = f"{child['id']}{ext}"
+            out_path = ASSETS_DIR / out_name
+            shutil.copyfile(src_path, out_path)
+        with Image.open(out_path) as im:
+            w, h = im.size
+        size_bytes = out_path.stat().st_size
+    except Exception as e:  # never lose the tile to an imaging error
+        logger.warning("logo placement failed for %s: %s; falling back to generation",
+                       child["id"], e)
+        return False
+
+    meta: dict[str, Any] = {"logo_source": "asset_file"}
+    if warning:
+        meta["warning"] = warning
+    db = await get_db()
+    try:
+        await db.execute(
+            """UPDATE ad_assets SET status='completed', source='uploaded',
+               filename=?, url=?, width=?, height=?, size_bytes=?, meta_json=?
+               WHERE id=?""",
+            (out_name, f"/api/assets/file/{out_name}", w, h, size_bytes,
+             json.dumps(meta), child["id"]),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+    logger.info("logo slot tile %s filled from real logo asset %s",
+                child["id"], logo_asset_id)
+    return True
 
 
 def composite_logo(base_path: "Path", logo_path: "Path", out_path: "Path") -> tuple[int, int, int]:
@@ -337,6 +500,11 @@ async def _apply_logo(batch: dict[str, Any], base_row: dict[str, Any]) -> None:
     warning attached to the composite record."""
     from app.routers.assets import ASSETS_DIR
     from google_ads.services.campaign.creative_images import locate_local_image
+
+    # A logo slot never gets a logo composited onto it — it already carries the
+    # brand mark (defect c/d guard).
+    if (base_row.get("slot") or "") in _LOGO_SLOTS:
+        return
 
     policy = _logo_overlay_policy(batch.get("campaign_type") or "pmax")
     if policy == "forbid":

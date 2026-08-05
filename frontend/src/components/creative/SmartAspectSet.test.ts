@@ -95,3 +95,20 @@ describe('SmartAspectSet — batch lifecycle wiring (FR2.3/2.4)', () => {
     expect(SRC).toContain('asset_anchored');
   });
 });
+
+describe('SmartAspectSet — references + logo are additive, not mode-gated (defect a)', () => {
+  const code = codeOnly(SRC);
+
+  it('sends reference photos whenever present, NOT only in asset_anchored mode', () => {
+    // The maiden-run bug: `reference_asset_ids: mode === 'asset_anchored' ? … : undefined`
+    // dropped the operator's photos the moment they chose a logo. Refs must flow
+    // whenever the wizard has them, independent of the mode selector.
+    expect(code).toContain('reference_asset_ids: referenceAssetIds?.length');
+    expect(code).not.toMatch(/reference_asset_ids:\s*mode\s*===/);
+  });
+
+  it('sends the logo whenever present, NOT only in with_logo mode', () => {
+    expect(code).toContain('logo_asset_id: logoAssetId ||');
+    expect(code).not.toMatch(/logo_asset_id:\s*mode\s*===/);
+  });
+});

@@ -74,6 +74,8 @@ async def _seed_asset(account: str, size=(200, 80)) -> str:
 
 class _FakeClient:
     last_params: dict = {}
+    last_prompt: str = ""
+    submit_calls: int = 0
 
     def __init__(self, *a, **k) -> None:
         pass
@@ -83,6 +85,8 @@ class _FakeClient:
 
     async def submit_image(self, *, model, prompt, aspect_ratio, **params):
         _FakeClient.last_params = dict(params)
+        _FakeClient.last_prompt = prompt
+        _FakeClient.submit_calls += 1
         return {"image_url": "https://cdn.example/x.png", "raw": [{"id": str(uuid.uuid4())}]}
 
 
@@ -98,10 +102,15 @@ class ModesBase(unittest.TestCase):
     def setUp(self) -> None:
         studio._GENERATION_SEMAPHORE = asyncio.Semaphore(6)
         _FakeClient.last_params = {}
+        _FakeClient.last_prompt = ""
+        _FakeClient.submit_calls = 0
 
 
 class WithLogo(ModesBase):
     def test_allow_warned_type_composites_two_rows_linked_by_parent(self):
+        # No campaign type is allow_warned anymore (all forbid since the medallion
+        # defect fix), so the composite CAPABILITY is exercised by flipping the
+        # policy function — proving the data-driven path still works end-to-end.
         async def _flow():
             logo = await _seed_asset("acc-logo")
             res = await br.create_batch(
@@ -110,7 +119,8 @@ class WithLogo(ModesBase):
                 logo_asset_id=logo, slots=[{"slot": "square", "variants": 1}])
             batch_id = res["batch_id"]
             with mock.patch.object(studio, "HiggsfieldClient", _FakeClient), \
-                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                    mock.patch.object(studio, "_download_to_assets", _fake_download), \
+                    mock.patch.object(br, "_logo_overlay_policy", lambda ct: "allow_warned"):
                 await br._supervise(batch_id)
             view = await br.get_batch(batch_id)
             composites = await br._read_composites(batch_id)
@@ -184,6 +194,90 @@ class WithoutLogo(ModesBase):
         composites, params = _run(_flow())
         self.assertEqual(composites, {})
         self.assertNotIn("image", params)  # no reference conditioning
+
+
+class ReferencesFlowInEveryMode(ModesBase):
+    """Defect (a) / fix 1: reference photos anchor SCENE tiles regardless of the
+    mode selector. The maiden run chose with_logo, which silently DROPPED the
+    references (empty reference_asset_ids_json in the DB) — this is the regression
+    guard: refs + a logo now BOTH flow, and the scene tile gets `--image` flags."""
+
+    def test_references_reach_submit_even_in_with_logo_mode(self):
+        async def _flow():
+            ref = await _seed_asset("acc-both", size=(640, 640))
+            logo = await _seed_asset("acc-both", size=(256, 256))
+            res = await br.create_batch(
+                account_id="acc-both", art_direction="real property facade",
+                model="nano_banana_2", mode="with_logo", campaign_type="demand_gen",
+                logo_asset_id=logo, reference_asset_ids=[ref],
+                slots=[{"slot": "landscape", "variants": 1}])
+            with mock.patch.object(studio, "HiggsfieldClient", _FakeClient), \
+                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                await br._supervise(res["batch_id"])
+            return _FakeClient.last_params
+
+        params = _run(_flow())
+        self.assertIn("image", params)     # scene tile anchored despite with_logo
+        self.assertTrue(params["image"])
+
+    def test_scene_prompt_contains_single_scene_anti_collage_clause(self):
+        async def _flow():
+            res = await br.create_batch(
+                account_id="acc-scene",
+                art_direction="3 concepts x landscape / square / portrait",
+                model="nano_banana_2", campaign_type="demand_gen",
+                slots=[{"slot": "landscape", "variants": 1}])
+            with mock.patch.object(studio, "HiggsfieldClient", _FakeClient), \
+                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                await br._supervise(res["batch_id"])
+            return _FakeClient.last_prompt
+
+        prompt = _run(_flow())
+        self.assertIn("SINGLE SCENE ONLY", prompt)   # defect b: no grids/mosaics
+        self.assertIn("COMPOSITION FOR THIS VARIANT", prompt)  # defect e
+
+
+class LogoSlotUsesRealAsset(ModesBase):
+    """Defect (d) / fix 4: a logo slot with a provided logo asset is filled from
+    the REAL logo file (crop/fit path), NOT an AI-generated brand impression and
+    NEVER the scene brief. Generation is bypassed entirely (zero credits)."""
+
+    def test_logo_slot_bypasses_generation_and_places_real_file(self):
+        async def _flow():
+            logo = await _seed_asset("acc-logoslot", size=(256, 256))
+            res = await br.create_batch(
+                account_id="acc-logoslot", art_direction="40s American with a family photo",
+                model="nano_banana_2", mode="with_logo", campaign_type="demand_gen",
+                logo_asset_id=logo, slots=[{"slot": "logos", "variants": 1}])
+            with mock.patch.object(studio, "HiggsfieldClient", _FakeClient), \
+                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                await br._supervise(res["batch_id"])
+            tile = await br._read_child(res["tiles"][0]["asset_id"])
+            return tile, _FakeClient.submit_calls
+
+        tile, submit_calls = _run(_flow())
+        self.assertEqual(submit_calls, 0)                 # NO generation call
+        self.assertEqual(tile["status"], "completed")
+        meta = json.loads(tile["meta_json"])
+        self.assertEqual(meta["logo_source"], "asset_file")
+        self.assertTrue(tile["url"])                       # a real file was placed
+
+    def test_logo_slot_without_asset_generates_clean_mark_not_scene(self):
+        async def _flow():
+            res = await br.create_batch(
+                account_id="acc-nologoasset",
+                art_direction="40s American holding an old family photograph",
+                model="nano_banana_2", campaign_type="demand_gen",
+                slots=[{"slot": "logos", "variants": 1}])
+            with mock.patch.object(studio, "HiggsfieldClient", _FakeClient), \
+                    mock.patch.object(studio, "_download_to_assets", _fake_download):
+                await br._supervise(res["batch_id"])
+            return _FakeClient.last_prompt, _FakeClient.submit_calls
+
+        prompt, submit_calls = _run(_flow())
+        self.assertEqual(submit_calls, 1)                  # generated (no asset)
+        self.assertIn("LOGO tile", prompt)                 # clean mark prompt
+        self.assertNotIn("family photograph", prompt)      # never the scene brief
 
 
 if __name__ == "__main__":
