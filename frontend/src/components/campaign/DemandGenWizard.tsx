@@ -29,7 +29,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ArrowRight, Megaphone, CheckCircle2, Circle, X,
   Upload, Image as ImageIcon, Sparkles, Loader2, AlertCircle,
-  FolderOpen, Search, Globe, Languages, DollarSign, Video, Compass,
+  FolderOpen, Search, DollarSign, Video, Compass,
   Monitor, Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -60,6 +60,7 @@ import StudioPanel, {
   type StudioPanelContext,
 } from '@/components/studio/StudioPanel';
 import SmartAspectSet, { type SmartAspectSlot } from '@/components/creative/SmartAspectSet';
+import TargetingFields from '@/components/campaign/TargetingFields';
 
 // The full slot set for a Demand Gen campaign (Smart ASPECT Set — story 17.6).
 const DG_FULL_SET_SLOTS: SmartAspectSlot[] = [
@@ -136,7 +137,7 @@ interface DGBundle {
 const EMPTY_BUNDLE: DGBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   corporateBrand: true, referenceAssetIds: [],
-  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '',
+  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
   headlines: [''], descriptions: [''],
   headlineAngles: [], headlineLocks: [], descriptionAngles: [], descriptionLocks: [],
   dismissedDupPairs: [],
@@ -542,28 +543,12 @@ function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField
 
 function StepTargeting({ bundle, setField }: { bundle: DGBundle; setField: SetField }) {
   return (
-    <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground leading-relaxed border border-border bg-secondary/20 rounded-md p-3">
-        Targeting is optional — leave a field empty and Google targets all locations / all languages. Enter Google
-        {' '}<b>geo target constant IDs</b> and <b>language constant IDs</b> (comma-separated numbers). Common ids:
-        {' '}<span className="font-mono">2840</span> = United States · <span className="font-mono">2826</span> = United Kingdom ·
-        {' '}<span className="font-mono">2124</span> = Canada · language <span className="font-mono">1000</span> = English ·
-        {' '}<span className="font-mono">1003</span> = Spanish.
-      </p>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Globe className="h-3.5 w-3.5" /> Included locations (geo ids)</label>
-        <Input value={bundle.locationIds} onChange={e => setField('locationIds', e.target.value)} placeholder="2840, 2826" />
-      </div>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Globe className="h-3.5 w-3.5 text-red-500" /> Excluded locations (geo ids)</label>
-        <Input value={bundle.excludedLocationIds} onChange={e => setField('excludedLocationIds', e.target.value)} placeholder="e.g. 1014044 (a metro to carve out)" />
-        <p className="text-[10px] text-muted-foreground mt-1">Negative geo criteria — carve regions OUT of the included target.</p>
-      </div>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Languages className="h-3.5 w-3.5" /> Languages (language ids)</label>
-        <Input value={bundle.languageIds} onChange={e => setField('languageIds', e.target.value)} placeholder="1000" />
-      </div>
-    </div>
+    <TargetingFields
+      locationIds={bundle.locationIds}
+      excludedLocationIds={bundle.excludedLocationIds}
+      languageIds={bundle.languageIds}
+      onChange={setField}
+    />
   );
 }
 

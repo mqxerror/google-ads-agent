@@ -16,7 +16,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   ArrowLeft, ArrowRight, Images, CheckCircle2, Circle, Sparkles, Loader2,
-  AlertCircle, Globe, Languages, DollarSign, ImageIcon,
+  AlertCircle, DollarSign, ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRdaRules } from '@/lib/creativeSpecs';
@@ -38,6 +38,7 @@ import { isLocalAssetRef, touchCacheTs } from '@/components/creative/crashCache'
 import SmartAspectSet, {
   type SmartAspectSlot, type SmartAspectSetProps,
 } from '@/components/creative/SmartAspectSet';
+import TargetingFields from '@/components/campaign/TargetingFields';
 
 // The RDA marketing-image slot set for the Smart ASPECT Set (logos are the
 // operator's real uploads, not generated — see the image step).
@@ -91,7 +92,7 @@ interface RdaBundle {
 const EMPTY_BUNDLE: RdaBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   referenceAssetIds: [],
-  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '',
+  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
   headlines: [''], headlineAngles: [],
   longHeadlines: [''], longHeadlineAngles: [],
   descriptions: [''], descriptionAngles: [],
@@ -391,29 +392,13 @@ function StepBrief({ bundle, setField, accountId }: { bundle: RdaBundle; setFiel
         <Input type="number" step="0.01" min="0.01" value={bundle.targetCpa} onChange={e => setField('targetCpa', e.target.value)} placeholder="Leave blank for pure Maximize Conversions" />
       </div>
 
-      <TargetingFields bundle={bundle} setField={setField} />
-    </div>
-  );
-}
-
-function TargetingFields({ bundle, setField }: { bundle: RdaBundle; setField: SetField }) {
-  return (
-    <div className="border border-border rounded-md p-3 bg-secondary/20 space-y-3">
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Targeting is optional — leave a field empty and Google targets all locations / all languages. Enter Google
-        {' '}<b>geo target constant IDs</b> and <b>language constant IDs</b> (comma-separated numbers).
-      </p>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Globe className="h-3.5 w-3.5" /> Included locations (geo ids)</label>
-        <Input value={bundle.locationIds} onChange={e => setField('locationIds', e.target.value)} placeholder="2840, 2826" />
-      </div>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Globe className="h-3.5 w-3.5 text-red-500" /> Excluded locations (geo ids)</label>
-        <Input value={bundle.excludedLocationIds} onChange={e => setField('excludedLocationIds', e.target.value)} placeholder="e.g. a metro to carve out" />
-      </div>
-      <div>
-        <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5"><Languages className="h-3.5 w-3.5" /> Languages (language ids)</label>
-        <Input value={bundle.languageIds} onChange={e => setField('languageIds', e.target.value)} placeholder="1000" />
+      <div className="border border-border rounded-md p-3 bg-secondary/20">
+        <TargetingFields
+          locationIds={bundle.locationIds}
+          excludedLocationIds={bundle.excludedLocationIds}
+          languageIds={bundle.languageIds}
+          onChange={setField}
+        />
       </div>
     </div>
   );
