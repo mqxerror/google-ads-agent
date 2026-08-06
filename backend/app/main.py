@@ -224,5 +224,16 @@ async def serve_spa(full_path: str):
         and str(candidate).startswith(str(_FRONTEND_DIST.resolve()))
         and candidate.is_file()
     ):
-        return FileResponse(candidate)
-    return FileResponse(_FRONTEND_DIST / "index.html")
+        # Hashed assets (index-XXXX.js etc.) are immutable — cache hard.
+        # Everything else (favicon, manifest) revalidates.
+        headers = (
+            {"Cache-Control": "public, max-age=31536000, immutable"}
+            if full_path.startswith("assets/")
+            else {"Cache-Control": "no-cache"}
+        )
+        return FileResponse(candidate, headers=headers)
+    # index.html must NEVER be cached — a stale entry page pins users to old
+    # bundles and forces the hard-refresh ritual after every ship.
+    return FileResponse(
+        _FRONTEND_DIST / "index.html", headers={"Cache-Control": "no-store"}
+    )
