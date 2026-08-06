@@ -403,6 +403,60 @@ class GoogleAdsService:
             })
         return out
 
+    async def get_conversion_actions_with_counts(
+        self, customer_id: str, window_days: int = 30
+    ) -> list[dict]:
+        """ENABLED conversion actions + their conversion count over the last
+        ``window_days`` days — the read behind the wizard's conversion-goal
+        picker (task #49).
+
+        Two READ-ONLY GAQL queries, joined in Python: the ENABLED action list
+        (id / name / type / category / primary_for_goal) and a
+        ``segments.conversion_action`` metrics pull so the operator can tell the
+        LIVE action (e.g. "Canada Descent Lead — 69 conv/30d") from a zombie
+        ("[DEPRECATED]… — 0"). Sorted by conversions desc. NEVER mutates.
+        """
+        days = window_days if window_days and window_days > 0 else 30
+        since = (date.today() - timedelta(days=days - 1)).isoformat()
+        today = date.today().isoformat()
+
+        list_query = (
+            "SELECT conversion_action.id, conversion_action.name, "
+            "conversion_action.type, conversion_action.category, "
+            "conversion_action.primary_for_goal "
+            "FROM conversion_action WHERE conversion_action.status = 'ENABLED'"
+        )
+        count_query = (
+            "SELECT segments.conversion_action, metrics.all_conversions "
+            "FROM customer "
+            f"WHERE segments.date BETWEEN '{since}' AND '{today}'"
+        )
+        cid = _clean_id(customer_id)
+        list_rows = await asyncio.to_thread(_run_query, cid, list_query)
+        count_rows = await asyncio.to_thread(_run_query, cid, count_query)
+
+        counts: dict[str, float] = {}
+        for r in count_rows:
+            rn = r.segments.conversion_action  # customers/.../conversionActions/{id}
+            action_id = rn.rsplit("/", 1)[-1]
+            counts[action_id] = counts.get(action_id, 0.0) + float(
+                r.metrics.all_conversions or 0
+            )
+
+        out: list[dict] = []
+        for r in list_rows:
+            ca = r.conversion_action
+            out.append({
+                "id": str(ca.id),
+                "name": ca.name,
+                "type": ca.type_.name,
+                "category": ca.category.name,
+                "conversions": round(counts.get(str(ca.id), 0.0), 1),
+                "primary_for_goal": bool(ca.primary_for_goal),
+            })
+        out.sort(key=lambda a: a["conversions"], reverse=True)
+        return out
+
     # ── ad groups ────────────────────────────────────────────────
 
     async def get_adgroups(

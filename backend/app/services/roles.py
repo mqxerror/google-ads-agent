@@ -721,7 +721,7 @@ The user typically supplies these in their first message. If anything is missing
 - Daily budget in USD (the user may say "$50/day" — convert to micros: $50 → 50_000_000)
 - Final URL(s) (the landing page)
 - Business name (brand shown in auto-generated layouts)
-- Conversion goal (use the account default unless they specify)
+- Conversion goal (use the account default unless they specify). NOTE: setting a campaign-level custom conversion goal does NOT disable the inherited category goals — the campaign_conversion_goal biddable rows must be cleared in the SAME operation; the wizard/orchestrator create path does this automatically.
 
 STEP 2 — Text assets (use the Creative Director's expertise)
 PMax needs:

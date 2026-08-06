@@ -71,6 +71,9 @@ from google_ads.sdk_client import get_sdk_client
 from google_ads.services.assets.asset_service import AssetService
 from google_ads.services.bidding.budget_service import BudgetService
 from google_ads.services.campaign import creative_images
+from google_ads.services.conversions.conversion_goal_setup import (
+    apply_bundle_conversion_goal,
+)
 from google_ads.services.campaign.campaign_service import CampaignService
 from google_ads.services.campaign.campaign_criterion_service import (
     CampaignCriterionService,
@@ -522,6 +525,16 @@ class RdaOrchestrator:
                 end_date=bundle.get("end_date"),
             )
             campaign_id = _id_from_resource_name(created_campaign_rn)
+
+            # ── Step 2.5 — Conversion goal (optional; wizard/Director choice) ─
+            # Pin the ONE chosen conversion action as the campaign's biddable
+            # goal, right after the campaign exists. No-op when the operator kept
+            # the account-default goals or made no choice. A failure here rolls
+            # back the campaign + budget like any other step.
+            failed_step = "conversion goal setup"
+            await apply_bundle_conversion_goal(
+                ctx, customer_id, campaign_id, bundle, warnings
+            )
 
             # ── Step 3 — Geo + language targeting ─────────────────────
             failed_step = "geo/language targeting"

@@ -51,6 +51,25 @@ class CampaignConversionGoalService:
         assert self._client is not None
         return self._client
 
+    def mutate_campaign_conversion_goals(
+        self,
+        customer_id: str,
+        operations: List[CampaignConversionGoalOperation],
+        validate_only: bool = False,
+    ) -> MutateCampaignConversionGoalsResponse:
+        """Apply pre-built campaign-conversion-goal operations in ONE batch.
+
+        The batch entry point reused by ``conversion_goal_setup`` to zero every
+        category row for a campaign in a single mutate (the proven fix for the
+        "multiple conversion goals" warning). Callers build the operations (each
+        an update masked to ``biddable``); this only sends them.
+        """
+        request = MutateCampaignConversionGoalsRequest()
+        request.customer_id = format_customer_id(customer_id)
+        request.operations = operations
+        request.validate_only = validate_only
+        return self.client.mutate_campaign_conversion_goals(request=request)
+
     async def update_campaign_conversion_goal(
         self,
         ctx: Context,

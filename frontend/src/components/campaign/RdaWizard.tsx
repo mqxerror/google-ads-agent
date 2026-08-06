@@ -39,6 +39,7 @@ import SmartAspectSet, {
   type SmartAspectSlot, type SmartAspectSetProps,
 } from '@/components/creative/SmartAspectSet';
 import TargetingFields from '@/components/campaign/TargetingFields';
+import ConversionGoalField from '@/components/campaign/ConversionGoalField';
 
 // The RDA marketing-image slot set for the Smart ASPECT Set (logos are the
 // operator's real uploads, not generated — see the image step).
@@ -73,6 +74,8 @@ interface RdaBundle {
   brief: string;
   referenceAssetIds: string[]; // operator photos anchoring generation (local ids)
   targetCpa: string;           // optional dollars; blank = pure Maximize Conversions
+  conversionGoalActionId: string; // '' unchosen · ACCOUNT_DEFAULT · action id
+  conversionGoalLabel: string;    // human label for the Review step
   locationIds: string;
   excludedLocationIds: string;
   languageIds: string;
@@ -92,7 +95,8 @@ interface RdaBundle {
 const EMPTY_BUNDLE: RdaBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   referenceAssetIds: [],
-  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
+  targetCpa: '', conversionGoalActionId: '', conversionGoalLabel: '',
+  locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
   headlines: [''], headlineAngles: [],
   longHeadlines: [''], longHeadlineAngles: [],
   descriptions: [''], descriptionAngles: [],
@@ -157,6 +161,7 @@ export default function RdaWizard({ onClose, onBackToTypePicker }: RdaWizardProp
       if (!bundle.businessName.trim()) missing.push('business name');
       else if (bundle.businessName.length > rules.businessNameMaxChars) missing.push(`business name over ${rules.businessNameMaxChars} chars`);
       if (bundle.targetCpa.trim() && !(parseFloat(bundle.targetCpa) > 0)) missing.push('a valid target CPA (or leave it blank)');
+      if (!bundle.conversionGoalActionId) missing.push('a conversion goal');
     } else if (stepId === 'text') {
       const h = bundle.headlines.filter(s => s.trim());
       const lh = bundle.longHeadlines.filter(s => s.trim());
@@ -184,6 +189,7 @@ export default function RdaWizard({ onClose, onBackToTypePicker }: RdaWizardProp
         return !!bundle.name.trim() && !!bundle.finalUrl.trim()
           && !!bundle.businessName.trim()
           && bundle.businessName.length <= rules.businessNameMaxChars
+          && !!bundle.conversionGoalActionId
           && Number.isFinite(b) && b > 0 && cpaOk;
       }
       case 'text': {
@@ -234,6 +240,7 @@ export default function RdaWizard({ onClose, onBackToTypePicker }: RdaWizardProp
           landscape_logos: bundle.landscapeLogos,
           marketing_images: { landscape: bundle.landscape, square: bundle.square },
           target_cpa_micros,
+          conversion_goal_action_id: bundle.conversionGoalActionId || null,
           location_ids: parseIds(bundle.locationIds),
           excluded_location_ids: parseIds(bundle.excludedLocationIds),
           language_ids: parseIds(bundle.languageIds),
@@ -391,6 +398,12 @@ function StepBrief({ bundle, setField, accountId }: { bundle: RdaBundle; setFiel
         <label className="text-xs font-medium mb-1.5 block">Target CPA (USD, optional)</label>
         <Input type="number" step="0.01" min="0.01" value={bundle.targetCpa} onChange={e => setField('targetCpa', e.target.value)} placeholder="Leave blank for pure Maximize Conversions" />
       </div>
+
+      <ConversionGoalField
+        accountId={accountId}
+        value={bundle.conversionGoalActionId}
+        onChange={(id, label) => { setField('conversionGoalActionId', id); setField('conversionGoalLabel', label); }}
+      />
 
       <div className="border border-border rounded-md p-3 bg-secondary/20">
         <TargetingFields
@@ -586,6 +599,7 @@ function StepReview({ bundle, submitResult, submitting }: {
       <ReviewRow label="Campaign name" value={bundle.name} />
       <ReviewRow label="Daily budget" value={`$${parseFloat(bundle.dailyBudget || '0').toFixed(2)}/d`} />
       <ReviewRow label="Bidding" value={bundle.targetCpa.trim() ? `Maximize Conversions · tCPA $${parseFloat(bundle.targetCpa).toFixed(2)}` : 'Maximize Conversions'} />
+      <ReviewRow label="Conversion goal" value={bundle.conversionGoalActionId === 'ACCOUNT_DEFAULT' ? 'Account default goals (not recommended)' : (bundle.conversionGoalLabel || bundle.conversionGoalActionId || 'Not selected')} />
       <ReviewRow label="Final URL" value={bundle.finalUrl} />
       <ReviewRow label="Business name" value={bundle.businessName} />
       <ReviewRow label="Targeting" value={`geo incl: ${geo(bundle.locationIds).join(', ') || 'all'} · geo excl: ${geo(bundle.excludedLocationIds).join(', ') || 'none'} · lang: ${geo(bundle.languageIds).join(', ') || 'all'}`} />

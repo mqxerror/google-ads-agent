@@ -14,6 +14,7 @@ from app.models.schemas import (
     AlertResponse,
     CampaignGoalResponse,
     CampaignGoalUpdateRequest,
+    ConversionActionOption,
     DashboardResponse,
     AccountHealthResponse,
     OnboardingScanResult,
@@ -299,6 +300,33 @@ async def update_campaign_goals(
         return CampaignGoalResponse(**dict(row))
     finally:
         await db.close()
+
+
+# ── Conversion actions (wizard conversion-goal picker) ─────────────
+
+
+@router.get(
+    "/accounts/{account_id}/conversion-actions",
+    response_model=list[ConversionActionOption],
+)
+async def list_conversion_actions(account_id: str, window: int = 30):
+    """List the account's ENABLED conversion actions with their conversion count
+    over the last ``window`` days (default 30) — backs the campaign wizards'
+    conversion-goal dropdown so the operator picks the live action, not a zombie.
+    READ-ONLY; 502 on a Google API failure."""
+    from app.services.google_ads import GoogleAdsService
+
+    try:
+        actions = await GoogleAdsService().get_conversion_actions_with_counts(
+            account_id, window_days=window
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Conversion-action listing failed for account=%s", account_id)
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "GOOGLE_ADS_ERROR", "message": str(e)[:500]},
+        )
+    return [ConversionActionOption(**a) for a in actions]
 
 
 # ── Alerts ─────────────────────────────────────────────────────────

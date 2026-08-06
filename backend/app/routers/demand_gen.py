@@ -98,6 +98,11 @@ class DemandGenCreateRequest(BaseModel):
     final_mobile_urls: Optional[List[str]] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    # Optional conversion-goal selection from the wizard's Brief step. A numeric
+    # conversion-action id pins that single action as the campaign's biddable
+    # goal (custom goal → CAMPAIGN config → clear inherited category rows). The
+    # "ACCOUNT_DEFAULT" sentinel (or None) keeps the account-default goals.
+    conversion_goal_action_id: Optional[str] = None
 
 
 class DemandGenCreateResponse(BaseModel):
@@ -151,6 +156,7 @@ async def create_demand_gen(
         "excluded_user_list_ids": body.excluded_user_list_ids,
         "start_date": body.start_date,
         "end_date": body.end_date,
+        "conversion_goal_action_id": body.conversion_goal_action_id,
     }
     try:
         _ensure_sdk_client()

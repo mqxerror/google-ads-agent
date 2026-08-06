@@ -61,6 +61,7 @@ import StudioPanel, {
 } from '@/components/studio/StudioPanel';
 import SmartAspectSet, { type SmartAspectSlot } from '@/components/creative/SmartAspectSet';
 import TargetingFields from '@/components/campaign/TargetingFields';
+import ConversionGoalField from '@/components/campaign/ConversionGoalField';
 
 // The full slot set for a Demand Gen campaign (Smart ASPECT Set — story 17.6).
 const DG_FULL_SET_SLOTS: SmartAspectSlot[] = [
@@ -113,6 +114,8 @@ interface DGBundle {
   corporateBrand: boolean;     // assisted image gen uses the demand_gen preset
   referenceAssetIds: string[]; // operator's own hotel/property photos (local ids)
   targetCpa: string;           // optional dollars; blank = pure Maximize Conversions
+  conversionGoalActionId: string; // '' unchosen · ACCOUNT_DEFAULT · action id
+  conversionGoalLabel: string;    // human label for the Review step
   locationIds: string;         // comma-separated geo target constant ids
   excludedLocationIds: string;
   languageIds: string;         // comma-separated language constant ids
@@ -137,7 +140,8 @@ interface DGBundle {
 const EMPTY_BUNDLE: DGBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
   corporateBrand: true, referenceAssetIds: [],
-  targetCpa: '', locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
+  targetCpa: '', conversionGoalActionId: '', conversionGoalLabel: '',
+  locationIds: '', excludedLocationIds: '', languageIds: '1000',  // default: English
   headlines: [''], descriptions: [''],
   headlineAngles: [], headlineLocks: [], descriptionAngles: [], descriptionLocks: [],
   dismissedDupPairs: [],
@@ -245,6 +249,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
       if (!bundle.businessName.trim()) missing.push('business name');
       else if (bundle.businessName.length > rules.businessNameMaxChars) missing.push(`business name over ${rules.businessNameMaxChars} chars`);
       if (bundle.targetCpa.trim() && !(parseFloat(bundle.targetCpa) > 0)) missing.push('a valid target CPA (or leave it blank)');
+      if (!bundle.conversionGoalActionId) missing.push('a conversion goal');
     } else if (stepId === 'text') {
       const h = bundle.headlines.filter(s => s.trim());
       const d = bundle.descriptions.filter(s => s.trim());
@@ -270,6 +275,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
           && !!bundle.finalUrl.trim()
           && !!bundle.businessName.trim()
           && bundle.businessName.length <= rules.businessNameMaxChars
+          && !!bundle.conversionGoalActionId
           && Number.isFinite(b) && b > 0
           && cpaOk;
       }
@@ -326,6 +332,7 @@ export default function DemandGenWizard({ onClose, onBackToTypePicker }: DemandG
           },
           channels: bundle.channels,
           target_cpa_micros,
+          conversion_goal_action_id: bundle.conversionGoalActionId || null,
           location_ids: parseIds(bundle.locationIds),
           excluded_location_ids: parseIds(bundle.excludedLocationIds),
           language_ids: parseIds(bundle.languageIds),
@@ -537,6 +544,12 @@ function StepBrief({ bundle, setField, accountId }: { bundle: DGBundle; setField
           placeholder="Leave blank for pure Maximize Conversions"
         />
       </div>
+
+      <ConversionGoalField
+        accountId={accountId}
+        value={bundle.conversionGoalActionId}
+        onChange={(id, label) => { setField('conversionGoalActionId', id); setField('conversionGoalLabel', label); }}
+      />
     </div>
   );
 }
@@ -992,6 +1005,7 @@ function StepReview({ bundle, submitResult, submitting }: {
       <ReviewRow label="Campaign name" value={bundle.name} />
       <ReviewRow label="Daily budget" value={`$${parseFloat(bundle.dailyBudget || '0').toFixed(2)}/d`} />
       <ReviewRow label="Bidding" value={bundle.targetCpa.trim() ? `Maximize Conversions · tCPA $${parseFloat(bundle.targetCpa).toFixed(2)}` : 'Maximize Conversions'} />
+      <ReviewRow label="Conversion goal" value={bundle.conversionGoalActionId === 'ACCOUNT_DEFAULT' ? 'Account default goals (not recommended)' : (bundle.conversionGoalLabel || bundle.conversionGoalActionId || 'Not selected')} />
       <ReviewRow label="Final URL" value={bundle.finalUrl} />
       <ReviewRow label="Business name" value={bundle.businessName} />
       <ReviewRow label="Targeting" value={`geo incl: ${geo(bundle.locationIds).join(', ') || 'all'} · geo excl: ${geo(bundle.excludedLocationIds).join(', ') || 'none'} · lang: ${geo(bundle.languageIds).join(', ') || 'all'}`} />

@@ -15,6 +15,19 @@ class AccountResponse(BaseModel):
     is_active: bool = True
 
 
+class ConversionActionOption(BaseModel):
+    """One selectable conversion action for the wizard's conversion-goal picker
+    (task #49). ``conversions`` is the count over the requested window (default
+    30 days) so the operator picks the LIVE action, not a zombie."""
+
+    id: str
+    name: str
+    type: str
+    category: str
+    conversions: float = 0.0
+    primary_for_goal: bool = False
+
+
 class CampaignMetrics(BaseModel):
     impressions: int = 0
     clicks: int = 0

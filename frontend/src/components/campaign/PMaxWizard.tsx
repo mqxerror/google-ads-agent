@@ -47,6 +47,7 @@ import BusinessNameField from '@/components/creative/BusinessNameField';
 import BrandPresetToggle from '@/components/creative/BrandPresetToggle';
 import ReferencePhotosPicker from '@/components/creative/ReferencePhotosPicker';
 import ConfirmCreateModal from '@/components/creative/ConfirmCreateModal';
+import ConversionGoalField from '@/components/campaign/ConversionGoalField';
 import {
   isLocalAssetRef, readServerRef, readCacheTs, writeServerRef,
   clearCacheMeta, touchCacheTs, shouldOfferRestore,
@@ -107,6 +108,8 @@ interface PMaxBundle {
   finalUrl: string;
   businessName: string;
   brief: string;          // optional — fuel for the Creative Director draft
+  conversionGoalActionId: string; // '' unchosen · ACCOUNT_DEFAULT · action id
+  conversionGoalLabel: string;    // human label for the Review step
   corporateBrand: boolean;     // assist-layer backport (16.5) — image preset
   referenceAssetIds: string[]; // operator's own photos → baseContext (asset-anchored)
   headlines: string[];
@@ -131,6 +134,7 @@ interface PMaxBundle {
 
 const EMPTY_BUNDLE: PMaxBundle = {
   name: '', dailyBudget: '', finalUrl: '', businessName: '', brief: '',
+  conversionGoalActionId: '', conversionGoalLabel: '',
   corporateBrand: true, referenceAssetIds: [],
   headlines: [''], longHeadlines: [''], descriptions: ['', ''],
   headlineAngles: [], headlineLocks: [],
@@ -234,6 +238,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
       if (!(parseFloat(bundle.dailyBudget) > 0)) missing.push('daily budget');
       if (!bundle.finalUrl.trim()) missing.push('final URL');
       if (!bundle.businessName.trim()) missing.push('business name');
+      if (!bundle.conversionGoalActionId) missing.push('a conversion goal');
     } else if (stepId === 'text') {
       const h = bundle.headlines.filter(Boolean);
       const lh = bundle.longHeadlines.filter(Boolean);
@@ -266,6 +271,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           && !isMalformedUrl(bundle.finalUrl)
           && !!bundle.businessName.trim()
           && bundle.businessName.length <= rules.businessNameMaxChars
+          && !!bundle.conversionGoalActionId
           && Number.isFinite(b) && b > 0;
       }
       case 'text': {
@@ -328,6 +334,7 @@ export default function PMaxWizard({ onClose, onBackToTypePicker }: PMaxWizardPr
           budget_micros,
           final_urls: [bundle.finalUrl],
           business_name: bundle.businessName,
+          conversion_goal_action_id: bundle.conversionGoalActionId || null,
           headlines: bundle.headlines.filter(Boolean),
           long_headlines: bundle.longHeadlines.filter(Boolean),
           descriptions: bundle.descriptions.filter(Boolean),
@@ -556,6 +563,11 @@ function StepBrief({ bundle, setField, accountId }: { bundle: PMaxBundle; setFie
         accountId={accountId}
         value={bundle.referenceAssetIds}
         onChange={ids => setField('referenceAssetIds', ids)}
+      />
+      <ConversionGoalField
+        accountId={accountId}
+        value={bundle.conversionGoalActionId}
+        onChange={(id, label) => { setField('conversionGoalActionId', id); setField('conversionGoalLabel', label); }}
       />
     </div>
   );
@@ -1981,6 +1993,7 @@ function StepReview({ bundle, submitResult, submitting }: { bundle: PMaxBundle; 
       <ReviewRow label="Daily budget" value={`$${parseFloat(bundle.dailyBudget || '0').toFixed(2)}/d`} />
       <ReviewRow label="Final URL" value={bundle.finalUrl} />
       <ReviewRow label="Business name" value={bundle.businessName} />
+      <ReviewRow label="Conversion goal" value={bundle.conversionGoalActionId === 'ACCOUNT_DEFAULT' ? 'Account default goals (not recommended)' : (bundle.conversionGoalLabel || bundle.conversionGoalActionId || 'Not selected')} />
       <ReviewRow label="Text assets" value={`${bundle.headlines.filter(Boolean).length} headlines · ${bundle.longHeadlines.filter(Boolean).length} long · ${bundle.descriptions.filter(Boolean).length} descriptions`} />
       <ReviewRow label="Image assets" value={`${bundle.logos.length} logo · ${bundle.landscape.length} landscape · ${bundle.square.length} square · ${bundle.portrait.length} portrait`} />
       <ReviewRow label="Videos" value={bundle.videoIds.filter(Boolean).length ? `${bundle.videoIds.filter(Boolean).length} YouTube video(s)` : '— (Google will auto-generate one)'} />
