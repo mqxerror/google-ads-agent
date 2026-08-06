@@ -81,6 +81,23 @@ Please propose:
 
 Show the plan before executing.`,
   },
+  {
+    id: 'business-agent-leads-watch',
+    label: 'Business Agent for Leads Watch',
+    icon: '🤝',
+    category: 'create',
+    description: 'Track the Gemini lead-agent beta and check whether the site is ready to power it',
+    suggestedModel: 'sonnet',
+    prompt: `Watch + readiness check for Google's "Business Agent for Leads" — a Gemini chat unit that replaces the static lead form, answers prospect questions grounded in your website copy, then submits a pre-filled form once the conversation signals real intent. It launched at Google Marketing Live (2026-05-20) and is in beta.
+
+1. **Check current availability / beta status**: do a quick web search to confirm the current state (still beta? GA? eligibility criteria?) — this moves fast. Report what you find WITH the source date; don't assume it's still where it was in May 2026.
+
+2. **Assess fit for this account**: it's purpose-built for high-consideration, question-heavy purchases — exactly RBI / immigration (eligibility, budget, timeline questions before a form). Give a plain-language recommendation on whether to pursue the beta and what it could do for lead quality (pre-qualification before the form submits).
+
+3. **Prerequisite audit — site copy accuracy (this is the gate):** the agent speaks AS the brand and answers ONLY from site content, so **site accuracy becomes ad accuracy**. Before enabling, the LP/site copy it would ground on must be current and compliant. Check for outdated program facts (stay requirements, investment minimums, timelines) — e.g. the Panama QIP "one visit every 2 years" fact must be correct — and confirm there is no citizenship or guaranteed-approval language the agent could repeat. List everything that must be fixed before this can be turned on.
+
+Output: current beta status (with source), a fit verdict, and a punch-list of site-copy fixes required before enabling. Nothing gets enabled without my approval.`,
+  },
 
   // ── Analyze ────────────────────────────────────────────
   {
@@ -136,6 +153,24 @@ Keep it concise and actionable.`,
 5. **Time-of-day waste**: If data available, any dayparting opportunities?
 
 For each issue found, provide the specific fix (negative keyword, pause, bid adjustment) and estimated savings.`,
+  },
+  {
+    id: 'ai-overviews-exposure',
+    label: 'AI Overviews Exposure Check',
+    icon: '🔮',
+    category: 'analyze',
+    needsCampaign: true,
+    description: 'Find AIO-triggering queries dragging CTR and build an SEO citation-target list',
+    suggestedModel: 'opus',
+    prompt: `AI Overviews (AIO) exposure check for "{campaign}". Informational immigration queries ("Panama residency requirements", "Greece golden visa cost") trigger AI Overviews most, which compresses paid CTR and inflates CPC.
+
+1. **Identify likely-AIO-triggering queries** in this campaign's search terms — the informational / research-stage terms (requirements, cost, how-to, eligibility, timeline) versus commercial / bottom-funnel terms (consultant, apply, "invest in", program name + intent). Split the terms into likely-AIO vs commercial.
+
+2. **Check CTR drift**: compare CTR (and CPC if available) on the likely-AIO informational terms vs the commercial terms over a recent window. Quantify the gap. Per the research, AIO-present paid CTR is recovering (14.64%→16.21%, Jan'25→Feb'26) but still sits below non-AIO CTR — so look for RELATIVE drag, not collapse.
+
+3. **Build a citation-target list for the SEO channel**: the terms where AIO hurts most are where an organic AIO *citation* would help most — brand cited in the AIO is associated with **~+91% paid CTR** (Seer, Q3 2025 — cite as reported, not as a guarantee). Output the ranked list of query themes to hand to seo-supreme-agent as citation targets.
+
+Output: the AIO-vs-commercial term split with CTR/CPC comparison, a recommendation to shift budget toward higher-intent terms where AIO drags, and the SEO citation-target list. This is analysis + a cross-lane handoff, not an ads change.`,
   },
 
   // ── Optimize ───────────────────────────────────────────
@@ -197,6 +232,44 @@ Show me the proposals before making changes.`,
 6. Compare current CPA to what a different strategy might achieve
 
 RESPECT THE PHASE RULES — if in learning phase, recommend patience not changes.`,
+  },
+  {
+    id: 'value-based-bidding-gate',
+    label: 'Value-Based Bidding Gate',
+    icon: '💰',
+    category: 'optimize',
+    description: 'Which campaigns clear the volume floor for value bidding, and how to stage the switch',
+    suggestedModel: 'opus',
+    prompt: `Account-wide value-based-bidding (VBB) gate check. VBB teaches Smart Bidding to optimize for lead QUALITY, not raw volume — the single biggest quality lever for this account — but it has a hard volume floor and a value-signal prerequisite.
+
+1. **Volume gate**: for each campaign, pull conversions over the last 30 days. The practical floor for value bidding is **~30 conv/30d** (tROAS technically needs ≥15, but practitioners want 30-50). List which campaigns clear it and which don't.
+
+2. **For campaigns that clear the floor**: assess lead-stage value feasibility. CRM stages exist (MQL / SQL / consult-booked / deal) but there is **no value feed wired yet**. State what it would take to push lead-stage values via GCLID offline import (which, since 2026-06-15, must go through the Data Manager API — not the Ads API). Recommend the staging: start on **tCPA**, seed value data for the full 4-week / 3-conversion-cycle window, then move to **Max-Conv-Value / tROAS**. Recommend tCPA vs tROAS per campaign with rationale.
+
+3. **For campaigns BELOW the floor**: give an explicit "not yet" verdict — state the current 30-day conversion count, the exact number of additional conversions needed to reach ~30, and keep them on tCPA / Max-Conv until they get there. VBB below the floor fails; do not recommend it.
+
+Output a table: Campaign | 30d conv | Clears floor? | Value feed feasible? | Recommended strategy | Verdict. No changes without my approval.`,
+  },
+  {
+    id: 'match-type-mix-review',
+    label: 'Match-Type Mix Review',
+    icon: '🎚️',
+    category: 'optimize',
+    needsCampaign: true,
+    description: 'Audit the broad/phrase/exact keyword split against real conversion signals',
+    suggestedModel: 'opus',
+    prompt: `Match-type mix review for "{campaign}". The evidence conflicts — Optmyzr's 30k-account Feb-2026 study finds phrase match dominates lead-gen and broad "loses its footing" without conversion-value signals, while Search Engine Land argues to drop phrase entirely — so resolve it with THIS campaign's data, not doctrine.
+
+1. **Audit the current split**: pull all keywords and break down spend / clicks / conversions / CPA by match type (broad vs phrase vs exact). Output a table.
+
+2. **Apply the conditional rule:**
+   - **Broad match is only defensible when Smart Bidding is receiving a value/quality signal** (offline lead-value data feeding the bid strategy). If this campaign has no value feed, broad match is likely leaking spend.
+   - **Phrase match is the lead-gen workhorse** otherwise — the default for controlled intent capture here.
+   - **Exact match** for tight control on core RBI terms.
+
+3. **Decide on evidence**: does the account data support the doctrine or contradict it for this campaign? Where broad match runs without a value signal AND underperforms, recommend pulling it back to phrase. Where phrase carries conversions efficiently, leave it. Cite the actual CPA/conversion numbers behind every call — account evidence over doctrine.
+
+Output: the match-type table, a per-match-type verdict, and specific keyword moves (with match types) for my approval before anything changes.`,
   },
 
   // ── Audit ──────────────────────────────────────────────
@@ -325,7 +398,74 @@ Flag any ad groups with only 1 RSA (Google recommends at least 2-3 for testing).
 4. Show estimated impact for each (if available)
 
 Do NOT auto-apply any recommendations. Present them for my review first.
-For the ones I approve, use recommendation__apply_recommendation to apply them.`,
+For the ones I approve, use recommendation__apply_recommendation to apply them.
+
+STANDING ACCOUNT RULES (non-negotiable):
+- This is a **read-only pass** by default — apply NOTHING without campaign-specific evidence that it helps THIS campaign's goals.
+- **Verify the Recommendations → Auto-apply toggles are ALL OFF** every single time you run this. On 2026-07-25 auto-apply silently changed this account, so confirm every auto-apply category is disabled and report that state BEFORE evaluating anything else.`,
+  },
+  {
+    id: 'ai-max-readiness',
+    label: 'AI Max Readiness Audit',
+    icon: '🤖',
+    category: 'audit',
+    description: 'Flag Sept 2026 AI Max auto-upgrade exposure and set compliance fences before opting in',
+    suggestedModel: 'opus',
+    prompt: `Account-wide AI Max readiness audit. AI Max for Search has been GA since April 2026, and from **Sept 2026 any campaign already using automatically-created assets OR campaign-level broad match auto-upgrades to AI Max**. Get ahead of it, don't get flipped blind.
+
+1. **Inventory exposure**: using MCP/GAQL, list every Search campaign and flag which have:
+   - Automatically-created assets ON (asset auto-creation setting)
+   - Campaign-level broad match keywords
+   These are the campaigns that auto-upgrade in Sept 2026. Output a table: Campaign | Auto-created assets | Broad match present | Sept-2026 auto-upgrade exposure (Y/N).
+
+2. **Model the opt-in decision** for this lead-gen account at ~$60 CPA. Google's own aggregate claims AI Max delivers ~7% more conversions/value at similar CPA — treat that as UNVERIFIED for lead-gen (it is not a lead-gen-specific figure). Weigh the real risks: Final URL expansion sending traffic to the wrong page (a blog post instead of the consult LP) and text customization rewriting claims, against the reach upside. Judge on CRM-scored lead quality, not Google's conversion count.
+
+3. **REQUIRED fences before ANY opt-in** — do NOT recommend opting a campaign in until all three are in place:
+   - **AI Brief / brand guidelines set**: matching + messaging guidelines that lock compliance-critical claims in plain language.
+   - **URL exclusions / Final URL Expansion disclaimers**: so traffic cannot land on off-brief pages and required legal text always renders.
+   - **Immigration-policy constraint**: NO citizenship or guaranteed-approval claims. Any AI-rewritten headline/description MUST be reviewed for policy before it can serve — this account has real disapproval history, and under the July 2026 TOS auto-generated text is legally your liability.
+
+Output: the exposure table, a per-campaign recommendation (opt in now / fence first / stay out), and the exact AI Brief guidelines to set. Recommend NOTHING be flipped without my approval.`,
+  },
+  {
+    id: 'measurement-pipeline-health',
+    label: 'Measurement Pipeline Health',
+    icon: '🩺',
+    category: 'audit',
+    description: 'Verify conversions, consent-mode signals, and the June 2026 Data Manager API migration',
+    suggestedModel: 'opus',
+    prompt: `Account-wide measurement pipeline health check. Since 2026-06-15 the measurement plumbing changed materially — verify nothing has silently broken.
+
+1. **Conversion actions recording vs expected**: list every conversion action (name, ID, category, counting, status) via a GAQL query on \`conversion_action\`. For each primary action, compare recent conversion volume to its baseline and flag any that have gone quiet — a silent stop = starved Smart Bidding.
+
+2. **Consent Mode / ad_storage**: since 2026-06-15, \`ad_storage\` is the SINGLE Consent Mode control for Ads↔Analytics data flow (Google Signals no longer governs ad-data sharing). Confirm \`ad_storage\` + \`ad_user_data\` signals fire (Enhanced Conversions for Leads needs \`ad_user_data\`). Re-check remarketing audience sizes for post-June shrinkage.
+
+3. **Enhanced Conversions status**: confirm Enhanced Conversions (web + leads are now a single on/off switch) is enabled and healthy.
+
+4. **Offline import path**: NOTE — as of 2026-06-15, offline conversion import + Enhanced Conversions for Leads are live behind the **Data Manager API** and are BLOCKED in the Google Ads API. This account is GCLID-based offline import — the exact pipeline that moved. Any planned CRM offline upload MUST target the Data Manager API, not the Ads API. Confirm current uploads still land after 2026-06-15; if the path still points at the old Ads-API endpoint, that is a P0.
+
+Output: a status line per check (OK / degraded / broken), the specific fix for anything broken, and which item is most urgent.`,
+  },
+  {
+    id: 'deprecation-calendar-check',
+    label: 'Deprecation Calendar Check',
+    icon: '📅',
+    category: 'audit',
+    description: 'Scan the account against the Google Ads sunset calendar and assign actions with dates',
+    suggestedModel: 'sonnet',
+    prompt: `Scan this account against the current Google Ads deprecation / sunset calendar and produce an owned action list.
+
+**Verify the current dates first** — these move; do a quick web search to confirm before you rely on them. As of the Aug 2026 digest the UPCOMING ones are:
+- **Sept 2026** — auto-upgrade to AI Max for campaigns using auto-created assets + campaign-level broad match
+- **Feb 2027** — Dynamic Search Ads sunset + DSA auto-upgrade to AI Max
+(Already passed, for context: Google Ads API v20 retired 2026-06-10; measurement/consent changes 2026-06-15; automation-authority TOS 2026-07-01.)
+
+For each UPCOMING item:
+1. Check whether this account is actually affected (does it have auto-created assets / campaign-level broad match / DSA campaigns?).
+2. State the required action.
+3. Assign an owner (me / GTM Specialist / seo-supreme-agent) and a do-by date working back from the sunset.
+
+Output a table: Date | Event | Affected here? | Required action | Owner | Do-by. Skip items the account is not exposed to and say so explicitly.`,
   },
 
   // ── Conversion & GTM ───────────────────────────────────
@@ -571,31 +711,27 @@ CRITICAL: Output structured data wrapped in <!-- STRUCTURED_DATA_START --> and <
 Save the full analysis to campaign memory after completion.`,
   },
   {
-    id: 'ad-strength-optimizer',
-    label: 'Ad Strength → Excellent',
-    icon: '⭐',
+    id: 'asset-diversity-review',
+    label: 'Asset Diversity Review',
+    icon: '🎨',
     category: 'optimize',
     needsCampaign: true,
-    description: 'Optimize ad strength to "Excellent" rating with 15 headlines + 4 descriptions',
+    description: 'Fill genuine RSA coverage gaps — without chasing the Ad Strength label',
     suggestedModel: 'opus',
-    prompt: `As the CRO Specialist, optimize all ads in "{campaign}" to achieve "Excellent" ad strength rating:
+    prompt: `Asset diversity review for "{campaign}". The goal is genuine message coverage, NOT the Ad Strength meter.
 
-REQUIREMENTS for Excellent rating:
-- 15 distinct, varied headlines (different angles, benefits, features)
-- 4 distinct descriptions (full 90-char usage)
-- Main keywords in at least 3 headlines
-- No near-duplicates (Google penalizes similarity)
-- Mix of: benefit-driven, feature-driven, urgency, trust, CTA-focused
+**Read this first — do NOT chase "Excellent":** Optmyzr's 1M-ad study found ads rated *Average* often outperformed *Excellent* on CPA/ROAS, and shorter headlines frequently won. Ad Strength is a guide, not a KPI. So: never pad a headline to hit a character count, never add near-duplicate assets just to fill slots, and never sacrifice a proven short headline to lift the label.
 
 WORKFLOW:
-1. Pull current ads in this campaign
-2. Audit each ad: count headlines, descriptions, identify duplicates and weak ones
-3. Check landing page promises (run quick analysis or read existing CRO notes)
-4. Generate replacement headlines/descriptions that match landing page value prop
-5. Suggest which headlines to pin (position 1) for compliance/branding
-6. Show before/after comparison with expected ad strength improvement
+1. Pull every RSA in the campaign — list headlines and descriptions per ad group.
+2. Find the GENUINE gaps (not label gaps):
+   - **Empty slots**: ad groups with fewer than 2-3 RSAs, or RSAs leaving distinct-angle capacity unused
+   - **Missing angles**: map current headlines to value props (eligibility, timeline, process simplicity, trust/track-record, cost clarity) and show which angles are uncovered
+   - **Near-duplicates**: headlines that say the same thing — flag to merge/differentiate (they dilute testing), not to keep for volume
+3. Cross-check against the landing page value prop so new assets match the page — and stay compliant (NO citizenship or guaranteed-approval claims).
+4. Propose replacement/additional headlines and descriptions ONLY where they close a real coverage gap or land a genuinely stronger angle. For each, state which gap it fills.
 
-Save findings to campaign memory.`,
+Output: current coverage map, gaps found, and proposed assets with the gap each one closes. Show before/after for my approval. Do NOT report an Ad Strength target as the objective. Save findings to campaign memory.`,
   },
   {
     id: 'competitor-landing-pages',
@@ -661,6 +797,23 @@ Format as a clean, client-ready report in markdown.`,
 7. **Next Month Plan**: Strategic recommendations and priority actions
 
 Format as a professional report.`,
+  },
+  {
+    id: 'benchmark-reality-check',
+    label: 'Benchmark Reality Check',
+    icon: '📐',
+    category: 'report',
+    description: 'Compare account CPC/CPA against the honest vertical benchmark (Legal), not retail',
+    suggestedModel: 'sonnet',
+    prompt: `Benchmark reality check across the account. Compare each campaign's CPC and CPA against the honest vertical comp — NOT the cross-industry average.
+
+**The comp for immigration / RBI lead-gen is Legal Services** (2026 reports): **~$6.75 CPC / ~$127 CPA**. Context: cross-industry CPC is up **+12% YoY**, so flat budgets buy ~12% fewer clicks than a year ago — bake that into the read.
+
+1. Pull each campaign's current CPC and CPA (last 30 days).
+2. For each, give a verdict vs the Legal benchmark: **competitive** (at/below ~$6.75 CPC / ~$127 CPA), **watch**, or **expensive for the vertical** (well above).
+3. **Important reframe**: this is a ~$300K-product business — a defensible CPA target for a high-ticket RBI lead differs from the vertical median. A $200-400 CPA on a genuinely qualified consult can be fine; a $127 CPA on junk leads is not. So pair each verdict with a note on whether lead quality justifies the cost, and flag high-CPA + low-quality campaigns as the real problems (VBB candidates), not high-CPA-but-qualified ones.
+
+Output a table: Campaign | CPC | CPA | vs Legal benchmark | Verdict | Quality note. Keep the +12% CPC inflation context in the summary. Client-ready markdown.`,
   },
 ];
 
