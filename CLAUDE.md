@@ -65,3 +65,13 @@ Decouples *capture the change* (cheap, always) from *rewrite the spec* (batched)
 ## Production safety
 
 This agent's MCP is wired into Wassim's Claude Code globally. Restarting the backend (`uvicorn` etc.) does NOT auto-reload `.env` — only `.py` files. Token/config changes require manual restart.
+
+
+## Known traps
+
+One line per incident: what bit us (date · source) → the correct action. A new incident adds a line here (rule: incidents become guardrails, 2026-10-03).
+
+- **Windows host = environment, not code** (www-pc2 parity check, 2026-10-03; www-pc2 is this agent's always-on host): `C:\Program Files\Git\bin` must be first in PATH (a bare `bash` is the WSL launcher → `bash ~/.claude/hooks/*.sh` and stdio MCP servers break); over SSH the default shell is cmd → run `"C:\Program Files\Git\bin\bash.exe" -s < script`; a hook/guard error there is an environment gap to fix on the machine, never a bypass invitation.
+- **Symlinks check out as text files on Windows** (meta-ads vendor skills, 2026-10-03: `core.symlinks=false`): the tracked symlink `data/guidelines/7178239091` needs Developer Mode + `git config core.symlinks true` + a re-checkout; never replace it with a copy.
+- **A refusal is the gate working** (meta-ads pipeline, 2026-10-03: bot-token 401 on merge, "pipelines must succeed" blocking): an approval-gate refusal or a 401/permission error on a write path → report and stop at "awaiting Wassim"; never retry with another identity, widen scope, or route around it (auto-apply stays killed, 2026-07-28).
+- **Dependency pins are coupled** (meta-ads META-3, 2026-10-03: Trivy CRITICAL/HIGH bumps): fastapi pins a starlette range (here fastapi 0.135.3 ↔ starlette 1.0.0 in `backend/uv.lock`) — CVE bumps go to the **minimal fixed version**, coupled pins move together (`uv lock --upgrade-package <pkg>`), no unrelated majors.
